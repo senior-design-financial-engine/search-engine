@@ -1,6 +1,35 @@
 # search-engine
 BU ECE Capstone Project: an effective financial search engine
 
+### Project Structure
+
+```
+search-engine/
+├── README.md
+├── LICENSE
+├── requirements.txt
+├── models/
+|    ├── trained/
+│    |   └── embedding_model.pth
+|    └── train_embedding_model.py
+└── src/
+    ├── __init__.py
+    ├── backend/
+    │   ├── __init__.py
+    │   ├── backend.py
+    │   ├── web_scraper.py
+    │   ├── indexer.py
+    │   └── engine.py
+    ├── frontend/
+    │   ├── __init__.py
+    │   └── frontend.py
+    ├── utils/
+    │   ├── __init__.py
+    │   └── helpers.py
+    └── main.py
+
+```
+
 
 ### API Flowchart/Diagram
 ```mermaid
