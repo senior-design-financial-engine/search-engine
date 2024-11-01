@@ -21,8 +21,7 @@ search-engine/
     │   ├── indexer.py
     │   └── engine.py
     ├── frontend/
-    │   ├── __init__.py
-    │   └── frontend.py
+    │   ├── frontend.js
     ├── utils/
     │   ├── __init__.py
     │   └── helpers.py
