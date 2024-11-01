@@ -6,8 +6,6 @@ BU ECE Capstone Project: an effective financial search engine
 ```mermaid
 classDiagram
 
-    classDef external fill:#f9f
-
     class SiteAPIs:::external {
         External API(s)
     }
