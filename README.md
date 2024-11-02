@@ -23,7 +23,7 @@ search-engine/
     │       ├── DataValidator.py
     │       ├── Engine.py
     │       |── EngineConfig.py
-            └── StorageManager.py  
+    |       └── StorageManager.py  
     ├── frontend/
     │   ├── frontend.js
     ├── utils/
