@@ -1,7 +1,7 @@
 from elasticsearch import Elasticsearch
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import yfinance as yf  # For stock symbol validation
 from decimal import Decimal
 
@@ -289,6 +289,619 @@ class FinancialNewsEngine:
         }
         
         return self.es.search(index=self.index_name, body=body)
+
+    def get_sentiment_trends(self, ticker, time_range='30d'):
+        """
+        Analyze sentiment trends for a specific company over time
+        Returns daily sentiment scores and volume of mentions
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"companies.ticker": ticker.upper()}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{time_range}"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "sentiment_over_time": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": "day",
+                    "min_doc_count": 0
+                },
+                "aggs": {
+                    "avg_sentiment": {"avg": {"field": "sentiment_score"}},
+                    "article_count": {"value_count": {"field": "headline"}}
+                }
+            }
+        }
+        
+        result = self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 0,
+                "aggs": aggs
+            }
+        )
+        
+        return result['aggregations']['sentiment_over_time']['buckets']
+
+    def get_source_distribution(self, timeframe='7d', min_articles=5):
+        """
+        Analyze distribution of news articles across different sources
+        Returns sources ranked by volume and their sentiment metrics
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "sources": {
+                "terms": {
+                    "field": "source",
+                    "size": 20,
+                    "min_doc_count": min_articles
+                },
+                "aggs": {
+                    "avg_sentiment_deviation": {
+                        "avg": {
+                            "script": {
+                                "source": "Math.abs(doc['sentiment_score'].value)"
+                            }
+                        }
+                    },
+                    "categories": {
+                        "terms": {
+                            "field": "categories",
+                            "size": 5
+                        }
+                    }
+                }
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 0,
+                "aggs": aggs
+            }
+        )
+
+    def get_regional_activity(self, timeframe='7d', include_categories=True):
+        """
+        Get news distribution and trends across different regions
+        Returns regional activity metrics and top stories by region
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "regions": {
+                "terms": {
+                    "field": "regions",
+                    "size": 20
+                },
+                "aggs": {
+                    "daily_volume": {
+                        "date_histogram": {
+                            "field": "published_at",
+                            "calendar_interval": "day"
+                        }
+                    },
+                    "categories": {
+                        "terms": {
+                            "field": "categories",
+                            "size": 5
+                        }
+                    } if include_categories else {},
+                    "avg_sentiment": {
+                        "avg": {
+                            "field": "sentiment_score"
+                        }
+                    }
+                }
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 0,
+                "aggs": aggs
+            }
+        )
+
+    def get_volume_spikes(self, threshold=2.0, timeframe='30d'):
+        """
+        Identify periods of unusually high news volume
+        Returns time periods with abnormal news activity
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "hourly_volume": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": "hour"
+                },
+                "aggs": {
+                    "categories": {
+                        "terms": {
+                            "field": "categories",
+                            "size": 5
+                        }
+                    },
+                    "companies": {
+                        "terms": {
+                            "field": "companies.ticker",
+                            "size": 5
+                        }
+                    }
+                }
+            }
+        }
+        
+        result = self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 0,
+                "aggs": aggs
+            }
+        )
+        
+        # Calculate average volume and identify spikes
+        volumes = [bucket['doc_count'] for bucket in result['aggregations']['hourly_volume']['buckets']]
+        avg_volume = sum(volumes) / len(volumes)
+        
+        spikes = [
+            {
+                'timestamp': bucket['key_as_string'],
+                'volume': bucket['doc_count'],
+                'categories': [cat['key'] for cat in bucket['categories']['buckets']],
+                'companies': [comp['key'] for comp in bucket['companies']['buckets']]
+            }
+            for bucket in result['aggregations']['hourly_volume']['buckets']
+            if bucket['doc_count'] > avg_volume * threshold
+        ]
+        
+        return {
+            'average_volume': avg_volume,
+            'threshold': threshold,
+            'spikes': spikes
+        }
+
+    def get_correlation_matrix(self, tickers, timeframe='30d'):
+        """
+        Generate a correlation matrix between companies based on news co-occurrence
+        Returns matrix of correlation scores
+        """
+        correlations = {}
+        
+        for ticker1 in tickers:
+            correlations[ticker1] = {}
+            
+            for ticker2 in tickers:
+                if ticker1 != ticker2:
+                    query = {
+                        "bool": {
+                            "must": [
+                                {"range": {
+                                    "published_at": {
+                                        "gte": f"now-{timeframe}"
+                                    }
+                                }},
+                                {"terms": {
+                                    "companies.ticker": [ticker1, ticker2]
+                                }}
+                            ]
+                        }
+                    }
+                    
+                    # Count articles mentioning both companies
+                    joint_count = self.es.count(
+                        index=self.index_name,
+                        body={"query": query}
+                    )['count']
+                    
+                    # Count articles mentioning each company individually
+                    count1 = self.es.count(
+                        index=self.index_name,
+                        body={
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {"term": {"companies.ticker": ticker1}},
+                                        {"range": {"published_at": {"gte": f"now-{timeframe}"}}}
+                                    ]
+                                }
+                            }
+                        }
+                    )['count']
+                    
+                    count2 = self.es.count(
+                        index=self.index_name,
+                        body={
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {"term": {"companies.ticker": ticker2}},
+                                        {"range": {"published_at": {"gte": f"now-{timeframe}"}}}
+                                    ]
+                                }
+                            }
+                        }
+                    )['count']
+                    
+                    # Calculate correlation score
+                    if count1 > 0 and count2 > 0:
+                        correlation = joint_count / ((count1 * count2) ** 0.5)
+                    else:
+                        correlation = 0
+                    
+                    correlations[ticker1][ticker2] = round(correlation, 3)
+                
+                else:
+                    correlations[ticker1][ticker2] = 1.0
+        
+        return correlations
+
+    def get_category_evolution(self, category, timeframe='90d', interval='1d'):
+        """
+        Track how a news category evolves over time
+        Returns temporal analysis of category volume and related topics
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"categories": category}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "timeline": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": interval
+                },
+                "aggs": {
+                    "top_companies": {
+                        "terms": {
+                            "field": "companies.ticker",
+                            "size": 5
+                        }
+                    },
+                    "related_categories": {
+                        "terms": {
+                            "field": "categories",
+                            "size": 5,
+                            "exclude": [category]
+                        }
+                    },
+                    "avg_sentiment": {
+                        "avg": {
+                            "field": "sentiment_score"
+                        }
+                    }
+                }
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 0,
+                "aggs": aggs
+            }
+        )
+
+    def get_stock_price_mentions(self, ticker, timeframe='30d'):
+        """
+        Find news articles mentioning specific stock price levels
+        Returns articles with price mentions and sentiment context
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"companies.ticker": ticker.upper()}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }},
+                    {
+                        "exists": {
+                            "field": "financial_metrics.price_change"
+                        }
+                    }
+                ]
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "sort": [{"published_at": "desc"}],
+                "_source": [
+                    "headline",
+                    "published_at",
+                    "financial_metrics",
+                    "sentiment",
+                    "sentiment_score"
+                ],
+                "size": 100
+            }
+        )
+
+    def get_stock_momentum_signals(self, ticker, timeframe='7d', sentiment_threshold=0.6):
+        """
+        Analyze news momentum signals for a stock
+        Returns aggregated sentiment and volume metrics
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"companies.ticker": ticker.upper()}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "hourly_signals": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": "hour"
+                },
+                "aggs": {
+                    "avg_sentiment": {
+                        "avg": {"field": "sentiment_score"}
+                    },
+                    "strong_signals": {
+                        "filter": {
+                            "range": {
+                                "sentiment_score": {
+                                    "abs": sentiment_threshold
+                                }
+                            }
+                        }
+                    },
+                    "categories": {
+                        "terms": {"field": "categories"}
+                    }
+                }
+            },
+            "overall_stats": {
+                "stats": {"field": "sentiment_score"}
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 0,
+                "aggs": aggs
+            }
+        )
+
+    def get_earnings_coverage(self, ticker, quarters=4):
+        """
+        Retrieve and analyze earnings-related news coverage
+        Returns articles and sentiment around earnings events
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"companies.ticker": ticker.upper()}},
+                    {"terms": {"categories": ["earnings", "financial-results"]}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{quarters * 90}d"
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "quarterly_coverage": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": "quarter"
+                },
+                "aggs": {
+                    "sentiment_stats": {
+                        "stats": {"field": "sentiment_score"}
+                    },
+                    "source_breakdown": {
+                        "terms": {"field": "source"}
+                    },
+                    "key_metrics": {
+                        "stats": {"field": "financial_metrics.price_change"}
+                    }
+                }
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 20,
+                "sort": [{"published_at": "desc"}],
+                "aggs": aggs
+            }
+        )
+
+    def get_institutional_activity(self, ticker, timeframe='90d'):
+        """
+        Track news mentions of institutional investor activity
+        Returns coverage of institutional trading, holdings, and ratings
+        """
+        institutional_keywords = [
+            "institutional", "hedge fund", "mutual fund",
+            "analyst rating", "price target", "upgrade",
+            "downgrade", "stake", "position", "holdings"
+        ]
+        
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"companies.ticker": ticker.upper()}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }},
+                    {
+                        "multi_match": {
+                            "query": " ".join(institutional_keywords),
+                            "fields": ["headline", "content"],
+                            "minimum_should_match": "1"
+                        }
+                    }
+                ]
+            }
+        }
+        
+        aggs = {
+            "activity_timeline": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": "week"
+                },
+                "aggs": {
+                    "sentiment_avg": {
+                        "avg": {"field": "sentiment_score"}
+                    },
+                    "sources": {
+                        "terms": {"field": "source"}
+                    }
+                }
+            },
+            "activity_types": {
+                "terms": {
+                    "field": "categories",
+                    "size": 10
+                }
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 50,
+                "sort": [{"published_at": "desc"}],
+                "aggs": aggs
+            }
+        )
+
+    def get_stock_volatility_news(self, ticker, volatility_threshold=2.0, timeframe='180d'):
+        """
+        Find news coverage during periods of high stock volatility
+        Returns news articles during volatile periods
+        """
+        query = {
+            "bool": {
+                "must": [
+                    {"term": {"companies.ticker": ticker.upper()}},
+                    {"range": {
+                        "published_at": {
+                            "gte": f"now-{timeframe}"
+                        }
+                    }},
+                    {"range": {
+                        "financial_metrics.price_change": {
+                            "abs": volatility_threshold
+                        }
+                    }}
+                ]
+            }
+        }
+        
+        aggs = {
+            "volatility_periods": {
+                "date_histogram": {
+                    "field": "published_at",
+                    "calendar_interval": "day"
+                },
+                "aggs": {
+                    "avg_price_change": {
+                        "avg": {"field": "financial_metrics.price_change"}
+                    },
+                    "volume_stats": {
+                        "stats": {"field": "financial_metrics.volume"}
+                    },
+                    "categories": {
+                        "terms": {"field": "categories"}
+                    }
+                }
+            }
+        }
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": query,
+                "size": 50,
+                "sort": [
+                    {"financial_metrics.price_change": "desc"},
+                    {"published_at": "desc"}
+                ],
+                "aggs": aggs
+            }
+        )
 
 # Usage example
 if __name__ == "__main__":
