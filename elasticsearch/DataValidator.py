@@ -15,3 +15,4 @@ class DataValidator:
                 return bool(stock.info)
             return False
         except:
+            return False
