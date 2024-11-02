@@ -62,4 +62,15 @@ class StorageManager:
                 "source": {
                     "type": "keyword"  # news source
                 },
-              
+                "author": {
+                    "type": "keyword"
+                },
+                "published_at": {
+                    "type": "date"
+                },
+                "updated_at": {
+                    "type": "date"
+                }
+            }
+        }
+    
