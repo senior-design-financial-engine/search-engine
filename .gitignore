@@ -161,5 +161,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-elasticsearch/api_key.json
 .DS_Store
+
+src/backend/elasticsearch/api_key.json
