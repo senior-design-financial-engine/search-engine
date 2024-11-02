@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 elasticsearch/credentials-e995a6-2024-Oct-29--22_25_53.csv
 elasticsearch/api_key.json
+elasticsearch/.DS_Store
