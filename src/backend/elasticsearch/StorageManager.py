@@ -1,4 +1,4 @@
-import EngineConfig
+from .EngineConfig import EngineConfig
 from elasticsearch import Elasticsearch
 from typing import Dict
 
