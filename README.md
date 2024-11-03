@@ -57,11 +57,17 @@ classDiagram
         +add_article(article: Dict)
         +search_news(query_text, filters, time_range)
         +get_trending_topics(timeframe)
-        +get_sentiment_trends(ticker)
-        +get_source_distribution(timeframe)
-        +get_volume_spikes(threshold)
-        +get_correlation_matrix(tickers)
-        +get_institutional_activity(ticker)
+        +get_sentiment_trends(ticker, time_range)
+        +get_source_distribution(timeframe, min_articles)
+        +get_volume_spikes(threshold, timeframe)
+        +get_correlation_matrix(tickers, timeframe)
+        +get_category_evolution(category, timeframe, interval)
+        +get_stock_price_mentions(ticker, timeframe)
+        +get_stock_momentum_signals(ticker, timeframe, sentiment_threshold)
+        +get_regional_activity(timeframe, include_categories)
+        +get_earnings_coverage(ticker, quarters)
+        +get_institutional_activity(ticker, timeframe)
+        +get_stock_volatility_news(ticker, volatility_threshold, timeframe)
     }
 
     class EngineConfig {
