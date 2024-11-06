@@ -1,0 +1,26 @@
+.container {
+    text-align: center;
+    margin-top: 50px;
+  }
+  .input {
+    width: 300px;
+    padding: 10px;
+    margin: 10px;
+  }
+  .button {
+    padding: 10px 20px;
+    margin: 10px;
+  }
+  .advancedQuery {
+    margin-top: 20px;
+  }
+  .queryRow {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+  }
+  .queryInput {
+    margin: 0 5px;
+    padding: 10px;
+    width: 150px;
+  }
