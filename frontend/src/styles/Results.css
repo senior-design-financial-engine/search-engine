@@ -1,0 +1,13 @@
+/* src/styles/Results.css */
+.container {
+    text-align: center;
+    margin-top: 50px;
+  }
+  .resultItem {
+    border: 1px solid #ddd;
+    margin: 10px;
+    padding: 10px;
+  }
+  .pagination {
+    margin-top: 20px;
+  }
