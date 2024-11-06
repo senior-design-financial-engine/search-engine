@@ -1,19 +1,17 @@
-// Home.js
+// src/components/Home.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './../styles/Home.css'
+import './../styles/Home.css';
 
 function Home() {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
-
   const handleSearch = (e) => {
     e.preventDefault();
     navigate(`/results?query=${query}`);
   };
-
   return (
-    <div style={styles.container}>
+    <div className="container">
       <h1>Financial Search Engine</h1>
       <form onSubmit={handleSearch}>
         <input
@@ -21,33 +19,23 @@ function Home() {
           placeholder="Enter your search query"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          style={styles.input}
+          className="input"
         />
-        <button type="submit" style={styles.button}>Search</button>
+        <button type="submit" className="button">Search</button>
       </form>
-
-      <div style={styles.advancedQuery}>
+      <div className="advancedQuery">
         <h2>Advanced Query</h2>
-        <div style={styles.queryRow}>
-          <input type="text" placeholder="Criterion" style={styles.queryInput} />
-          <input type="text" placeholder="Value" style={styles.queryInput} />
+        <div className="queryRow">
+          <input type="text" placeholder="Criterion" className="queryInput" />
+          <input type="text" placeholder="Value" className="queryInput" />
         </div>
-        <div style={styles.queryRow}>
-          <input type="text" placeholder="Criterion" style={styles.queryInput} />
-          <input type="text" placeholder="Value" style={styles.queryInput} />
+        <div className="queryRow">
+          <input type="text" placeholder="Criterion" className="queryInput" />
+          <input type="text" placeholder="Value" className="queryInput" />
         </div>
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: { textAlign: 'center', marginTop: '50px' },
-  input: { width: '300px', padding: '10px', margin: '10px' },
-  button: { padding: '10px 20px', margin: '10px' },
-  advancedQuery: { marginTop: '20px' },
-  queryRow: { display: 'flex', justifyContent: 'center', margin: '10px 0' },
-  queryInput: { margin: '0 5px', padding: '10px', width: '150px' }
-};
 
 export default Home;

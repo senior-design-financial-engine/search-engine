@@ -12,24 +12,25 @@ search-engine/
 |    ├── trained/
 │    |   └── embedding_model.pth
 |    └── train_embedding_model.py
-└── src/
-    ├── __init__.py
-    ├── backend/
-    │   ├── __init__.py
-    │   ├── backend.py
-    │   ├── web_scraper.py
-    │   ├── indexer.py
-    │   └── elasticsearch/
-    │       ├── DataValidator.py
-    │       ├── Engine.py
-    │       |── EngineConfig.py
-    |       └── StorageManager.py  
-    ├── frontend/
-    │   ├── frontend.js
-    ├── utils/
-    │   ├── __init__.py
-    │   └── helpers.py
-    └── main.py
+|
+├── backend/
+│   ├── __init__.py
+│   ├── backend.py
+│   ├── web_scraper.py
+│   ├── indexer.py
+│   └── elasticsearch/
+│       ├── DataValidator.py
+│       ├── Engine.py
+│       |── EngineConfig.py
+|       └── StorageManager.py  
+|
+├── frontend/
+│   └── ... react stuff ...
+|
+├── utils/
+│   ├── __init__.py
+│   └── helpers.py
+└── main.py
 
 ```
 
