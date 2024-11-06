@@ -19,7 +19,11 @@ search-engine/
     │   ├── backend.py
     │   ├── web_scraper.py
     │   ├── indexer.py
-    │   └── engine.py
+    │   └── elasticsearch/
+    │       ├── DataValidator.py
+    │       ├── Engine.py
+    │       |── EngineConfig.py
+            └── StorageManager.py  
     ├── frontend/
     │   ├── frontend.js
     ├── utils/
