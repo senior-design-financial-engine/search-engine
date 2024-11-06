@@ -161,8 +161,7 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# Created by https://www.toptal.com/developers/gitignore/api/react,node
-# Edit at https://www.toptal.com/developers/gitignore?templates=react,node
+ww.toptal.com/developers/gitignore?templates=react,node
 
 ### Node ###
 # Logs
@@ -318,3 +317,7 @@ thumb
 sketch
 
 # End of https://www.toptal.com/developers/gitignore/api/react,node
+=======
+.DS_Store
+
+src/backend/elasticsearch/api_key.json
