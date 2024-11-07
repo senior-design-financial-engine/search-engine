@@ -136,3 +136,71 @@ classDiagram
     note for FrontEnd "User interface and\nvisualization"
 
 ```
+
+### Data Flow Diagram
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Backend
+    participant E as Engine
+    participant ML as ML Processing
+    participant ES as Elasticsearch
+    participant S as Scraper
+    participant N as News Sources
+
+    U->>F: Enter Search Query
+    F->>B: Send Query Request
+    B->>E: Process Query
+    
+    par Data Collection
+        E->>ES: Search Indexed Data
+        S->>N: Fetch Latest News
+        S->>ES: Update Index
+    end
+    
+    E->>ML: Analyze Sentiment
+    ML->>E: Return Analysis
+    
+    E->>B: Aggregated Results
+    B->>F: Formatted Response
+    F->>U: Display Results
+    
+    Note over U,N: Real-time updates maintain data freshness
+```
+
+### Search Process Flow
+```mermaid
+stateDiagram-v2
+    [*] --> QueryInput: User enters search
+    
+    QueryInput --> QueryProcessing: Submit query
+    
+    state QueryProcessing {
+        [*] --> TextAnalysis
+        TextAnalysis --> FilterApplication
+        FilterApplication --> RelevanceScoring
+        RelevanceScoring --> ResultsAggregation
+        ResultsAggregation --> [*]
+    }
+    
+    QueryProcessing --> MLEnrichment: Process results
+    
+    state MLEnrichment {
+        [*] --> SentimentAnalysis
+        SentimentAnalysis --> Summarization
+        Summarization --> CategoryTagging
+        CategoryTagging --> [*]
+    }
+    
+    MLEnrichment --> ResultsDisplay: Show results
+    
+    state ResultsDisplay {
+        [*] --> RankResults
+        RankResults --> ApplyHighlighting
+        ApplyHighlighting --> AddMetadata
+        AddMetadata --> [*]
+    }
+    
+    ResultsDisplay --> [*]: Display to user
+```
