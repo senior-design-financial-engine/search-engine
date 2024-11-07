@@ -34,7 +34,6 @@ search-engine/
 
 ```
 
-
 ### Microservices Diagram
 ```mermaid
 classDiagram
@@ -114,6 +113,33 @@ classDiagram
 
 ```
 
+### Data Flow Diagram
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Engine
+    participant ElasticSearch
+    participant DataValidator
+    participant StorageManager
+
+    User->>Frontend: Enter search query
+    Frontend->>Backend: POST /query
+    Backend->>Engine: process_search_query()
+    
+    Engine->>DataValidator: Validate parameters
+    Engine->>StorageManager: Access index
+    StorageManager->>ElasticSearch: Execute search
+    
+    ElasticSearch-->>StorageManager: Return results
+    StorageManager-->>Engine: Process results
+    Engine-->>Backend: Return formatted results
+    Backend-->>Frontend: JSON response
+    Frontend-->>User: Display results
+
+```
+
 ### Search Process Diagram
 ```mermaid
 stateDiagram-v2
@@ -155,100 +181,4 @@ stateDiagram-v2
     }
     
     Display --> [*]: Display to user
-
-```
-
-### Data Flow Diagram
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Backend
-    participant Engine
-    participant ElasticSearch
-    participant DataValidator
-    participant StorageManager
-
-    User->>Frontend: Enter search query
-    Frontend->>Backend: POST /query
-    Backend->>Engine: process_search_query()
-    
-    Engine->>DataValidator: Validate parameters
-    Engine->>StorageManager: Access index
-    StorageManager->>ElasticSearch: Execute search
-    
-    ElasticSearch-->>StorageManager: Return results
-    StorageManager-->>Engine: Process results
-    Engine-->>Backend: Return formatted results
-    Backend-->>Frontend: JSON response
-    Frontend-->>User: Display results
-
-```
-
-### Data Flow Diagram
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant B as Backend
-    participant E as Engine
-    participant ML as ML Processing
-    participant ES as Elasticsearch
-    participant S as Scraper
-    participant N as News Sources
-
-    U->>F: Enter Search Query
-    F->>B: Send Query Request
-    B->>E: Process Query
-    
-    par Data Collection
-        E->>ES: Search Indexed Data
-        S->>N: Fetch Latest News
-        S->>ES: Update Index
-    end
-    
-    E->>ML: Analyze Sentiment
-    ML->>E: Return Analysis
-    
-    E->>B: Aggregated Results
-    B->>F: Formatted Response
-    F->>U: Display Results
-    
-    Note over U,N: Real-time updates maintain data freshness
-```
-
-### Search Process Flow
-```mermaid
-stateDiagram-v2
-    [*] --> QueryInput: User enters search
-    
-    QueryInput --> QueryProcessing: Submit query
-    
-    state QueryProcessing {
-        [*] --> TextAnalysis
-        TextAnalysis --> FilterApplication
-        FilterApplication --> RelevanceScoring
-        RelevanceScoring --> ResultsAggregation
-        ResultsAggregation --> [*]
-    }
-    
-    QueryProcessing --> MLEnrichment: Process results
-    
-    state MLEnrichment {
-        [*] --> SentimentAnalysis
-        SentimentAnalysis --> Summarization
-        Summarization --> CategoryTagging
-        CategoryTagging --> [*]
-    }
-    
-    MLEnrichment --> ResultsDisplay: Show results
-    
-    state ResultsDisplay {
-        [*] --> RankResults
-        RankResults --> ApplyHighlighting
-        ApplyHighlighting --> AddMetadata
-        AddMetadata --> [*]
-    }
-    
-    ResultsDisplay --> [*]: Display to user
 ```
