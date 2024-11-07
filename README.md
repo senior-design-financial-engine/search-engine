@@ -1,184 +1,125 @@
-# search-engine
-BU ECE Capstone Project: an effective financial search engine
+# Financial News Engine
 
-### Project Structure
+## Overview
+The Financial News Engine is an open-source, customizable search platform designed to provide real-time financial news aggregation and analysis. The system aims to democratize access to financial information by offering a free alternative to expensive terminals while incorporating advanced machine learning capabilities for enhanced news processing and analysis.
 
-```
-search-engine/
-├── README.md
-├── LICENSE
-├── requirements.txt
-├── models/
-|    ├── trained/
-│    |   └── embedding_model.pth
-|    └── train_embedding_model.py
-|
-├── backend/
-│   ├── __init__.py
-│   ├── backend.py
-│   ├── web_scraper.py
-│   ├── indexer.py
-│   └── elasticsearch/
-│       ├── DataValidator.py
-│       ├── Engine.py
-│       |── EngineConfig.py
-|       └── StorageManager.py  
-|
-├── frontend/
-│   └── ... react stuff ...
-|
-├── utils/
-│   ├── __init__.py
-│   └── helpers.py
-└── main.py
+## Project Status
+Currently in development by Team 14 at Boston University's Electrical & Computer Engineering department as part of the EC463/EC464 Capstone Senior Design Project.
 
-```
+## Key Features
 
-### Microservices Diagram
-```mermaid
-classDiagram
-    class Engine {
-        +config: EngineConfig
-        +validator: DataValidator
-        +storage: StorageManager
-        +es: Elasticsearch
-        +add_article(article: Dict)
-        +search_news(query_text, filters, time_range)
-        +get_trending_topics(timeframe)
-        +get_sentiment_trends(ticker, time_range)
-        +get_source_distribution(timeframe, min_articles)
-        +get_correlation_matrix(tickers, timeframe)
-        +get_regional_activity(timeframe)
-        +get_earnings_coverage(ticker, quarters)
-        +get_stock_momentum_signals(ticker, timeframe)
-        -_build_search_query()
-    }
+### Real-Time News Aggregation
+- Continuous web crawling of diverse financial news sources
+- Real-time indexing with updates within 3 minutes of publication
+- Support for multiple news categories and regions
 
-    class EngineConfig {
-        +api_key: str
-        +elasticsearch_url: str
-        +index_name: str
-        +index_settings: Dict
-        +validate_config()
-        -_get_default_settings()
-    }
+### Advanced Search Capabilities
+- Full-text search across headlines, summaries, and content
+- Filtering by companies, categories, regions, and time ranges
+- Customizable news feeds based on user portfolios and preferences
+- Response time under 500ms for standard queries
 
-    class DataValidator {
-        +validate_article(article: Dict)
-        +validate_company_data(company: Dict)
-    }
+### Machine Learning Integration
+- Automated sentiment analysis with 80% accuracy
+- Article summarization (≤ 100 words per article)
+- Trending topic identification
+- Category evolution tracking
 
-    class StorageManager {
-        +config: EngineConfig
-        +es: Elasticsearch
-        +index_name: str
-        +create_index()
-        -_get_index_mappings()
-    }
+### Analytics Features
+- Stock price mention tracking
+- Institutional activity monitoring
+- Volatility analysis
+- Regional news distribution analysis
+- Company correlation analysis
+- Earnings coverage tracking
 
-    class BackEnd {
-        +web_scraper: WebScraper
-        +indexer: Indexer
-        +engine: Engine
-        +process_search_query()
-        +update_index()
-    }
+## Technical Architecture
 
-    class WebScraper {
-        +scrape_news()
-        +process_content()
-    }
+### Frontend (React.js)
+- Responsive web interface
+- Customizable dashboard layouts
+- Real-time updates
+- Advanced query interface
+- Interactive visualization components
 
-    class Indexer {
-        +embedding_model
-        +num_dim: int
-        +score_and_rank()
-    }
+### Backend (Python/Flask)
+- RESTful API architecture
+- Elasticsearch integration
+- Scalable cloud infrastructure
+- Real-time data processing pipeline
 
-    class FrontEnd {
-        +Home
-        +Results
-        +SearchForm
-        +ResultsList
-    }
+### Core Components
+1. **Web Crawler**
+   - Recursive website scraping
+   - Source validation
+   - Content extraction and cleaning
 
-    Engine --> EngineConfig : Uses
-    Engine --> DataValidator : Uses
-    Engine --> StorageManager : Uses
-    StorageManager --> EngineConfig : Uses
-    BackEnd --> Engine : Uses
-    BackEnd --> WebScraper : Uses
-    BackEnd --> Indexer : Uses
-    FrontEnd --> BackEnd : Makes API calls
+2. **Indexer**
+   - Document processing
+   - Metadata extraction
+   - Real-time index updates
 
-```
+3. **Search Engine**
+   - Query processing
+   - Relevance scoring
+   - Result ranking
+   - Aggregation pipeline
 
-### Data Flow Diagram
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant Backend
-    participant Engine
-    participant ElasticSearch
-    participant DataValidator
-    participant StorageManager
+4. **Storage Layer**
+   - Elasticsearch backend
+   - Distributed architecture
+   - High availability setup
+   - Data validation
 
-    User->>Frontend: Enter search query
-    Frontend->>Backend: POST /query
-    Backend->>Engine: process_search_query()
-    
-    Engine->>DataValidator: Validate parameters
-    Engine->>StorageManager: Access index
-    StorageManager->>ElasticSearch: Execute search
-    
-    ElasticSearch-->>StorageManager: Return results
-    StorageManager-->>Engine: Process results
-    Engine-->>Backend: Return formatted results
-    Backend-->>Frontend: JSON response
-    Frontend-->>User: Display results
+## System Requirements
 
-```
+### Performance Metrics
+- News indexing within 3 minutes of publication
+- Search query response time < 500ms
+- Support for 10,000+ concurrent requests
+- High availability with 3 shards and 2 replicas
 
-### Search Process Diagram
-```mermaid
-stateDiagram-v2
-    [*] --> QueryInput: User enters search
-    
-    QueryInput --> QueryValidation: Submit query
-    
-    state QueryValidation {
-        [*] --> ValidateParams
-        ValidateParams --> BuildQuery
-        BuildQuery --> [*]
-    }
-    
-    QueryValidation --> DataRetrieval: Process query
-    
-    state DataRetrieval {
-        [*] --> ElasticsearchSearch
-        ElasticsearchSearch --> ApplyFilters
-        ApplyFilters --> TimeRangeFilter
-        TimeRangeFilter --> [*]
-    }
-    
-    DataRetrieval --> ResultsProcessing: Enrich results
-    
-    state ResultsProcessing {
-        [*] --> RankResults
-        RankResults --> ExtractHighlights
-        ExtractHighlights --> AggregateMetrics
-        AggregateMetrics --> [*]
-    }
-    
-    ResultsProcessing --> Display: Show results
-    
-    state Display {
-        [*] --> RenderList
-        RenderList --> ShowPagination
-        ShowPagination --> EnableFilters
-        EnableFilters --> [*]
-    }
-    
-    Display --> [*]: Display to user
-```
+### Technical Dependencies
+- Python 3.x
+- Flask 3.0.0
+- Elasticsearch 8.11.0
+- React.js
+- Additional libraries:
+  - pandas 2.1.4
+  - numpy 1.26.2
+  - requests 2.31.0
+  - yfinance 0.2.36
+
+## Differentiators
+
+### vs. Bloomberg Terminal
+- Open-source and free access
+- Machine learning-enhanced search
+- Customizable interface
+- Focus on diverse news sources
+
+### vs. Yahoo Finance
+- Advanced filtering capabilities
+- Sentiment analysis
+- Real-time processing
+- Comprehensive API access
+
+## Target Users
+- Individual traders and investors
+- Financial professionals
+- Business owners
+- Market analysts
+- Anyone interested in financial markets
+
+## Development Constraints
+- Open-source requirement
+- Data privacy compliance
+- Development budget cap of $1,000
+- Real-time processing requirements
+
+## Future Enhancements
+- Extended machine learning capabilities
+- Additional data source integration
+- Enhanced visualization tools
+- Mobile application development
+- API ecosystem expansion
