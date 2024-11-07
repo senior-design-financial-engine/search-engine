@@ -6,10 +6,9 @@ from datetime import datetime
 
 
 class Engine:
-    def __init__(self, config_path: str = 'api_key.json') -> None:
+    def __init__(self) -> None:
         """Initialize the Engine with configuration and dependencies."""
-        self.config = EngineConfig(config_path)
-        self.config.load_config()
+        self.config = EngineConfig()
         
         self.validator = DataValidator()
         self.storage = StorageManager(self.config)

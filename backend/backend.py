@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from typing import Dict, Optional, List
-from web_scraper import WebScraper
+from scraper import WebScraper
 from indexer import Indexer
 from elasticsearch import Engine
 from dotenv import load_dotenv
