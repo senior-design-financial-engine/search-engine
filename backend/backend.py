@@ -1,21 +1,25 @@
 from flask import Flask, request, jsonify
 from web_scraper import WebScraper
 from indexer import Indexer
-from engine import Engine
-import torch
+from elasticsearch import Engine
+from dotenv import load_dotenv
+import os
 
 app = Flask(__name__)
 
 class BackEnd:
     def __init__(self, embedding_model_path: str, num_dim: int):
+        # Load environment variables
+        load_dotenv()
+        
+        # Initialize components
         self.web_scraper = WebScraper()
         self.indexer = Indexer(embedding_model_path, num_dim)
         self.engine = Engine()
-        self.elastic_search = None  # Placeholder for ElasticSearch integration
 
     def initialize_components(self):
-        # Initialize or load any necessary components
-        pass
+        # Validate configuration before starting
+        self.engine.config.validate_config()
 
     def process_query(self, query_str: str):
         # Process the query and return results
