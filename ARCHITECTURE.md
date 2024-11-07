@@ -6,30 +6,36 @@ BU ECE Capstone Project: an effective financial search engine
 ```
 search-engine/
 ├── README.md
+├── ARCHITECTURE.md
 ├── LICENSE
 ├── requirements.txt
+│
 ├── models/
-|    ├── trained/
-│    |   └── embedding_model.pth
-|    └── train_embedding_model.py
-|
+│   ├── trained/
+│   │   └── embedding_model.pth
+│   └── train_embedding_model.py
+│
 ├── backend/
 │   ├── __init__.py
 │   ├── backend.py
-│   ├── web_scraper.py
+│   ├── scraper/
+│   │   ├── __init__.py
+│   │   └── web_scraper.py
 │   ├── indexer.py
 │   └── elasticsearch/
+│       ├── __init__.py
 │       ├── DataValidator.py
 │       ├── Engine.py
-│       |── EngineConfig.py
-|       └── StorageManager.py  
-|
+│       ├── EngineConfig.py
+│       └── StorageManager.py
+│
 ├── frontend/
 │   └── ... react stuff ...
-|
+│
 ├── utils/
 │   ├── __init__.py
 │   └── helpers.py
+│
 └── main.py
 
 ```
