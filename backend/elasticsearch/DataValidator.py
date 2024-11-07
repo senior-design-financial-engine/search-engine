@@ -4,7 +4,7 @@ from typing import Dict
 class DataValidator:
     @staticmethod
     def validate_article(article: Dict) -> bool:
-        required_fields = ['headline', 'content', 'companies']
+        required_fields = ['headline', 'source', 'companies']
         return all(field in article for field in required_fields)
 
     @staticmethod
