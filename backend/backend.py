@@ -61,7 +61,7 @@ def query():
         results = backend.process_search_query(query_text, filters, time_range)
         return jsonify(results)
     except Exception as e:
-        logger.error(f"Search endpoint error: {str(e)}")
+        logger.error(f"Query endpoint error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.errorhandler(404)
