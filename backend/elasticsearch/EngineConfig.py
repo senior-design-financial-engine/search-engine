@@ -14,6 +14,10 @@ class EngineConfig:
             'https://f4e7b79a4d854dceaa351824e58f2065.us-east-2.aws.elastic-cloud.com:443'
         )
         self.index_name: str = os.getenv('ELASTICSEARCH_INDEX', 'financial_news')
+        
+        # Embedding configuration
+        self.embedding_dimensions: int = int(os.getenv('EMBEDDING_DIMENSIONS', '768'))
+        
         self.index_settings: Dict = self._get_default_settings()
 
     def validate_config(self) -> None:
@@ -24,8 +28,11 @@ class EngineConfig:
             raise ValueError("ELASTICSEARCH_URL environment variable is required")
         if not self.index_name:
             raise ValueError("ELASTICSEARCH_INDEX environment variable is required")
+        if self.embedding_dimensions <= 0:
+            raise ValueError("EMBEDDING_DIMENSIONS must be a positive integer")
 
     def _get_default_settings(self) -> Dict:
+        """Get default Elasticsearch index settings."""
         return {
             "number_of_shards": int(os.getenv('ES_NUMBER_OF_SHARDS', '3')),
             "number_of_replicas": int(os.getenv('ES_NUMBER_OF_REPLICAS', '2')),

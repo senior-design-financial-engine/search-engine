@@ -1,12 +1,13 @@
 from .EngineConfig import EngineConfig
 from elasticsearch import Elasticsearch
-from typing import Dict
+from typing import Dict, Optional, List, Union
+import numpy as np
 
 class StorageManager:
     def __init__(self, config: EngineConfig):
         self.config = config
         self.es = Elasticsearch(config.elasticsearch_url, api_key=config.api_key)
-        self.index_name = 'financial_news'
+        self.index_name = config.index_name
 
     def create_index(self) -> None:
         mappings = self._get_index_mappings()
@@ -16,7 +17,7 @@ class StorageManager:
         })
 
     def _get_index_mappings(self) -> Dict:
-    	return {
+        base_mappings = {
             "properties": {
                 "headline": {
                     "type": "text",
@@ -48,19 +49,19 @@ class StorageManager:
                     }
                 },
                 "categories": {
-                    "type": "keyword"  # e.g., earnings, mergers, crypto
+                    "type": "keyword"
                 },
                 "sentiment": {
-                    "type": "keyword"  # positive, negative, neutral
+                    "type": "keyword"
                 },
                 "sentiment_score": {
-                    "type": "float"    # numerical score -1 to 1
+                    "type": "float"
                 },
                 "regions": {
-                    "type": "keyword"  # geographical regions affected
+                    "type": "keyword"
                 },
                 "source": {
-                    "type": "keyword"  # news source
+                    "type": "keyword"
                 },
                 "author": {
                     "type": "keyword"
@@ -70,7 +71,14 @@ class StorageManager:
                 },
                 "updated_at": {
                     "type": "date"
+                },
+                # Add embeddings field with dynamic dimensions
+                "embeddings": {
+                    "type": "dense_vector",
+                    "dims": self.config.embedding_dimensions,
+                    "index": True,
+                    "similarity": "cosine"
                 }
             }
         }
-    
+        return base_mappings
