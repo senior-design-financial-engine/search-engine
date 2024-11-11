@@ -1,27 +1,86 @@
-# Class: Engine
+# Engine Module
 
 ## Initialization
 ```python
-engine = Engine(config_path: str = 'api_key.json')
+engine = Engine()
 ```
-- `config_path`: Path to configuration file
+Initializes the engine with default configuration from environment variables.
 
-## Methods
+## Core Features
 
 ### Article Management
+
 ```python
-def add_article(article: Dict) -> bool
+def add_article(
+    article: Dict,
+    embeddings: Optional[Union[List[float], np.ndarray]] = None,
+    custom_id: Optional[str] = None
+) -> str
 ```
-Adds a new article to the index with validation.
+Adds a new article with optional embeddings vector.
 - **Arguments**:
   - `article`: Dictionary containing article data with required fields:
     - `headline`: Article headline
-    - `content`: Article content
-    - `published_at` (optional): Publication datetime
-    - `companies` (optional): List of company data
-- **Returns**: Boolean indicating success
+    - `source`: News source
+    - `companies`: List of company data
+    - Additional optional fields: content, summary, categories, sentiment, regions, etc.
+  - `embeddings`: Optional pre-computed embeddings vector
+  - `custom_id`: Optional custom identifier
+- **Returns**: Article ID
 
-### Search and Retrieval
+```python
+def batch_add_articles(
+    articles: List[Dict],
+    embeddings_list: Optional[List[Union[List[float], np.ndarray]]] = None,
+    custom_ids: Optional[List[str]] = None
+) -> List[str]
+```
+Adds multiple articles in batch with their embeddings.
+- **Returns**: List of added article IDs
+
+### Similarity Search
+
+```python
+def search_by_id(
+    article_id: str,
+    k: int = 5,
+    min_score: float = 0.7,
+    additional_filters: Optional[Dict] = None,
+    exclude_self: bool = True
+) -> Dict
+```
+Finds similar articles using embeddings of a reference article.
+- **Arguments**:
+  - `article_id`: ID of the reference article
+  - `k`: Number of similar articles to return
+  - `min_score`: Minimum similarity score threshold
+  - `additional_filters`: Optional query filters
+  - `exclude_self`: Whether to exclude reference article
+- **Returns**: Search results with similarity scores
+
+```python
+def search_by_vector(
+    embedding_vector: Union[List[float], np.ndarray],
+    k: int = 5,
+    min_score: float = 0.7,
+    additional_filters: Optional[Dict] = None
+) -> Dict
+```
+Searches for articles similar to a given embedding vector.
+- **Returns**: Search results with similarity scores
+
+```python
+def bulk_search_by_ids(
+    article_ids: List[str],
+    k: int = 5,
+    min_score: float = 0.7,
+    additional_filters: Optional[Dict] = None
+) -> Dict[str, Dict]
+```
+Performs similarity search for multiple articles.
+- **Returns**: Dictionary mapping article IDs to search results
+
+### Text Search and Filtering
 
 ```python
 def search_news(
@@ -30,7 +89,7 @@ def search_news(
     time_range: Optional[Dict] = None
 ) -> Dict
 ```
-Performs advanced search for financial news.
+Performs advanced search with text matching and filters.
 - **Arguments**:
   - `query_text`: Search text to match against articles
   - `filters`: Dictionary of filters:
@@ -38,9 +97,7 @@ Performs advanced search for financial news.
     - `categories`: List of news categories
     - `sentiment`: Sentiment value
     - `regions`: List of regions
-  - `time_range`: Dictionary with keys:
-    - `start`: Start datetime
-    - `end`: End datetime
+  - `time_range`: Dictionary with start/end dates
 - **Returns**: Search results with highlights and aggregations
 
 ### Trend Analysis
@@ -51,16 +108,13 @@ def get_trending_topics(timeframe: str = "1d") -> Dict
 Retrieves trending financial topics.
 - **Arguments**:
   - `timeframe`: Time period ("1d", "1w", "1m")
-- **Returns**: Dictionary with popular categories and company mentions
+- **Returns**: Popular categories and company mentions
 
 ```python
 def get_sentiment_trends(ticker: str, time_range: str = '30d') -> List[Dict]
 ```
 Analyzes sentiment trends for a company.
-- **Arguments**:
-  - `ticker`: Company stock ticker symbol
-  - `time_range`: Time period for analysis
-- **Returns**: List of daily sentiment metrics
+- **Returns**: Daily sentiment metrics
 
 ### Source Analysis
 
@@ -71,10 +125,7 @@ def get_source_distribution(
 ) -> Dict
 ```
 Analyzes news distribution across sources.
-- **Arguments**:
-  - `timeframe`: Time period to analyze
-  - `min_articles`: Minimum articles required for inclusion
-- **Returns**: Source distribution metrics
+- **Returns**: Source distribution with sentiment and category breakdowns
 
 ### Volume Analysis
 
@@ -85,12 +136,9 @@ def get_volume_spikes(
 ) -> Dict
 ```
 Identifies periods of high news volume.
-- **Arguments**:
-  - `threshold`: Multiple of average volume to consider as spike
-  - `timeframe`: Time period to analyze
-- **Returns**: Dictionary with volume analysis and spike information
+- **Returns**: Volume analysis with spike information
 
-### Correlation Analysis
+### Company Analysis
 
 ```python
 def get_correlation_matrix(
@@ -98,13 +146,38 @@ def get_correlation_matrix(
     timeframe: str = '30d'
 ) -> Dict
 ```
-Generates correlation matrix between companies.
-- **Arguments**:
-  - `tickers`: List of company ticker symbols
-  - `timeframe`: Time period for analysis
+Generates correlation matrix between companies based on news co-occurrence.
 - **Returns**: Matrix of correlation scores
 
-### Category Analysis
+```python
+def get_earnings_coverage(
+    ticker: str,
+    quarters: int = 4
+) -> Dict
+```
+Analyzes earnings-related news coverage.
+- **Returns**: Quarterly coverage analysis with sentiment and source breakdown
+
+```python
+def get_institutional_activity(
+    ticker: str,
+    timeframe: str = '90d'
+) -> Dict
+```
+Tracks institutional investor activity mentions.
+- **Returns**: Activity timeline with sentiment and source analysis
+
+```python
+def get_stock_volatility_news(
+    ticker: str,
+    volatility_threshold: float = 2.0,
+    timeframe: str = '180d'
+) -> Dict
+```
+Finds news coverage during periods of high stock volatility.
+- **Returns**: Volatility analysis with related news
+
+### Category and Regional Analysis
 
 ```python
 def get_category_evolution(
@@ -114,41 +187,7 @@ def get_category_evolution(
 ) -> Dict
 ```
 Tracks category evolution over time.
-- **Arguments**:
-  - `category`: Category to analyze
-  - `timeframe`: Time period for analysis
-  - `interval`: Time interval for aggregation
-- **Returns**: Category evolution metrics
-
-### Stock Analysis
-
-```python
-def get_stock_price_mentions(
-    ticker: str,
-    timeframe: str = '30d'
-) -> Dict
-```
-Finds articles mentioning stock prices.
-- **Arguments**:
-  - `ticker`: Company stock ticker symbol
-  - `timeframe`: Time period to analyze
-- **Returns**: Articles with price mentions
-
-```python
-def get_stock_momentum_signals(
-    ticker: str,
-    timeframe: str = '7d',
-    sentiment_threshold: float = 0.6
-) -> Dict
-```
-Analyzes news momentum signals.
-- **Arguments**:
-  - `ticker`: Company stock ticker symbol
-  - `timeframe`: Time period to analyze
-  - `sentiment_threshold`: Threshold for significant sentiment
-- **Returns**: Momentum signal analysis
-
-### Regional Analysis
+- **Returns**: Category trends with company and sentiment analysis
 
 ```python
 def get_regional_activity(
@@ -157,67 +196,56 @@ def get_regional_activity(
 ) -> Dict
 ```
 Analyzes news distribution across regions.
-- **Arguments**:
-  - `timeframe`: Time period to analyze
-  - `include_categories`: Whether to include category analysis
-- **Returns**: Regional activity analysis
+- **Returns**: Regional activity with volume and sentiment metrics
 
-### Earnings Analysis
+## Configuration
 
-```python
-def get_earnings_coverage(
-    ticker: str,
-    quarters: int = 4
-) -> Dict
-```
-Analyzes earnings-related news coverage.
-- **Arguments**:
-  - `ticker`: Company stock ticker symbol
-  - `quarters`: Number of quarters to analyze
-- **Returns**: Earnings coverage analysis
+The engine uses environment variables for configuration:
+- `ELASTICSEARCH_API_KEY`: Required API key for Elasticsearch
+- `ELASTICSEARCH_URL`: Elasticsearch endpoint URL
+- `ELASTICSEARCH_INDEX`: Index name (default: 'financial_news')
+- `EMBEDDING_DIMENSIONS`: Dimension of embedding vectors (default: 768)
+- `ES_NUMBER_OF_SHARDS`: Number of index shards (default: 3)
+- `ES_NUMBER_OF_REPLICAS`: Number of index replicas (default: 2)
 
-### Institutional Activity
+## Data Types and Formats
 
-```python
-def get_institutional_activity(
-    ticker: str,
-    timeframe: str = '90d'
-) -> Dict
-```
-Tracks institutional investor activity mentions.
-- **Arguments**:
-  - `ticker`: Company stock ticker symbol
-  - `timeframe`: Time period to analyze
-- **Returns**: Institutional activity analysis
+### Article Schema
+Required fields:
+- `headline`: str
+- `source`: str
+- `companies`: List[Dict]
 
-### Volatility Analysis
+Optional fields:
+- `content`: str
+- `summary`: str
+- `categories`: List[str]
+- `sentiment`: str
+- `sentiment_score`: float
+- `regions`: List[str]
+- `author`: str
+- `published_at`: datetime
+- `embeddings`: List[float]
+- `financial_metrics`: Dict
 
-```python
-def get_stock_volatility_news(
-    ticker: str,
-    volatility_threshold: float = 2.0,
-    timeframe: str = '180d'
-) -> Dict
-```
-Finds news during volatile periods.
-- **Arguments**:
-  - `ticker`: Company stock ticker symbol
-  - `volatility_threshold`: Threshold for considering price movement volatile
-  - `timeframe`: Time period to analyze
-- **Returns**: Volatility analysis and related news
-
-# Common Parameters
-
-## Time Formats
-- Standard time periods: '1d', '7d', '30d', '90d', '180d'
+### Time Formats
+- Standard periods: '1d', '7d', '30d', '90d', '180d'
 - Date format: 'YYYY-MM-DD'
 - DateTime format: 'YYYY-MM-DD HH:mm:ss'
 
-## Ticker Symbols
-- Always provided in uppercase (e.g., 'AAPL', 'MSFT')
-- The engine will automatically convert to uppercase if needed
+### Company Data
+- Ticker symbols: Uppercase (e.g., 'AAPL', 'MSFT')
+- Company dictionary format:
+  ```python
+  {
+      "name": str,
+      "ticker": str,
+      "exchange": str
+  }
+  ```
 
-## Thresholds
-- Sentiment threshold: Float between -1.0 and 1.0
-- Volatility threshold: Typically 1.0 to 5.0, representing standard deviations
-- Volume threshold: Typically 1.5 to 3.0, representing multiples of average volume
+### Thresholds
+- Similarity score: 0.0 to 1.0 (default: 0.7)
+- Sentiment: -1.0 to 1.0
+- Volatility: 1.0 to 5.0 (standard deviations)
+- Volume: 1.5 to 3.0 (multiples of average)
