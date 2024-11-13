@@ -1,137 +1,125 @@
-# search-engine
-BU ECE Capstone Project: an effective financial search engine
+# Financial News Engine
 
-### Project Structure
+## Overview
+The Financial News Engine is an open-source, customizable search platform designed to provide real-time financial news aggregation and analysis. The system aims to democratize access to financial information by offering a free alternative to expensive terminals while incorporating advanced machine learning capabilities for enhanced news processing and analysis.
 
-```
-search-engine/
-├── README.md
-├── LICENSE
-├── requirements.txt
-├── models/
-|    ├── trained/
-│    |   └── embedding_model.pth
-|    └── train_embedding_model.py
-└── src/
-    ├── __init__.py
-    ├── backend/
-    │   ├── __init__.py
-    │   ├── backend.py
-    │   ├── web_scraper.py
-    │   ├── indexer.py
-    │   └── elasticsearch/
-    │       ├── DataValidator.py
-    │       ├── Engine.py
-    │       |── EngineConfig.py
-    |       └── StorageManager.py  
-    ├── frontend/
-    │   ├── frontend.js
-    ├── utils/
-    │   ├── __init__.py
-    │   └── helpers.py
-    └── main.py
+## Project Status
+Currently in development by Team 14 at Boston University's Electrical & Computer Engineering department as part of the EC463/EC464 Capstone Senior Design Project.
 
-```
+## Key Features
 
+### Real-Time News Aggregation
+- Continuous web crawling of diverse financial news sources
+- Real-time indexing with updates within 3 minutes of publication
+- Support for multiple news categories and regions
 
-### API Flowchart/Diagram
-```mermaid
-classDiagram
-    class SiteAPIs:::external {
-        External API(s)
-    }
-    
-    class WebScraper {
-        int num_pages
-        List[str] list_source_sites
-        crawl_web() ~List[JSON]~
-        clean_webpage(~JSON~ webpage_raw) ~str~
-        get_new_webpage() ~str~
-    }
+### Advanced Search Capabilities
+- Full-text search across headlines, summaries, and content
+- Filtering by companies, categories, regions, and time ranges
+- Customizable news feeds based on user portfolios and preferences
+- Response time under 500ms for standard queries
 
-    class Engine {
-        +config: EngineConfig
-        +validator: DataValidator
-        +storage: StorageManager
-        +es: Elasticsearch
-        +add_article(article: Dict)
-        +search_news(query_text, filters, time_range)
-        +get_trending_topics(timeframe)
-        +get_sentiment_trends(ticker, time_range)
-        +get_source_distribution(timeframe, min_articles)
-        +get_volume_spikes(threshold, timeframe)
-        +get_correlation_matrix(tickers, timeframe)
-        +get_category_evolution(category, timeframe, interval)
-        +get_stock_price_mentions(ticker, timeframe)
-        +get_stock_momentum_signals(ticker, timeframe, sentiment_threshold)
-        +get_regional_activity(timeframe, include_categories)
-        +get_earnings_coverage(ticker, quarters)
-        +get_institutional_activity(ticker, timeframe)
-        +get_stock_volatility_news(ticker, volatility_threshold, timeframe)
-    }
+### Machine Learning Integration
+- Automated sentiment analysis with 80% accuracy
+- Article summarization (≤ 100 words per article)
+- Trending topic identification
+- Category evolution tracking
 
-    class EngineConfig {
-        +config_path: str
-        +api_key: str
-        +elasticsearch_url: str
-        +index_settings: Dict
-        +load_config()
-        -get_default_settings()
-    }
+### Analytics Features
+- Stock price mention tracking
+- Institutional activity monitoring
+- Volatility analysis
+- Regional news distribution analysis
+- Company correlation analysis
+- Earnings coverage tracking
 
-    class DataValidator {
-        +validate_article(article: Dict)
-        +validate_company_data(company: Dict)
-    }
+## Technical Architecture
 
-    class StorageManager {
-        +config: EngineConfig
-        +es: Elasticsearch
-        +index_name: str
-        +create_index()
-        -get_index_mappings()
-    }
+### Frontend (React.js)
+- Responsive web interface
+- Customizable dashboard layouts
+- Real-time updates
+- Advanced query interface
+- Interactive visualization components
 
-    class BackEnd ["BackEnd (Python)"] {
-        WebScraper web_scraper
-        Engine engine
-        ElasticSearch elastic_search
-        +initialize_components()
-        +process_query(query) List[JSON] results
-        +update_index()
-    }
+### Backend (Python/Flask)
+- RESTful API architecture
+- Elasticsearch integration
+- Scalable cloud infrastructure
+- Real-time data processing pipeline
 
-    class FrontEnd["Frontend (React.js)"] {
-        str user_interface
-        +display_results(List[JSON] results)
-        +get_user_query() Query
-        +show_error(str message)
-    }
+### Core Components
+1. **Web Crawler**
+   - Recursive website scraping
+   - Source validation
+   - Content extraction and cleaning
 
-    class ElasticSearch:::external {
-        External API
-    }
+2. **Indexer**
+   - Document processing
+   - Metadata extraction
+   - Real-time index updates
 
-    class YFinance:::external {
-        External API
-    }
+3. **Search Engine**
+   - Query processing
+   - Relevance scoring
+   - Result ranking
+   - Aggregation pipeline
 
-    WebScraper <-- BackEnd : Uses
-    WebScraper --> SiteAPIs : Uses
-    Engine --> BackEnd : Uses
-    Engine --> ElasticSearch : Uses
-    BackEnd --> FrontEnd : Provides data
-    FrontEnd --> BackEnd : Sends queries
-    Engine --> EngineConfig : Uses
-    Engine --> DataValidator : Uses
-    Engine --> StorageManager : Uses
-    StorageManager --> EngineConfig : Uses
-    StorageManager -- ElasticSearch : Connects to
-    DataValidator -- YFinance : Validates with
+4. **Storage Layer**
+   - Elasticsearch backend
+   - Distributed architecture
+   - High availability setup
+   - Data validation
 
-    note for Engine "Orchestrates financial\ndata processing"
-    note for WebScraper "Collects news from\nvarious sources"
-    note for BackEnd "Coordinates system\ncomponents"
-    note for FrontEnd "User interface and\nvisualization"
+## System Requirements
 
-```
+### Performance Metrics
+- News indexing within 3 minutes of publication
+- Search query response time < 500ms
+- Support for 10,000+ concurrent requests
+- High availability with 3 shards and 2 replicas
+
+### Technical Dependencies
+- Python 3.x
+- Flask 3.0.0
+- Elasticsearch 8.11.0
+- React.js
+- Additional libraries:
+  - pandas 2.1.4
+  - numpy 1.26.2
+  - requests 2.31.0
+  - yfinance 0.2.36
+
+## Differentiators
+
+### vs. Bloomberg Terminal
+- Open-source and free access
+- Machine learning-enhanced search
+- Customizable interface
+- Focus on diverse news sources
+
+### vs. Yahoo Finance
+- Advanced filtering capabilities
+- Sentiment analysis
+- Real-time processing
+- Comprehensive API access
+
+## Target Users
+- Individual traders and investors
+- Financial professionals
+- Business owners
+- Market analysts
+- Anyone interested in financial markets
+
+## Development Constraints
+- Open-source requirement
+- Data privacy compliance
+- Development budget cap of $1,000
+- Real-time processing requirements
+
+## Future Enhancements
+- Extended machine learning capabilities
+- Additional data source integration
+- Enhanced visualization tools
+- Mobile application development
+- API ecosystem expansion

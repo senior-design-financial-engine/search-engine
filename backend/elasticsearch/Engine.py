@@ -1,16 +1,15 @@
+from datetime import datetime
+from typing import Dict, List, Optional, Union, Any
+import numpy as np
+import hashlib
 from .EngineConfig import EngineConfig
 from .StorageManager import StorageManager
 from .DataValidator import DataValidator
-from typing import Dict, List, Optional
-from datetime import datetime
-
 
 class Engine:
-    def __init__(self, config_path: str = 'api_key.json') -> None:
+    def __init__(self) -> None:
         """Initialize the Engine with configuration and dependencies."""
-        self.config = EngineConfig(config_path)
-        self.config.load_config()
-        
+        self.config = EngineConfig()
         self.validator = DataValidator()
         self.storage = StorageManager(self.config)
         self.es = self.storage.es
@@ -18,18 +17,72 @@ class Engine:
         
         self.storage.create_index()
 
-    def add_article(self, article: Dict) -> bool:
+    def _generate_article_id(self, article: Dict) -> str:
         """
-        Add a new article with validation.
+        Generate a deterministic ID for an article based on its content.
+        
+        Args:
+            article: Article dictionary
+            
+        Returns:
+            str: Unique article ID
+        """
+        unique_string = (
+            f"{article.get('headline', '')}"
+            f"{article.get('published_at', '')}"
+            f"{article.get('source', '')}"
+        )
+        return hashlib.sha256(unique_string.encode()).hexdigest()[:20]
+
+    def validate_embeddings(self, embeddings: Union[List[float], np.ndarray]) -> bool:
+        """
+        Validate that embeddings match the expected dimension.
+        
+        Args:
+            embeddings: Vector of embeddings
+            
+        Returns:
+            bool: True if embeddings are valid
+        """
+        if isinstance(embeddings, np.ndarray):
+            embeddings = embeddings.tolist()
+        
+        if not isinstance(embeddings, list):
+            return False
+            
+        if len(embeddings) != self.config.embedding_dimensions:
+            return False
+            
+        return all(isinstance(x, (int, float)) for x in embeddings)
+
+    def add_article(
+        self,
+        article: Dict,
+        embeddings: Optional[Union[List[float], np.ndarray]] = None,
+        custom_id: Optional[str] = None
+    ) -> str:
+        """
+        Add a new article with validation and external embeddings.
         
         Args:
             article: Dictionary containing article data
+            embeddings: Pre-computed embeddings vector for the article
+            custom_id: Optional custom ID for the article
             
         Returns:
-            bool: True if article was added successfully, False otherwise
+            str: ID of the added article
         """
         if not self.validator.validate_article(article):
-            return False
+            raise ValueError("Invalid article format")
+
+        if embeddings is not None:
+            if not self.validate_embeddings(embeddings):
+                raise ValueError(
+                    f"Embeddings must be a list or numpy array of {self.config.embedding_dimensions} dimensions"
+                )
+            if isinstance(embeddings, np.ndarray):
+                embeddings = embeddings.tolist()
+            article['embeddings'] = embeddings
 
         article['published_at'] = article.get('published_at', datetime.now())
         article['updated_at'] = datetime.now()
@@ -39,11 +92,209 @@ class Engine:
                 if not self.validator.validate_company_data(company):
                     return False
 
+        article_id = custom_id if custom_id else self._generate_article_id(article)
+        
         self.es.index(
             index=self.index_name,
+            id=article_id,
             body=article
         )
-        return True
+        return article_id
+
+    def get_article_by_id(self, article_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve an article by its ID.
+        
+        Args:
+            article_id: ID of the article to retrieve
+            
+        Returns:
+            Optional[Dict]: Article data if found, None otherwise
+        """
+        try:
+            result = self.es.get(
+                index=self.index_name,
+                id=article_id
+            )
+            return result['_source']
+        except:
+            return None
+
+    def search_by_id(
+        self,
+        article_id: str,
+        k: int = 5,
+        min_score: float = 0.7,
+        additional_filters: Optional[Dict] = None,
+        exclude_self: bool = True
+    ) -> Dict:
+        """
+        Search for similar articles using the embeddings of an article identified by ID.
+        
+        Args:
+            article_id: ID of the reference article
+            k: Number of similar articles to return
+            min_score: Minimum similarity score threshold
+            additional_filters: Optional additional query filters
+            exclude_self: Whether to exclude the reference article from results
+            
+        Returns:
+            Dict: Search results with similar articles
+        """
+        reference_article = self.get_article_by_id(article_id)
+        if not reference_article:
+            raise ValueError(f"Article with ID {article_id} not found")
+            
+        embeddings = reference_article.get('embeddings')
+        if not embeddings:
+            raise ValueError(f"Article with ID {article_id} has no embeddings")
+
+        query = {
+            "query": {
+                "script_score": {
+                    "query": {"match_all": {}},
+                    "script": {
+                        "source": "cosineSimilarity(params.query_vector, 'embeddings') + 1.0",
+                        "params": {"query_vector": embeddings}
+                    }
+                }
+            },
+            "min_score": min_score,
+            "size": k + (1 if exclude_self else 0)
+        }
+
+        if additional_filters or exclude_self:
+            must_not = []
+            if exclude_self:
+                must_not.append({"term": {"_id": article_id}})
+                
+            bool_query = {"bool": {}}
+            if additional_filters:
+                bool_query["bool"]["must"] = [additional_filters]
+            if must_not:
+                bool_query["bool"]["must_not"] = must_not
+                
+            query["query"]["script_score"]["query"] = bool_query
+
+        return self.es.search(index=self.index_name, body=query)
+
+    def search_by_vector(
+        self,
+        embedding_vector: Union[List[float], np.ndarray],
+        k: int = 5,
+        min_score: float = 0.7,
+        additional_filters: Optional[Dict] = None
+    ) -> Dict:
+        """
+        Search for articles similar to a given embedding vector.
+        
+        Args:
+            embedding_vector: Query embedding vector
+            k: Number of similar articles to return
+            min_score: Minimum similarity score threshold
+            additional_filters: Optional additional query filters
+            
+        Returns:
+            Dict containing search results
+        """
+        if not self.validate_embeddings(embedding_vector):
+            raise ValueError(
+                f"Query vector must have {self.config.embedding_dimensions} dimensions"
+            )
+            
+        if isinstance(embedding_vector, np.ndarray):
+            embedding_vector = embedding_vector.tolist()
+
+        query = {
+            "query": {
+                "script_score": {
+                    "query": {"match_all": {}},
+                    "script": {
+                        "source": "cosineSimilarity(params.query_vector, 'embeddings') + 1.0",
+                        "params": {"query_vector": embedding_vector}
+                    }
+                }
+            },
+            "min_score": min_score,
+            "size": k
+        }
+        
+        if additional_filters:
+            query["query"]["script_score"]["query"] = {
+                "bool": {
+                    "must": [
+                        {"match_all": {}},
+                        additional_filters
+                    ]
+                }
+            }
+        
+        return self.es.search(index=self.index_name, body=query)
+
+    def batch_add_articles(
+        self,
+        articles: List[Dict],
+        embeddings_list: Optional[List[Union[List[float], np.ndarray]]] = None,
+        custom_ids: Optional[List[str]] = None
+    ) -> List[str]:
+        """
+        Add multiple articles in batch with their embeddings.
+        
+        Args:
+            articles: List of article dictionaries
+            embeddings_list: Optional list of embedding vectors
+            custom_ids: Optional list of custom IDs
+            
+        Returns:
+            List[str]: List of added article IDs
+        """
+        if embeddings_list and len(articles) != len(embeddings_list):
+            raise ValueError("Number of articles must match number of embeddings")
+            
+        if custom_ids and len(articles) != len(custom_ids):
+            raise ValueError("Number of articles must match number of custom IDs")
+
+        article_ids = []
+        for i, article in enumerate(articles):
+            embeddings = embeddings_list[i] if embeddings_list else None
+            custom_id = custom_ids[i] if custom_ids else None
+            article_id = self.add_article(article, embeddings, custom_id)
+            article_ids.append(article_id)
+
+        return article_ids
+
+    def bulk_search_by_ids(
+        self,
+        article_ids: List[str],
+        k: int = 5,
+        min_score: float = 0.7,
+        additional_filters: Optional[Dict] = None
+    ) -> Dict[str, Dict]:
+        """
+        Perform similarity search for multiple articles by their IDs.
+        
+        Args:
+            article_ids: List of article IDs to search for
+            k: Number of similar articles to return per query
+            min_score: Minimum similarity score threshold
+            additional_filters: Optional additional query filters
+            
+        Returns:
+            Dict[str, Dict]: Dictionary mapping article IDs to their search results
+        """
+        results = {}
+        for article_id in article_ids:
+            try:
+                results[article_id] = self.search_by_id(
+                    article_id,
+                    k=k,
+                    min_score=min_score,
+                    additional_filters=additional_filters
+                )
+            except ValueError as e:
+                results[article_id] = {"error": str(e)}
+                
+        return results
 
     def search_news(
         self,
@@ -52,7 +303,7 @@ class Engine:
         time_range: Optional[Dict] = None
     ) -> Dict:
         """
-        Perform advanced search for financial news with multiple parameters.
+        Perform a text-based search with optional filters.
         
         Args:
             query_text: Optional text to search for
@@ -60,10 +311,89 @@ class Engine:
             time_range: Optional time range for filtering results
             
         Returns:
-            Dict containing search results and aggregations
+            Dict: Search results
         """
-        query = self._build_search_query(query_text, filters, time_range)
-        return self.es.search(index=self.index_name, body=query)
+        must_conditions = []
+        filter_conditions = []
+        
+        if query_text:
+            must_conditions.append({
+                "multi_match": {
+                    "query": query_text,
+                    "fields": [
+                        "headline^3",
+                        "summary^2",
+                        "content",
+                        "companies.name"
+                    ],
+                    "fuzziness": "AUTO"
+                }
+            })
+        
+        if filters:
+            if 'companies' in filters:
+                filter_conditions.append({
+                    "terms": {"companies.ticker": filters['companies']}
+                })
+            if 'categories' in filters:
+                filter_conditions.append({
+                    "terms": {"categories": filters['categories']}
+                })
+            if 'sentiment' in filters:
+                filter_conditions.append({
+                    "term": {"sentiment": filters['sentiment']}
+                })
+            if 'regions' in filters:
+                filter_conditions.append({
+                    "terms": {"regions": filters['regions']}
+                })
+        
+        if time_range:
+            filter_conditions.append({
+                "range": {
+                    "published_at": {
+                        "gte": time_range.get('start'),
+                        "lte": time_range.get('end')
+                    }
+                }
+            })
+        
+        return self.es.search(
+            index=self.index_name,
+            body={
+                "query": {
+                    "bool": {
+                        "must": must_conditions,
+                        "filter": filter_conditions
+                    }
+                },
+                "highlight": {
+                    "fields": {
+                        "headline": {},
+                        "summary": {},
+                        "content": {}
+                    }
+                },
+                "sort": [
+                    {"_score": {"order": "desc"}},
+                    {"published_at": {"order": "desc"}}
+                ],
+                "aggs": {
+                    "sentiment_distribution": {
+                        "terms": {"field": "sentiment"}
+                    },
+                    "category_distribution": {
+                        "terms": {"field": "categories"}
+                    },
+                    "publication_timeline": {
+                        "date_histogram": {
+                            "field": "published_at",
+                            "calendar_interval": "day"
+                        }
+                    }
+                }
+            }
+        )
 
     def get_trending_topics(self, timeframe: str = "1d") -> Dict:
         """
@@ -706,99 +1036,3 @@ class Engine:
                 "aggs": aggs
             }
         )
-
-    def _build_search_query(
-        self,
-        query_text: Optional[str],
-        filters: Optional[Dict],
-        time_range: Optional[Dict]
-    ) -> Dict:
-        """
-        Build Elasticsearch query from parameters.
-        
-        Args:
-            query_text: Optional text to search for
-            filters: Optional dictionary of filters to apply
-            time_range: Optional time range for filtering results
-            
-        Returns:
-            Dict containing complete Elasticsearch query
-        """
-        must_conditions = []
-        filter_conditions = []
-        
-        if query_text:
-            must_conditions.append({
-                "multi_match": {
-                    "query": query_text,
-                    "fields": [
-                        "headline^3",
-                        "summary^2",
-                        "content",
-                        "companies.name"
-                    ],
-                    "fuzziness": "AUTO"
-                }
-            })
-        
-        if filters:
-            if 'companies' in filters:
-                filter_conditions.append({
-                    "terms": {"companies.ticker": filters['companies']}
-                })
-            if 'categories' in filters:
-                filter_conditions.append({
-                    "terms": {"categories": filters['categories']}
-                })
-            if 'sentiment' in filters:
-                filter_conditions.append({
-                    "term": {"sentiment": filters['sentiment']}
-                })
-            if 'regions' in filters:
-                filter_conditions.append({
-                    "terms": {"regions": filters['regions']}
-                })
-        
-        if time_range:
-            filter_conditions.append({
-                "range": {
-                    "published_at": {
-                        "gte": time_range.get('start'),
-                        "lte": time_range.get('end')
-                    }
-                }
-            })
-        
-        return {
-            "query": {
-                "bool": {
-                    "must": must_conditions,
-                    "filter": filter_conditions
-                }
-            },
-            "highlight": {
-                "fields": {
-                    "headline": {},
-                    "summary": {},
-                    "content": {}
-                }
-            },
-            "sort": [
-                {"_score": {"order": "desc"}},
-                {"published_at": {"order": "desc"}}
-            ],
-            "aggs": {
-                "sentiment_distribution": {
-                    "terms": {"field": "sentiment"}
-                },
-                "category_distribution": {
-                    "terms": {"field": "categories"}
-                },
-                "publication_timeline": {
-                    "date_histogram": {
-                        "field": "published_at",
-                        "calendar_interval": "day"
-                    }
-                }
-            }
-        }
