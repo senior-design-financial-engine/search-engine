@@ -4,7 +4,13 @@ from scraper import WebScraper
 from indexer import Indexer
 from elasticsearch import Engine
 from dotenv import load_dotenv
-import os
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 app = Flask(__name__)
 
