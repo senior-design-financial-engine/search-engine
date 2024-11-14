@@ -53,7 +53,9 @@ class WebScraper:
         if not source_rules:
             raise ValueError(f"No parsing rules defined for source: {self.source}")
 
-        # Extract headline
+        for caption_div in soup.find_all('div', class_='credit-caption'):                    # Used specifically for NPR
+            caption_div.decompose()
+
         headline_rules = source_rules.get("headline", {})
         headline_tag = soup.find(
             headline_rules.get("tag"),
@@ -64,10 +66,8 @@ class WebScraper:
             headline_tag = soup.find("h1")
         headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
 
-        # Extract content
         content = ""
         if self.source == "bbc":
-            # For BBC, content is within divs with data-component="text-block"
             content_sections = soup.find_all(
                 source_rules['content'].get("tag"),
                 attrs={"data-component": source_rules['content'].get("data-component")}
@@ -77,7 +77,6 @@ class WebScraper:
                 for paragraph in paragraphs:
                     content += paragraph.get_text(" ", strip=True) + " "
         else:
-            # For other sources
             content_rules = source_rules.get("content", {})
             content_section = soup.find(
                 content_rules.get("tag"),
@@ -113,10 +112,18 @@ class WebScraper:
         return self.article_data
 
 def main():
-    url = "https://www.bbc.com/news/articles/c5yjnkgz0djo"  # Replace with your desired BBC article URL
-    scraper = WebScraper(url, "bbc")
+    url = "https://www.npr.org/2024/11/13/nx-s1-5188441/inflation-prices-trump-election"  
+    scraper = WebScraper(url, "npr")
     article_data = scraper.scrape()
-    print(json.dumps(article_data, indent=4, ensure_ascii=False))
+    #print(json.dumps(article_data, indent=4, ensure_ascii=False))
+
+    with open('article.json', 'r', encoding='utf-8') as f:
+        article_data = json.load(f)
+        
+    content = article_data['content']
+    print(content)
 
 if __name__ == "__main__":
     main()
+
+
