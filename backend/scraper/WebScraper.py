@@ -5,14 +5,14 @@ import json
 # Current news source application for clean JSON outputs
 # NPR
 # AP News
+# BBC
 
 # Future news sources to be worked on
-# Reurers
-# BBC
-# Bloomberg
+# Reurers (Might not allow scraping?)
+# Bloomberg (Paid service)
 # CNBC
 # Forbes
-# Wall Street Journal (This is a paid subscription)
+# Wall Street Journal (Paid service) 
 
 NEWS_SOURCES = {
     "npr": {
@@ -22,12 +22,16 @@ NEWS_SOURCES = {
     "ap_news": {
         "headline": {"tag": "h1", "class": "Page-headline"},
         "content": {"tag": "div", "class": "RichTextStoryBody"}
+    },
+    "bbc": {
+        "headline": {"tag": "h1"},
+        "content": {"tag": "div", "data-component": "text-block"}
     }
 }
 
 class WebScraper:
     def __init__(self, url: str, source: str):
-        """Initialize with the URL and news source type (e.g., 'npr', 'ap_news')."""
+        """Initialize with the URL and news source type (e.g., 'npr', 'ap_news', 'bbc')."""
         self.url = url
         self.source = source
         self.html_content = None
@@ -35,51 +39,60 @@ class WebScraper:
 
     def fetch_content(self):
         """Fetch the HTML content of the webpage."""
-        response = requests.get(self.url)
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(self.url, headers=headers)
         self.html_content = response.content
 
     def parse_content(self):
         """
-        Parse through the html contents based off source rules and return a JSON file containing the article headline and article content
+        Parse the HTML content based on source rules and extract the article headline and content.
         """
         soup = BeautifulSoup(self.html_content, "html.parser")
         source_rules = NEWS_SOURCES.get(self.source)
-        
-
-        # Source rules need improvement, considering different options to avoid a messy main webscraper code. Possibly reference a dictionary for each source to avoid so many if statements when scraping
-        # This current format will definitely only work for 2 news sources, needs optimization
 
         if not source_rules:
             raise ValueError(f"No parsing rules defined for source: {self.source}")
-        
-        for caption_div in soup.find_all('div', class_='credit-caption'):                    # Used specifically for NPR
-            caption_div.decompose()
 
-        headline_rules = source_rules.get("headline", {})                                    # Used mostly for AP News
-        headline_tag = soup.find(headline_rules.get("tag"), 
-                                 id=headline_rules.get("id"), 
-                                 class_=headline_rules.get("class"))
-        if not headline_tag:                                                                
+        # Extract headline
+        headline_rules = source_rules.get("headline", {})
+        headline_tag = soup.find(
+            headline_rules.get("tag"),
+            id=headline_rules.get("id"),
+            class_=headline_rules.get("class")
+        )
+        if not headline_tag:
             headline_tag = soup.find("h1")
         headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
-        
-        content_rules = source_rules.get("content", {})
-        content_section = soup.find(content_rules.get("tag"), 
-                                    id=content_rules.get("id"), 
-                                    class_=content_rules.get("class"))
-        if not content_section:
-            content_section = soup.find(id="storytext") or soup.find("div")
-        
+
+        # Extract content
         content = ""
-        if content_section:
-            content_paragraphs = content_section.find_all("p")
-            for paragraph in content_paragraphs:
-                for a_tag in paragraph.find_all("a"):
-                    link_text = a_tag.get_text(strip=True)
-                    a_tag.replace_with(link_text)
-                content += paragraph.get_text(" ", strip=True) + " "
+        if self.source == "bbc":
+            # For BBC, content is within divs with data-component="text-block"
+            content_sections = soup.find_all(
+                source_rules['content'].get("tag"),
+                attrs={"data-component": source_rules['content'].get("data-component")}
+            )
+            for section in content_sections:
+                paragraphs = section.find_all("p")
+                for paragraph in paragraphs:
+                    content += paragraph.get_text(" ", strip=True) + " "
         else:
-            content = "No content found"
+            # For other sources
+            content_rules = source_rules.get("content", {})
+            content_section = soup.find(
+                content_rules.get("tag"),
+                id=content_rules.get("id"),
+                class_=content_rules.get("class")
+            )
+            if not content_section:
+                content_section = soup.find(id="storytext") or soup.find("div")
+
+            if content_section:
+                content_paragraphs = content_section.find_all("p")
+                for paragraph in content_paragraphs:
+                    content += paragraph.get_text(" ", strip=True) + " "
+            else:
+                content = "No content found"
 
         self.article_data = {
             "headline": headline,
@@ -98,14 +111,12 @@ class WebScraper:
         self.parse_content()
         self.save_to_json()
         return self.article_data
-    
 
-def main():   # testing class by user inputs
-    url = "https://apnews.com/article/home-depot-hurricane-atlanta-consumer-housing-1fc6196ff0ac81b85ef20cfba74ad051"     
-    
-    scraper = WebScraper(url, "ap_news")
+def main():
+    url = "https://www.bbc.com/news/articles/c5yjnkgz0djo"  # Replace with your desired BBC article URL
+    scraper = WebScraper(url, "bbc")
     article_data = scraper.scrape()
-    
+    print(json.dumps(article_data, indent=4, ensure_ascii=False))
 
 if __name__ == "__main__":
-    main()    
+    main()
