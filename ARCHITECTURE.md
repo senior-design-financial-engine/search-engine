@@ -11,37 +11,37 @@ search-engine/
 ├── requirements.txt
 │
 ├── models/
-│ ├── trained/
-│ │ └── embedding_model.pth
-│ └── train_embedding_model.py
+│   ├── trained/
+│   │   └── embedding_model.pth
+│   └── train_embedding_model.py
 │
 ├── backend/
-│ ├── init.py
-│ ├── backend.py
-│ ├── scraper/
-│ │ ├── init.py
-│ │ └── WebScraper.py
-│ ├── indexer.py
-│ ├── elasticsearch/
-│ │ ├── init.py
-│ │ ├── DataValidator.py
-│ │ ├── Engine.py
-│ │ ├── EngineConfig.py
-│ │ └── StorageManager.py
-│ └── recommender/
-│ ├── init.py
-│ ├── Recommender.py
-│ ├── QueryProcessor.py
-│ ├── ResultEnhancer.py
-│ ├── QueryTable.py
-│ └── RecommenderConfig.py
+│   ├── __init__.py
+│   ├── backend.py
+│   ├── scraper/
+│   │   ├── __init__.py
+│   │   └── WebScraper.py
+│   ├── indexer.py
+│   ├── elasticsearch/
+│   │   ├── __init__.py
+│   │   ├── DataValidator.py
+│   │   ├── Engine.py
+│   │   ├── EngineConfig.py
+│   │   └── StorageManager.py
+│   └── recommender/
+│       ├── __init__.py
+│       ├── Recommender.py
+│       ├── QueryProcessor.py
+│       ├── ResultEnhancer.py
+│       ├── QueryTable.py
+│       └── RecommenderConfig.py
 │
 ├── frontend/
-│ └── ... react stuff ...
+│   └── ... react stuff ...
 │
 ├── utils/
-│ ├── init.py
-│ └── helpers.py
+│   ├── __init__.py
+│   └── helpers.py
 │
 └── main.py
 
