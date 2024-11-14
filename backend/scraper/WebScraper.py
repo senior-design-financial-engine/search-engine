@@ -2,36 +2,42 @@ from bs4 import BeautifulSoup
 import requests
 import json
 
-# Current news source application for clean JSON outputs
-# NPR
-# AP News
-# BBC
-
-# Future news sources to be worked on
-# Reurers (Might not allow scraping?)
-# Bloomberg (Paid service)
-# CNBC
-# Forbes
-# Wall Street Journal (Paid service) 
-
 NEWS_SOURCES = {
+
+    # Each news source has their own HTML source format. Here we organize the HTML source per news source, specifically
+    # looking for the headline and content features. Some articles will also include cleanup features to avoid certain 
+    # things such as image captions being pulled. This makes adding more news sources seamless compared to the previous
+    # implementation.
+    
     "npr": {
         "headline": {"tag": "h1"},
-        "content": {"tag": "div", "id": "storytext"}
+        "content": {
+            "container": {"tag": "div", "id": "storytext"},
+            "paragraphs": {"tag": "p"}
+        },
+        "cleanup": [
+            {"tag": "div", "class": "credit-caption"}
+        ]
     },
     "ap_news": {
         "headline": {"tag": "h1", "class": "Page-headline"},
-        "content": {"tag": "div", "class": "RichTextStoryBody"}
+        "content": {
+            "container": {"tag": "div", "class": "RichTextStoryBody"},
+            "paragraphs": {"tag": "p"}
+        }
     },
     "bbc": {
         "headline": {"tag": "h1"},
-        "content": {"tag": "div", "data-component": "text-block"}
+        "content": {
+            "containers": {"tag": "div", "attrs": {"data-component": "text-block"}},
+            "paragraphs": {"tag": "p"}
+        }
     }
 }
 
 class WebScraper:
     def __init__(self, url: str, source: str):
-        """Initialize with the URL and news source type (e.g., 'npr', 'ap_news', 'bbc')."""
+        """Initialize with the URL and news source type."""
         self.url = url
         self.source = source
         self.html_content = None
@@ -39,9 +45,20 @@ class WebScraper:
 
     def fetch_content(self):
         """Fetch the HTML content of the webpage."""
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {'User-Agent': 'Mozilla/5.0'}                      # Experiment with headers and requests to see if we could possibly accessed paid news info. Looking into NewsAPI first before doing anymore exploration.
         response = requests.get(self.url, headers=headers)
         self.html_content = response.content
+
+    def build_find_kwargs(self, rule):
+        """Helper method to build keyword arguments for find/find_all based on the rule."""
+        kwargs = {}
+        if 'id' in rule:
+            kwargs['id'] = rule['id']
+        if 'class' in rule:
+            kwargs['class_'] = rule['class']
+        if 'attrs' in rule:
+            kwargs['attrs'] = rule['attrs']
+        return kwargs
 
     def parse_content(self):
         """
@@ -53,45 +70,39 @@ class WebScraper:
         if not source_rules:
             raise ValueError(f"No parsing rules defined for source: {self.source}")
 
-        for caption_div in soup.find_all('div', class_='credit-caption'):                    # Used specifically for NPR
-            caption_div.decompose()
+        cleanup_rules = source_rules.get("cleanup", [])
+        for rule in cleanup_rules:
+            kwargs = self.build_find_kwargs(rule)
+            for tag in soup.find_all(rule.get("tag"), **kwargs):
+                tag.decompose()
 
         headline_rules = source_rules.get("headline", {})
-        headline_tag = soup.find(
-            headline_rules.get("tag"),
-            id=headline_rules.get("id"),
-            class_=headline_rules.get("class")
-        )
-        if not headline_tag:
-            headline_tag = soup.find("h1")
+        kwargs = self.build_find_kwargs(headline_rules)
+        headline_tag = soup.find(headline_rules.get("tag"), **kwargs)
         headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
 
         content = ""
-        if self.source == "bbc":
-            content_sections = soup.find_all(
-                source_rules['content'].get("tag"),
-                attrs={"data-component": source_rules['content'].get("data-component")}
-            )
-            for section in content_sections:
-                paragraphs = section.find_all("p")
+        content_rules = source_rules.get("content", {})
+
+        containers = []
+        if 'containers' in content_rules:
+            kwargs = self.build_find_kwargs(content_rules['containers'])
+            containers = soup.find_all(content_rules['containers'].get("tag"), **kwargs)
+        elif 'container' in content_rules:
+            kwargs = self.build_find_kwargs(content_rules['container'])
+            container = soup.find(content_rules['container'].get("tag"), **kwargs)
+            if container:
+                containers = [container]
+
+        for container in containers:
+            if container:
+                kwargs = self.build_find_kwargs(content_rules['paragraphs'])
+                paragraphs = container.find_all(content_rules['paragraphs'].get("tag"), **kwargs)
                 for paragraph in paragraphs:
                     content += paragraph.get_text(" ", strip=True) + " "
-        else:
-            content_rules = source_rules.get("content", {})
-            content_section = soup.find(
-                content_rules.get("tag"),
-                id=content_rules.get("id"),
-                class_=content_rules.get("class")
-            )
-            if not content_section:
-                content_section = soup.find(id="storytext") or soup.find("div")
 
-            if content_section:
-                content_paragraphs = content_section.find_all("p")
-                for paragraph in content_paragraphs:
-                    content += paragraph.get_text(" ", strip=True) + " "
-            else:
-                content = "No content found"
+        if not content.strip():
+            content = "No content found"
 
         self.article_data = {
             "headline": headline,
@@ -111,19 +122,41 @@ class WebScraper:
         self.save_to_json()
         return self.article_data
 
-def main():
-    url = "https://www.npr.org/2024/11/13/nx-s1-5188441/inflation-prices-trump-election"  
-    scraper = WebScraper(url, "npr")
-    article_data = scraper.scrape()
-    #print(json.dumps(article_data, indent=4, ensure_ascii=False))
+def main():   
+    # # Test with NPR
+    # url = "https://www.npr.org/2024/11/13/nx-s1-5188441/inflation-prices-trump-election"
+    # scraper = WebScraper(url, "npr")
+    # article_data = scraper.scrape()
+    # print("Headline:", article_data['headline'])
+    # print("Content:\n", article_data['content'])
 
-    with open('article.json', 'r', encoding='utf-8') as f:
-        article_data = json.load(f)
-        
-    content = article_data['content']
-    print(content)
+    # # Test with BBC
+    # url = "https://www.bbc.com/news/articles/c5yjnkgz0djo"
+    # scraper = WebScraper(url, "bbc")
+    # article_data = scraper.scrape()
+    # print("Headline:", article_data['headline'])
+    # print("Content:\n", article_data['content'])
+
+    # Test with AP News
+    url = "https://apnews.com/article/home-depot-hurricane-atlanta-consumer-housing-1fc6196ff0ac81b85ef20cfba74ad051"
+    scraper = WebScraper(url, "ap_news")
+    article_data = scraper.scrape()
+    print("Headline:", article_data['headline'])
+    print("Content:\n", article_data['content'])
 
 if __name__ == "__main__":
     main()
 
 
+
+
+"""
+For future reference, some JSON outputs will containt '\' throughout the parsed content which will cause noise when running it 
+through a NLP model. In order to avoid this pointless noise, load the JSON content into a python string and it will remove
+the JSON '\' characters, making it clean and ready for summarization use. 
+"""
+
+#with open('article.json', 'r', encoding='utf-8') as f:
+#    article_data = json.load(f)
+    
+#content = article_data['content']
