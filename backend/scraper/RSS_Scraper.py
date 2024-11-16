@@ -22,7 +22,7 @@ class RSSFeedScraper:
     
     def save_processed_urls(self):
         with open(self.processed_urls_file, 'w') as f:
-            json.dump(list(self.processed_urls), f)
+            json.dump(list(self.processed_urls), f, indent=4)
     
     def get_articles(self):
         feed = feedparser.parse(self.feed_url)
