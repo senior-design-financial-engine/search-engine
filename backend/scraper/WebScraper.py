@@ -1,39 +1,12 @@
 from bs4 import BeautifulSoup
 import requests
 import json
-
-NEWS_SOURCES = {
-
-    # Each news source has their own HTML source format. Here we organize the HTML source per news source, specifically
-    # looking for the headline and content features. Some articles will also include cleanup features to avoid certain 
-    # things such as image captions being pulled. This makes adding more news sources seamless compared to the previous
-    # implementation.
-    
-    "npr": {
-        "headline": {"tag": "h1"},
-        "content": {
-            "container": {"tag": "div", "id": "storytext"},
-            "paragraphs": {"tag": "p"}
-        },
-        "cleanup": [
-            {"tag": "div", "class": "credit-caption"}
-        ]
-    },
-    "ap_news": {
-        "headline": {"tag": "h1", "class": "Page-headline"},
-        "content": {
-            "container": {"tag": "div", "class": "RichTextStoryBody"},
-            "paragraphs": {"tag": "p"}
-        }
-    },
-    "bbc": {
-        "headline": {"tag": "h1"},
-        "content": {
-            "containers": {"tag": "div", "attrs": {"data-component": "text-block"}},
-            "paragraphs": {"tag": "p"}
-        }
-    }
-}
+import feedparser
+import os
+import time
+import schedule
+#from RSS_Scraper import RSSFeedScraper
+from news_sources import NEWS_SOURCES  # Import NEWS_SOURCES
 
 class WebScraper:
     def __init__(self, url: str, source: str):
@@ -111,6 +84,7 @@ class WebScraper:
 
     def save_to_json(self, filename="article.json"):
         """Save the article data to a JSON file."""
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, "w", encoding="utf-8") as json_file:
             json.dump(self.article_data, json_file, ensure_ascii=False, indent=4)
         print(f"Article data saved to {filename}")
@@ -122,30 +96,6 @@ class WebScraper:
         self.save_to_json()
         return self.article_data
 
-def main():   
-    # # Test with NPR
-    # url = "https://www.npr.org/2024/11/13/nx-s1-5188441/inflation-prices-trump-election"
-    # scraper = WebScraper(url, "npr")
-    # article_data = scraper.scrape()
-    # print("Headline:", article_data['headline'])
-    # print("Content:\n", article_data['content'])
-
-    # # Test with BBC
-    # url = "https://www.bbc.com/news/articles/c5yjnkgz0djo"
-    # scraper = WebScraper(url, "bbc")
-    # article_data = scraper.scrape()
-    # print("Headline:", article_data['headline'])
-    # print("Content:\n", article_data['content'])
-
-    # Test with AP News
-    url = "https://apnews.com/article/home-depot-hurricane-atlanta-consumer-housing-1fc6196ff0ac81b85ef20cfba74ad051"
-    scraper = WebScraper(url, "ap_news")
-    article_data = scraper.scrape()
-    print("Headline:", article_data['headline'])
-    print("Content:\n", article_data['content'])
-
-if __name__ == "__main__":
-    main()
 
 
 
