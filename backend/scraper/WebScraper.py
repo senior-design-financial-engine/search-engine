@@ -5,8 +5,8 @@ import feedparser
 import os
 import time
 import schedule
-#from RSS_Scraper import RSSFeedScraper
-from news_sources import NEWS_SOURCES  # Import NEWS_SOURCES
+
+from news_sources import NEWS_SOURCES  
 
 class WebScraper:
     def __init__(self, url: str, source: str):
@@ -18,7 +18,7 @@ class WebScraper:
 
     def fetch_content(self):
         """Fetch the HTML content of the webpage."""
-        headers = {'User-Agent': 'Mozilla/5.0'}                      # Experiment with headers and requests to see if we could possibly accessed paid news info. Looking into NewsAPI first before doing anymore exploration.
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(self.url, headers=headers)
         self.html_content = response.content
 
@@ -34,9 +34,7 @@ class WebScraper:
         return kwargs
 
     def parse_content(self):
-        """
-        Parse the HTML content based on source rules and extract the article headline and content.
-        """
+        """Parse the HTML content based on source rules and extract the article headline and content."""
         soup = BeautifulSoup(self.html_content, "html.parser")
         source_rules = NEWS_SOURCES.get(self.source)
 
@@ -78,24 +76,16 @@ class WebScraper:
             content = "No content found"
 
         self.article_data = {
+            "url": self.url,  
             "headline": headline,
             "content": content.strip()
         }
-
-    def save_to_json(self, filename="article.json"):
-        """Save the article data to a JSON file."""
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        with open(filename, "w", encoding="utf-8") as json_file:
-            json.dump(self.article_data, json_file, ensure_ascii=False, indent=4)
-        print(f"Article data saved to {filename}")
 
     def scrape(self):
         """Perform the complete scraping process."""
         self.fetch_content()
         self.parse_content()
-        self.save_to_json()
-        return self.article_data
-
+        return self.article_data  
 
 
 

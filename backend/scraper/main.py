@@ -1,4 +1,5 @@
 from RSS_Scraper import RSSFeedScraper
+from ap_news_scraper import APNewsScraper
 import schedule
 import time
 
@@ -9,10 +10,14 @@ def main():
         rss_scraper = RSSFeedScraper(source, processed_urls_file=f'processed_urls_{source}.json')
         rss_scraper.scrape()
 
+    ap_scraper = APNewsScraper()
+    ap_scraper.scrape()
+
+
 if __name__ == "__main__":
     main()
     schedule.every(1).minutes.do(main)
-    print("running programs")
+    print("Running programs")
     while True:
         schedule.run_pending()
         time.sleep(1)
