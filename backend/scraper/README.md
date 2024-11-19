@@ -19,8 +19,8 @@ Works with news sources that provide open access RSS.xml files. The article data
 
 ### ap_news_scraper.py
 
-Does the sam, but is specifically made for AP news hub pages.
+Does the same, but is specifically made for AP news hub pages.
 
 ### WebScraper.py
 
-Scrapes any news article from AP News, BBC, or NPR. It utilizes the dictionary in news_source.,py to do proper scraping on different websites.
+Scrapes any news article from AP News, BBC, or NPR. It utilizes the dictionary in news_source.py to do proper scraping on different websites.
