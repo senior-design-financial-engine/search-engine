@@ -302,17 +302,6 @@ class Engine:
         filters: Optional[Dict] = None,
         time_range: Optional[Dict] = None
     ) -> Dict:
-        """
-        Perform a text-based search with optional filters.
-        
-        Args:
-            query_text: Optional text to search for
-            filters: Optional dictionary of filters to apply
-            time_range: Optional time range for filtering results
-            
-        Returns:
-            Dict: Search results
-        """
         must_conditions = []
         filter_conditions = []
         
@@ -331,9 +320,16 @@ class Engine:
             })
         
         if filters:
-            if 'companies' in filters:
+            if 'companies.ticker' in filters:
                 filter_conditions.append({
-                    "terms": {"companies.ticker": filters['companies']}
+                    "nested": {
+                        "path": "companies",
+                        "query": {
+                            "terms": {
+                                "companies.ticker": filters['companies.ticker']
+                            }
+                        }
+                    }
                 })
             if 'categories' in filters:
                 filter_conditions.append({
@@ -347,7 +343,7 @@ class Engine:
                 filter_conditions.append({
                     "terms": {"regions": filters['regions']}
                 })
-        
+
         if time_range:
             filter_conditions.append({
                 "range": {
@@ -377,21 +373,7 @@ class Engine:
                 "sort": [
                     {"_score": {"order": "desc"}},
                     {"published_at": {"order": "desc"}}
-                ],
-                "aggs": {
-                    "sentiment_distribution": {
-                        "terms": {"field": "sentiment"}
-                    },
-                    "category_distribution": {
-                        "terms": {"field": "categories"}
-                    },
-                    "publication_timeline": {
-                        "date_histogram": {
-                            "field": "published_at",
-                            "calendar_interval": "day"
-                        }
-                    }
-                }
+                ]
             }
         )
 

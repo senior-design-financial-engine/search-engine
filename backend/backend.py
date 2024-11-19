@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from typing import Dict, Optional, List
 from scraper import WebScraper
 from indexer import Indexer
-from elasticsearch import Engine
+from searchdb import Engine
 from dotenv import load_dotenv
 import os
 

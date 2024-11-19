@@ -26,6 +26,10 @@ class StorageManager:
                         "keyword": {"type": "keyword"}
                     }
                 },
+                "url": {
+                    "type": "keyword",
+                    "index": True
+                },
                 "content": {
                     "type": "text",
                     "analyzer": "english"
@@ -35,6 +39,7 @@ class StorageManager:
                     "analyzer": "english"
                 },
                 "companies": {
+                    "type": "nested",
                     "properties": {
                         "name": {"type": "keyword"},
                         "ticker": {"type": "keyword"},
@@ -72,7 +77,6 @@ class StorageManager:
                 "updated_at": {
                     "type": "date"
                 },
-                # Add embeddings field with dynamic dimensions
                 "embeddings": {
                     "type": "dense_vector",
                     "dims": self.config.embedding_dimensions,

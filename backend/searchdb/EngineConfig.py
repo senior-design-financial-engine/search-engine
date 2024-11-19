@@ -41,7 +41,26 @@ class EngineConfig:
                     "financial_analyzer": {
                         "type": "custom",
                         "tokenizer": "standard",
-                        "filter": ["lowercase", "stop", "financial_symbols", "company_names"]
+                        "char_filter": ["html_strip"],
+                        "filter": [
+                            "lowercase",
+                            "stop",
+                            "financial_symbols_filter",
+                            "company_names_filter",
+                            "stemmer"
+                        ]
+                    }
+                },
+                "filter": {
+                    "financial_symbols_filter": {
+                        "type": "pattern_replace",
+                        "pattern": "[$€£¥]",
+                        "replacement": ""
+                    },
+                    "company_names_filter": {
+                        "type": "pattern_replace",
+                        "pattern": "(Inc\\.?|Corp\\.?|Ltd\\.?|LLC)",
+                        "replacement": ""
                     }
                 }
             }

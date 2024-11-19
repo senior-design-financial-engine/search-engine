@@ -325,3 +325,4 @@ elasticsearch/api_key.json
 .DS_Store
 
 src/backend/elasticsearch/api_key.json
+*.csv

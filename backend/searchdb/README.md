@@ -22,7 +22,7 @@ Adds a new article with optional embeddings vector.
   - `article`: Dictionary containing article data with required fields:
     - `headline`: Article headline
     - `source`: News source
-    - `companies`: List of company data
+    - `url`: Article URL
     - Additional optional fields: content, summary, categories, sentiment, regions, etc.
   - `embeddings`: Optional pre-computed embeddings vector
   - `custom_id`: Optional custom identifier
