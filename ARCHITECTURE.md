@@ -20,7 +20,9 @@ search-engine/
 │   ├── backend.py
 │   ├── scraper/
 │   │   ├── __init__.py
-│   │   └── web_scraper.py
+│   │   ├── web_scraper.py
+│   │   ├── ap_news_scraper.py
+│   │   └── RSS_scraper.py
 │   ├── indexer.py
 │   └── elasticsearch/
 │       ├── __init__.py
@@ -30,7 +32,12 @@ search-engine/
 │       └── StorageManager.py
 │
 ├── frontend/
-│   └── ... react stuff ...
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── services/
+│   │   └── styles/
+│   └── package.json
 │
 ├── utils/
 │   ├── __init__.py
@@ -122,69 +129,23 @@ classDiagram
 ### Data Flow Diagram
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Frontend
-    participant Backend
-    participant Engine
-    participant ElasticSearch
-    participant DataValidator
-    participant StorageManager
+participant User
+participant Frontend
+participant Backend
+participant Engine
+participant ElasticSearch
+participant DataValidator
+participant StorageManager
+User->>Frontend: Enter search query
+Frontend->>Backend: GET /query
+Backend->>Engine: process_search_query()
+Engine->>DataValidator: Validate parameters
+Engine->>StorageManager: Access index
+StorageManager->>ElasticSearch: Execute search
+ElasticSearch-->>StorageManager: Return results
+StorageManager-->>Engine: Process results
+Engine-->>Backend: Return formatted results
+Backend-->>Frontend: JSON response
+Frontend-->>User: Display results
 
-    User->>Frontend: Enter search query
-    Frontend->>Backend: POST /query
-    Backend->>Engine: process_search_query()
-    
-    Engine->>DataValidator: Validate parameters
-    Engine->>StorageManager: Access index
-    StorageManager->>ElasticSearch: Execute search
-    
-    ElasticSearch-->>StorageManager: Return results
-    StorageManager-->>Engine: Process results
-    Engine-->>Backend: Return formatted results
-    Backend-->>Frontend: JSON response
-    Frontend-->>User: Display results
-
-```
-
-### Search Process Diagram
-```mermaid
-stateDiagram-v2
-    [*] --> QueryInput: User enters search
-    
-    QueryInput --> QueryValidation: Submit query
-    
-    state QueryValidation {
-        [*] --> ValidateParams
-        ValidateParams --> BuildQuery
-        BuildQuery --> [*]
-    }
-    
-    QueryValidation --> DataRetrieval: Process query
-    
-    state DataRetrieval {
-        [*] --> ElasticsearchSearch
-        ElasticsearchSearch --> ApplyFilters
-        ApplyFilters --> TimeRangeFilter
-        TimeRangeFilter --> [*]
-    }
-    
-    DataRetrieval --> ResultsProcessing: Enrich results
-    
-    state ResultsProcessing {
-        [*] --> RankResults
-        RankResults --> ExtractHighlights
-        ExtractHighlights --> AggregateMetrics
-        AggregateMetrics --> [*]
-    }
-    
-    ResultsProcessing --> Display: Show results
-    
-    state Display {
-        [*] --> RenderList
-        RenderList --> ShowPagination
-        ShowPagination --> EnableFilters
-        EnableFilters --> [*]
-    }
-    
-    Display --> [*]: Display to user
 ```
