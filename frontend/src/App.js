@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Home from './components/Home';
 import Results from './components/Results';
-import Filters from './components/Filters';
+// import Filters from './components/Filters';
 import { Navbar, Container, Nav } from 'react-bootstrap';
 
 function App() {
@@ -12,8 +12,8 @@ function App() {
         <Container>
           <Navbar.Brand href="/">Financial Search Engine</Navbar.Brand>
           <Nav className="me-auto">
-            <Nav.Link href="/">Home</Nav.Link>
-            <Nav.Link href="/filters">Filters</Nav.Link>
+            {/* <Nav.Link href="/">Home</Nav.Link> */}
+            {/* <Nav.Link href="/filters">Filters</Nav.Link> */}
           </Nav>
         </Container>
       </Navbar>
@@ -21,7 +21,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/results" element={<Results />} />
-          <Route path="/filters" element={<Filters />} />
+          {/* <Route path="/filters" element={<Filters />} /> */}
         </Routes>
       </Container>
     </Router>

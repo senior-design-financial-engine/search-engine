@@ -3,61 +3,67 @@ import { useNavigate } from 'react-router-dom';
 import { Form, Button, Container, Row, Col } from 'react-bootstrap';
 
 function Home() {
-  const [query, setQuery] = useState('');
-  const [advancedQueries, setAdvancedQueries] = useState({ filters: '', time_range: '' });
-  const navigate = useNavigate();
+	const [query, setQuery] = useState('');
+	// const [advancedQueries, setAdvancedQueries] = useState({ filters: '', time_range: '' });
+	const [advancedQueries, setAdvancedQueries] = useState({});
+	const navigate = useNavigate();
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    navigate(`/results?query=${query}&filters=${advancedQueries.filters}&time_range=${advancedQueries.time_range}`);
-  };
 
-  // const handleAdvancedChange = (field, value) => {
-  //   setAdvancedQueries({ ...advancedQueries, [field]: value });
-  // };
+	const handleSearch = (e) => {
+		e.preventDefault();
+		const searchParams = new URLSearchParams({ query });
 
-  return (
-    <Container className="text-center mt-5">
-      <h1>Financial Search Engine</h1>
-      <Form onSubmit={handleSearch}>
-        <Row className="justify-content-center mb-4">
-          <Col md={6}>
-            <Form.Control
-              type="text"
-              placeholder="Enter your search query"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </Col>
-          <Col md="auto">
-            <Button type="submit" variant="primary">
-              Search
-            </Button>
-          </Col>
-        </Row>
+		// Add advanced queries to search params
+		for (const [key, value] of Object.entries(advancedQueries)) {
+			searchParams.append(key, value);
+		}
 
-        {/* <h3 className="mb-3">Advanced Query</h3>
-        <Row className="justify-content-center mb-3">
-          <Col md={3}>
-            <Form.Control
-              type="text"
-              placeholder="Criterion"
-              value={advancedQueries.filters}
-              onChange={(e) => handleAdvancedChange('filters', e.target.value)}
-            />
-          </Col>
-          <Col md={3}>
-            <Form.Control
-              type="text"
-              placeholder="Value"
-              value={advancedQueries.time}
-              onChange={(e) => handleAdvancedChange('value', e.target.value)}
-            />
-          </Col>
-        </Row> */}
-      </Form>
-    </Container>
-  );
+		navigate(`/results?${searchParams.toString()}`);
+	};
+
+
+	const handleAdvancedChange = (field, value) => {
+		console.log(value)
+		setAdvancedQueries(advancedQueries => ({...advancedQueries, [field]: value}));
+	};
+
+	return (
+		<Container className="text-center mt-5">
+			<h1>Financial Search Engine</h1>
+			<Form onSubmit={handleSearch}>
+				<Row className="justify-content-center mb-4">
+					<Col md={6}>
+						<Form.Control
+							type="text"
+							placeholder="Enter your search query"
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+						/>
+					</Col>
+					<Col md="auto">
+						<Button type="submit" variant="primary">
+							Search
+						</Button>
+					</Col>
+				</Row>
+
+				{/* <h4 className="mb-3">Filters</h4>
+				<Row className="justify-content-center mb-3">
+					<Col md={2}>
+						Source
+					</Col>
+					<Col md={2}>
+						<Form.Control
+							type="text"
+							placeholder="e.g. bbc"
+							value={advancedQueries.time}
+							onChange={(e) => handleAdvancedChange('source', e.target.value)}
+						/>
+					</Col>
+				</Row> */}
+			</Form>
+		</Container>
+	);
 }
 
 export default Home;

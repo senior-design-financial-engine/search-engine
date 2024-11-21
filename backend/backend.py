@@ -34,6 +34,7 @@ class BackEnd:
         filters: Optional[Dict] = None,
         time_range: Optional[Dict] = None
     ) -> Dict:
+        logger.info(msg=f"hello {filters}")
         """Process a search query with optional filters and time range."""
         try:
             results = self.engine.search_news(query_text, filters, time_range)
@@ -69,8 +70,14 @@ backend = BackEnd(embedding_model_path, num_dim)
 def query():
     try:
         query_text = request.args.get('query', None)
-        filters = request.args.get('filters', None)
+        source = request.args.get('source', None)
         time_range = request.args.get('time_range', None)
+        
+        filters = {
+            "source": source
+        }
+        
+        logger.info(msg=f"hello {filters}")
         
         results = backend.process_search_query(query_text, filters, time_range)
         # results = backend.dummy_search(query_text, filters, time_range)
