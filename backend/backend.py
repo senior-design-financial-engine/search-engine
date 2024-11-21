@@ -21,8 +21,8 @@ class BackEnd:
             # Initialize components
             # self.web_scraper = WebScraper()
             # self.indexer = Indexer(embedding_model_path, num_dim)
-            # self.engine = Engine()
-            # self.engine.config.validate_config()
+            self.engine = Engine()
+            self.engine.config.validate_config()
             logger.info("Backend initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize backend: {str(e)}")
@@ -38,7 +38,7 @@ class BackEnd:
         try:
             results = self.engine.search_news(query_text, filters, time_range)
             # return self.indexer.score_and_rank(results)
-            return results
+            return results['hits']['hits']
         except Exception as e:
             logger.error(f"Error processing search query: {str(e)}")
             raise
@@ -65,19 +65,15 @@ embedding_model_path = 'models/embedding_model.pth'
 num_dim = 300  # Example dimension size
 backend = BackEnd(embedding_model_path, num_dim)
 
-@app.route('/query', methods=['POST'])
+@app.route('/query', methods=['GET'])
 def query():
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
-        query_text = data.get('query')
-        filters = data.get('filters')
-        time_range = data.get('time_range')
+        query_text = request.args.get('query', None)
+        filters = request.args.get('filters', None)
+        time_range = request.args.get('time_range', None)
         
-        # results = backend.process_search_query(query_text, filters, time_range)
-        results = backend.dummy_search(query_text, filters, time_range)
+        results = backend.process_search_query(query_text, filters, time_range)
+        # results = backend.dummy_search(query_text, filters, time_range)
         return jsonify(results)
     except Exception as e:
         logger.error(f"Query endpoint error: {str(e)}")

@@ -36,8 +36,12 @@ function Results() {
     fetchResults();
   }, [query, filters, time_range]);
 
+  console.log(results)
 
-  const handleSortChange = (value) => setSortBy(value);
+  const handleSortChange = (value) => {
+    setSortBy(value);
+    results.sort((a,b) => a._score - b._score)
+  }
 
   return (
     <Container className="mt-5">
@@ -58,11 +62,11 @@ function Results() {
             <Card className="mb-4">
               <Card.Body>
                 <Card.Title>
-                  <a href={result.url} target="_blank" rel="noopener noreferrer">{result.url}</a>
+                  <a href={result._source.url} target="_blank" rel="noopener noreferrer">{result._source.url}</a>
                 </Card.Title>
-                <Card.Text>{result.snippet}</Card.Text>
+                <Card.Text>{result._source.headline}</Card.Text>
                 <Card.Subtitle className="text-muted">
-                  Sentiment: {result.sentiment} | Date: {result.date}
+                  Sentiment: {result._source.sentiment} | Date: {result._source.published_at}
                 </Card.Subtitle>
               </Card.Body>
             </Card>
