@@ -2,13 +2,16 @@ import feedparser
 import json
 import os
 import time
-from news_sources import NEWS_SOURCES 
+# from news_sources import NEWS_SOURCES 
 from WebScraper import WebScraper
 
 class RSSFeedScraper:
     def __init__(self, source, processed_urls_file='processed_urls.json'):
         self.source = source
-        self.feed_url = NEWS_SOURCES.get(self.source, {}).get('rss_feed')
+
+        with open("sources.json") as f:
+            self.feed_url = json.load(f).get(self.source, {}).get('rss_feed')
+        
         if not self.feed_url:
             raise ValueError(f"No RSS feed URL defined for source: {self.source}")
         self.processed_urls_file = processed_urls_file

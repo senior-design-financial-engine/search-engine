@@ -1,11 +1,4 @@
-
-NEWS_SOURCES = {
-
-    # Each news source has their own HTML source format. Here we organize the HTML source per news source, specifically
-    # looking for the headline and content features. Some articles will also include cleanup features to avoid certain 
-    # things such as image captions being pulled. This makes adding more news sources seamless compared to the previous
-    # implementation.
-    
+{
     "npr": {
         "rss_feed": "https://feeds.npr.org/1006/rss.xml",
         "headline": {"tag": "h1"},

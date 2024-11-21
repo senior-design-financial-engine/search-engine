@@ -6,7 +6,10 @@ import os
 import time
 import schedule
 
-from news_sources import NEWS_SOURCES  
+# from news_sources import NEWS_SOURCES  
+
+with open("scraper/data/sources.json") as f:
+    NEWS_SOURCES = json.load(f)
 
 class WebScraper:
     def __init__(self, url: str, source: str):

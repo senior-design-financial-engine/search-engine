@@ -4,17 +4,17 @@ import { Form, Button, Container, Row, Col } from 'react-bootstrap';
 
 function Home() {
   const [query, setQuery] = useState('');
-  const [advancedQueries, setAdvancedQueries] = useState({ criterion: '', value: '' });
+  const [advancedQueries, setAdvancedQueries] = useState({ filters: '', time_range: '' });
   const navigate = useNavigate();
 
   const handleSearch = (e) => {
     e.preventDefault();
-    navigate(`/results?query=${query}&criterion=${advancedQueries.criterion}&value=${advancedQueries.value}`);
+    navigate(`/results?query=${query}&filters=${advancedQueries.filters}&time_range=${advancedQueries.time_range}`);
   };
 
-  const handleAdvancedChange = (field, value) => {
-    setAdvancedQueries({ ...advancedQueries, [field]: value });
-  };
+  // const handleAdvancedChange = (field, value) => {
+  //   setAdvancedQueries({ ...advancedQueries, [field]: value });
+  // };
 
   return (
     <Container className="text-center mt-5">
@@ -36,33 +36,25 @@ function Home() {
           </Col>
         </Row>
 
-        <h3 className="mb-3">Advanced Query</h3>
+        {/* <h3 className="mb-3">Advanced Query</h3>
         <Row className="justify-content-center mb-3">
           <Col md={3}>
             <Form.Control
               type="text"
               placeholder="Criterion"
-              value={advancedQueries.criterion}
-              onChange={(e) => handleAdvancedChange('criterion', e.target.value)}
+              value={advancedQueries.filters}
+              onChange={(e) => handleAdvancedChange('filters', e.target.value)}
             />
           </Col>
           <Col md={3}>
             <Form.Control
               type="text"
               placeholder="Value"
-              value={advancedQueries.value}
+              value={advancedQueries.time}
               onChange={(e) => handleAdvancedChange('value', e.target.value)}
             />
           </Col>
-        </Row>
-        <Row className="justify-content-center">
-          <Col md={3}>
-            <Form.Control type="text" placeholder="Region (e.g., North America)" />
-          </Col>
-          <Col md={3}>
-            <Form.Control type="text" placeholder="Source (e.g., Bloomberg)" />
-          </Col>
-        </Row>
+        </Row> */}
       </Form>
     </Container>
   );
