@@ -2,7 +2,7 @@
 
 ## Initialization
 
-The main.py script in this directory will run all the scrapers on a 1 minute clock. It will run through two of our scrapers, RSS_Scraper.py and ap_news_scraper.py. The reasoning for the two scripts is that AP News doesn't keep their RSS.xml file public, meaning that scraping their front page for each business hub was much more efficient. Combining it with the RSS_Scraper.py seemed like a futile challenge at the moment.
+The run_scrapers.py script in this directory will run all the scrapers on a 1 minute clock. It will run through two of our scrapers, RSS_Scraper.py and ap_news_scraper.py. The reasoning for the two scripts is that AP News doesn't keep their RSS.xml file public, meaning that scraping their front page for each business hub was much more efficient. Combining it with the RSS_Scraper.py seemed like a futile challenge at the moment.
 
 ### RSS Scraper
 

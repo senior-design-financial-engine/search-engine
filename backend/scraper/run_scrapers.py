@@ -1,9 +1,10 @@
-from RSS_Scraper import RSSFeedScraper
-from backend.scraper.ScraperAP import APNewsScraper
+from .scrapers import APNewsScraper, RSSFeedScraper
 import schedule
 import time
 
 def main():
+    
+    # SCRAPE DETAILS 
     sources = ["npr", "bbc"]  
 
     for source in sources:
@@ -12,7 +13,9 @@ def main():
 
     ap_scraper = APNewsScraper()
     ap_scraper.scrape()
-
+    
+def run_scrapers():
+    main()
 
 if __name__ == "__main__":
     main()
