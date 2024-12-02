@@ -9,86 +9,84 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 ## Key Features
 
 ### Real-Time News Aggregation
-- Continuous web crawling of diverse financial news sources
+- Multi-source web crawling (BBC, NPR, AP News)
 - Real-time indexing with updates within 3 minutes of publication
 - Support for multiple news categories and regions
 
 ### Advanced Search Capabilities
-- Full-text search across headlines, summaries, and content
-- Filtering by companies, categories, regions, and time ranges
-- Customizable news feeds based on user portfolios and preferences
-- Response time under 500ms for standard queries
+- Full-text search across headlines and content
+- Filtering by source, time ranges, and categories
+- Customizable news feeds
+- Sub-second query response time
 
 ### Machine Learning Integration
-- Automated sentiment analysis with 80% accuracy
-- Article summarization (≤ 100 words per article)
-- Trending topic identification
-- Category evolution tracking
+- Article summarization using transformers
+- Sentiment analysis
+- Topic identification
+- Category classification
 
 ### Analytics Features
-- Stock price mention tracking
-- Institutional activity monitoring
-- Volatility analysis
-- Regional news distribution analysis
-- Company correlation analysis
-- Earnings coverage tracking
+- News source distribution analysis
+- Sentiment trends tracking
+- Regional news coverage analysis
+- Company mention tracking
 
 ## Technical Architecture
 
 ### Frontend (React.js)
 - Responsive web interface
-- Customizable dashboard layouts
 - Real-time updates
-- Advanced query interface
-- Interactive visualization components
+- Bootstrap integration
+- Chart.js visualization components
 
 ### Backend (Python/Flask)
 - RESTful API architecture
+- CORS support
 - Elasticsearch integration
-- Scalable cloud infrastructure
-- Real-time data processing pipeline
+- Environment-based configuration
 
 ### Core Components
 1. **Web Crawler**
-   - Recursive website scraping
-   - Source validation
-   - Content extraction and cleaning
+   - RSS feed processing
+   - Multi-source support (BBC, NPR, AP News)
+   - Content validation
+   - URL deduplication
 
 2. **Indexer**
    - Document processing
    - Metadata extraction
-   - Real-time index updates
+   - Real-time updates
 
 3. **Search Engine**
    - Query processing
-   - Relevance scoring
-   - Result ranking
-   - Aggregation pipeline
-
-4. **Storage Layer**
    - Elasticsearch backend
-   - Distributed architecture
-   - High availability setup
-   - Data validation
+   - Result ranking
+
+4. **ML Pipeline**
+   - Transformer-based summarization
+   - Sentiment analysis
+   - Topic modeling
 
 ## System Requirements
 
-### Performance Metrics
-- News indexing within 3 minutes of publication
-- Search query response time < 500ms
-- Support for 10,000+ concurrent requests
-- High availability with 3 shards and 2 replicas
-
 ### Technical Dependencies
 - Python 3.x
-- Flask 3.0.0
+- Flask
 - Elasticsearch 8.11.0
 - React.js
 - Additional libraries:
-  - pandas 2.1.4
-  - numpy 1.26.2
-  - requests 2.31.0
-  - yfinance 0.2.36
+  - transformers
+  - pandas
+  - numpy
+  - requests
+  - flask-cors
+  - python-dotenv
+
+### Development Setup
+- Node.js environment for frontend
+- Python virtual environment for backend
+- Elasticsearch instance
+- Environment configuration (.env)
 
 ## Differentiators
 

@@ -1,4 +1,4 @@
-from searchdb import Engine
+from es_database import Engine
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import time
@@ -87,6 +87,12 @@ market_results = engine.search_news(
 )
 print(f"Found {market_results['hits']['total']['value']} market warning articles")
 
+print("\n4. Search for AI no categories:")
+no_category_results = engine.search_news(
+    query_text="AI",
+)
+print(f"Found {market_results['hits']['total']['value']} market warning articles")
+
 # Print detailed results for each search
 def print_results(results):
     for hit in results['hits']['hits']:
@@ -105,6 +111,10 @@ print_results(ai_results)
 
 print("\nDetailed market warning results:")
 print_results(market_results)
+
+print("\nLast results:")
+print_results(no_category_results)
+print(no_category_results)
 
 
 '''

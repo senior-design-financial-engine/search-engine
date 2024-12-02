@@ -15,7 +15,9 @@ class Engine:
         self.es = self.storage.es
         self.index_name = self.storage.index_name
         
-        self.storage.create_index()
+        # delete index if already existing
+        if self.index_name not in self.es.indices.get(index='*'):
+            self.storage.create_index()
 
     def _generate_article_id(self, article: Dict) -> str:
         """
@@ -343,6 +345,10 @@ class Engine:
                 filter_conditions.append({
                     "terms": {"regions": filters['regions']}
                 })
+            # if 'source' in filters:
+            #     filter_conditions.append({
+            #         "terms": {"source": filters['source']}
+            #     })
 
         if time_range:
             filter_conditions.append({
