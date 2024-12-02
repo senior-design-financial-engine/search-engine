@@ -95,12 +95,6 @@ classDiagram
         +process_content()
     }
 
-    class Indexer {
-        +embedding_model
-        +num_dim: int
-        +score_and_rank()
-    }
-
     class FrontEnd {
         +Home
         +Results
@@ -114,7 +108,6 @@ classDiagram
     StorageManager --> EngineConfig : Uses
     BackEnd --> Engine : Uses
     BackEnd --> WebScraper : Uses
-    BackEnd --> Indexer : Uses
     FrontEnd --> BackEnd : Makes API calls
 
 ```
