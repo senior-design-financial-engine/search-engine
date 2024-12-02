@@ -1,45 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Dropdown } from 'react-bootstrap';
+import { searchArticles } from '../services/api';
+import { Container, Row, Col, Card, Button, Dropdown } from 'react-bootstrap';
 
 function Results() {
   const location = useLocation();
-  const query = new URLSearchParams(location.search).get('query');
-  const [sortBy, setSortBy] = useState('Relevance');
+  const url_params = new URLSearchParams(location.search)
+
+  // get query info
+  const query = url_params.get('query');
+  url_params.delete('query')
+
+  // get all filters
+  const source = url_params.get('source')
+  
+  const [results, setResults] = useState([]);
   const navigate = useNavigate();
 
-  const mockResults = [
-    { url: 'https://example.com/1', snippet: 'Result 1 summary...', sentiment: 'Positive', date: '2024-11-01' },
-    { url: 'https://example.com/2', snippet: 'Result 2 summary...', sentiment: 'Neutral', date: '2024-11-02' },
-    { url: 'https://example.com/3', snippet: 'Result 3 summary...', sentiment: 'Negative', date: '2024-11-03' },
-  ];
 
-  const handleSortChange = (value) => setSortBy(value);
+  console.log("FETCHING RESULTS")
+  useEffect(() => {
+    const fetchResults = async () => {
+      try {
+        if (query) {
+          const searchResults = await searchArticles(query, source);
+          setResults(searchResults);
+        }
+      } catch (error) {
+        console.error('Error fetching search results:', error);
+      }
+    };
+
+    fetchResults();
+  }, [query, source]);
+
+  const handleBack = () => {
+    navigate(-1); // Navigate back to the previous page
+  };
 
   return (
     <Container className="mt-5">
-      <h1>Results for: "{query}"</h1>
+      <Button variant="secondary" onClick={handleBack} className="mt-3">
+        Back
+      </Button>
 
-      <Dropdown className="mb-3">
-        <Dropdown.Toggle variant="secondary">Sort by: {sortBy}</Dropdown.Toggle>
-        <Dropdown.Menu>
-          <Dropdown.Item onClick={() => handleSortChange('Relevance')}>Relevance</Dropdown.Item>
-          <Dropdown.Item onClick={() => handleSortChange('Date')}>Date</Dropdown.Item>
-          <Dropdown.Item onClick={() => handleSortChange('Sentiment')}>Sentiment</Dropdown.Item>
-        </Dropdown.Menu>
-      </Dropdown>
+      <h1>Results for: <b><i>"{query}</i></b>"</h1>
 
       <Row>
-        {mockResults.map((result, index) => (
+        {results.map((result, index) => (
           <Col md={4} key={index}>
             <Card className="mb-4">
               <Card.Body>
                 <Card.Title>
-                  <a href={result.url} target="_blank" rel="noopener noreferrer">{result.url}</a>
+                  <a href={result._source.url} target="_blank" rel="noopener noreferrer">{result._source.url}</a>
                 </Card.Title>
-                <Card.Text>{result.snippet}</Card.Text>
+                <Card.Text>{result._source.headline}</Card.Text>
                 <Card.Subtitle className="text-muted">
-                  Sentiment: {result.sentiment} | Date: {result.date}
+                  Sentiment: {result._source.sentiment} | Date: {result._source.published_at}
                 </Card.Subtitle>
               </Card.Body>
             </Card>
