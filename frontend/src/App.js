@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Home from './components/Home';
 import Results from './components/Results';
-// import Filters from './components/Filters';
+// import Filters from './components/Filters'; // Remove for demo functionality
 import { Navbar, Container, Nav } from 'react-bootstrap';
 
 function App() {

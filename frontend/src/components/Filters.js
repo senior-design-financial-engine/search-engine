@@ -1,4 +1,3 @@
-// Filters.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,6 +6,7 @@ function Filters() {
   const [source, setSource] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // Companies, Industries, Sentiment
   const navigate = useNavigate();
 
   const handleApplyFilters = (e) => {

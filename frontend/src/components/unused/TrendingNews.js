@@ -1,6 +1,6 @@
-// TrendingNews.js
 import React, { useState, useEffect } from 'react';
 
+// Can also be recent articles or articles with high sentiment
 function TrendingNews() {
   const [trendingArticles, setTrendingArticles] = useState([]);
 

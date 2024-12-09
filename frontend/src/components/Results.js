@@ -18,7 +18,7 @@ function Results() {
           const searchResults = await searchArticles(query, source);
           setResults(searchResults);
         } else {
-          // Mock data for testing
+          // Mock articles for demo
           setResults([
             {
               _source: {

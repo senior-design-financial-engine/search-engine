@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000'; // Replace with your backend URL
+const API_BASE_URL = 'http://localhost:5000'; // Local until cloud hosted
 
 export const searchArticles = async (query, source, time_range) => {
 	try {

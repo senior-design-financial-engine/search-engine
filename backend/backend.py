@@ -63,7 +63,7 @@ class BackEnd:
 
 # Initialize the backend
 embedding_model_path = 'models/embedding_model.pth'
-num_dim = 300  # Example dimension size
+num_dim = 300
 backend = BackEnd(embedding_model_path, num_dim)
 
 @app.route('/query', methods=['GET'])
@@ -77,10 +77,7 @@ def query():
             "source": source
         }
         
-        logger.info(msg=f"hello {filters}")
-        
         results = backend.process_search_query(query_text, filters, time_range)
-        # results = backend.dummy_search(query_text, filters, time_range)
         return jsonify(results)
     except Exception as e:
         logger.error(f"Query endpoint error: {str(e)}")
