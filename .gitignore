@@ -326,3 +326,4 @@ elasticsearch/api_key.json
 
 src/backend/elasticsearch/api_key.json
 *.csv
+backend_pid.txt
