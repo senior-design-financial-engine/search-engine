@@ -1,0 +1,1 @@
+This memo outlines the cloud architecture, design decisions, and deployment steps for deploying the Financial News Engine on AWS with Elastic Cloud (Elasticsearch from Elastic.co) as the search engine backend.
