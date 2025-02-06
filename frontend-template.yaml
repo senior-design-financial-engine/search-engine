@@ -1,0 +1,146 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Frontend Infrastructure for Search Engine Application (S3 + CloudFront)'
+
+Parameters:
+  EnvironmentName:
+    Description: Environment name that will be prefixed to resource names
+    Type: String
+    Default: search-engine
+
+  DomainName:
+    Description: Domain name for the application (e.g., example.com)
+    Type: String
+
+  CertificateArn:
+    Description: ARN of the SSL certificate in AWS Certificate Manager
+    Type: String
+
+Resources:
+  # S3 bucket for website hosting
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${EnvironmentName}-frontend
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+
+  # Bucket policy to allow CloudFront access
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${WebsiteBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}
+
+  # CloudFront Origin Access Identity
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub ${EnvironmentName} OAI
+
+  # CloudFront Distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !Ref DomainName
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          TargetOriginId: S3Origin
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          DefaultTTL: 86400
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        HttpVersion: http2
+        IPV6Enabled: true
+
+  # DNS Record for CloudFront
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub ${DomainName}.
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID is always this value
+
+Outputs:
+  WebsiteBucketName:
+    Description: Name of S3 bucket to hold website content
+    Value: !Ref WebsiteBucket
+    Export:
+      Name: !Sub ${EnvironmentName}-frontend-bucket
+
+  CloudFrontDistributionId:
+    Description: ID of CloudFront distribution
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub ${EnvironmentName}-cloudfront-distribution-id
+
+  CloudFrontDomainName:
+    Description: Domain name of CloudFront distribution
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub ${EnvironmentName}-cloudfront-domain
+
+  WebsiteURL:
+    Description: URL of the website
+    Value: !Sub https://${DomainName}
+    Export:
+      Name: !Sub ${EnvironmentName}-website-url 
