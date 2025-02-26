@@ -257,7 +257,60 @@ Resources:
             Value: !Ref FrontendStackName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: deployspec.yml
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 16
+              commands:
+                - echo "Using inline buildspec..."
+                - echo "Current directory: $(pwd)"
+                - ls -la
+            
+            pre_build:
+              commands:
+                - echo "Pre-build phase in inline buildspec"
+                - |
+                  if [ -d "frontend" ]; then
+                    cd frontend
+                    if [ -f "package.json" ]; then
+                      echo "Found frontend package.json, installing dependencies..."
+                      npm install
+                    fi
+                    cd ..
+                  fi
+            
+            build:
+              commands:
+                - echo "Build phase in inline buildspec"
+                - |
+                  if [ -d "frontend" ]; then
+                    cd frontend
+                    if [ -f "package.json" ]; then
+                      echo "Building frontend..."
+                      npm run build
+                    fi
+                    cd ..
+                  fi
+            
+            post_build:
+              commands:
+                - echo "Post-build phase in inline buildspec"
+                - echo "Listing contents of frontend/build directory:"
+                - ls -la frontend/build || echo "frontend/build directory not found"
+                - echo "Deployment artifacts ready in frontend/build/"
+          
+          artifacts:
+            files:
+              - appspec.yml
+              - scripts/**/*
+              - frontend/build/**/*
+            discard-paths: no
+          
+          cache:
+            paths:
+              - 'frontend/node_modules/**/*'
       TimeoutInMinutes: 15
       Tags:
         - Key: Name
