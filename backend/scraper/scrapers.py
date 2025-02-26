@@ -5,15 +5,16 @@ import time
 import os
 import feedparser
 from urllib.parse import urljoin
+import datetime
 
-with open("scraper/data/sources.json") as f:
+with open("data/sources.json") as f:
     NEWS_SOURCES = json.load(f)
 
 class RSSFeedScraper:
     def __init__(self, source, processed_urls_file='data/processed_urls.json'):
         self.source = source
 
-        with open("sources.json") as f:
+        with open("data/sources.json") as f:
             self.feed_url = json.load(f).get(self.source, {}).get('rss_feed')
         
         if not self.feed_url:
@@ -210,10 +211,12 @@ class WebScraper:
         return kwargs
 
     def parse_content(self):
-        """Parse the HTML content based on source rules and extract the article headline and content."""
+        """
+        Parse the HTML content based on source rules and extract the article headline,
+        date, and content.
+        """
         soup = BeautifulSoup(self.html_content, "html.parser")
         source_rules = NEWS_SOURCES.get(self.source)
-
         if not source_rules:
             raise ValueError(f"No parsing rules defined for source: {self.source}")
 
@@ -228,9 +231,25 @@ class WebScraper:
         headline_tag = soup.find(headline_rules.get("tag"), **kwargs)
         headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
 
+        timestamp_rules = source_rules.get("timestamp", {})
+        kwargs = self.build_find_kwargs(timestamp_rules)
+        timestamp_tag = soup.find(timestamp_rules.get("tag"), **kwargs)
+        # If the tag is bsp-timestamp (used by AP News) and has data-timestamp, convert it.
+        if timestamp_tag:
+            if timestamp_tag.name.lower() == "bsp-timestamp" and timestamp_tag.has_attr("data-timestamp"):
+                ts_ms = int(timestamp_tag["data-timestamp"])
+                ts = ts_ms / 1000.0
+                date_only = datetime.datetime.utcfromtimestamp(ts).strftime("%B %d, %Y")
+            elif timestamp_tag.has_attr("datetime"):
+                full_datetime = timestamp_tag["datetime"]
+                date_only = full_datetime.split("T")[0]
+            else:
+                date_only = timestamp_tag.get_text(strip=True)
+        else:
+            date_only = "No date found"
+
         content = ""
         content_rules = source_rules.get("content", {})
-
         containers = []
         if 'containers' in content_rules:
             kwargs = self.build_find_kwargs(content_rules['containers'])
@@ -240,20 +259,19 @@ class WebScraper:
             container = soup.find(content_rules['container'].get("tag"), **kwargs)
             if container:
                 containers = [container]
-
         for container in containers:
             if container:
                 kwargs = self.build_find_kwargs(content_rules['paragraphs'])
                 paragraphs = container.find_all(content_rules['paragraphs'].get("tag"), **kwargs)
                 for paragraph in paragraphs:
                     content += paragraph.get_text(" ", strip=True) + " "
-
         if not content.strip():
             content = "No content found"
 
         self.article_data = {
-            "url": self.url,  
+            "url": self.url,
             "headline": headline,
+            "date": date_only,
             "content": content.strip()
         }
 
@@ -261,7 +279,7 @@ class WebScraper:
         """Perform the complete scraping process."""
         self.fetch_content()
         self.parse_content()
-        return self.article_data  
+        return self.article_data
 
 
 

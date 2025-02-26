@@ -1,28 +1,31 @@
 {
     "npr": {
         "rss_feed": "https://feeds.npr.org/1006/rss.xml",
-        "headline": {"tag": "h1"},
+        "headline": { "tag": "h1" },
+        "timestamp": { "tag": "time" },
         "content": {
-            "container": {"tag": "div", "id": "storytext"},
-            "paragraphs": {"tag": "p"}
+            "container": { "tag": "div", "id": "storytext" },
+            "paragraphs": { "tag": "p" }
         },
         "cleanup": [
-            {"tag": "div", "class": "credit-caption"}
+            { "tag": "div", "class": "credit-caption" }
         ]
     },
     "ap_news": {
-        "headline": {"tag": "h1", "class": "Page-headline"},
+        "headline": { "tag": "h1", "class": "Page-headline" },
+        "timestamp": { "tag": "bsp-timestamp", "attrs": { "data-timestamp": true } },
         "content": {
-            "container": {"tag": "div", "class": "RichTextStoryBody"},
-            "paragraphs": {"tag": "p"}
+            "container": { "tag": "div", "class": "RichTextStoryBody" },
+            "paragraphs": { "tag": "p" }
         }
     },
     "bbc": {
         "rss_feed": "http://feeds.bbci.co.uk/news/business/rss.xml",
-        "headline": {"tag": "h1"},
+        "headline": { "tag": "h1" },
+        "timestamp": { "tag": "time" },
         "content": {
-            "containers": {"tag": "div", "attrs": {"data-component": "text-block"}},
-            "paragraphs": {"tag": "p"}
+            "containers": { "tag": "div", "attrs": { "data-component": "text-block" } },
+            "paragraphs": { "tag": "p" }
         }
     }
 }
