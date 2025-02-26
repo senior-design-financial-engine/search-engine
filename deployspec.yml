@@ -14,10 +14,10 @@ phases:
       # If frontend/deployspec.yml exists, use its contents
       - |
         if [ -f "frontend/deployspec.yml" ]; then
-          echo "Found frontend/deployspec.yml, using its content..."
-          cp frontend/deployspec.yml ./deployspec.yml
+          echo "Found frontend/deployspec.yml, noting its existence..."
+          # No longer copying it since we're using this root file directly
         else
-          echo "WARNING: frontend/deployspec.yml not found!"
+          echo "WARNING: frontend/deployspec.yml not found, but continuing with root version"
         fi
 
   pre_build:
@@ -30,6 +30,7 @@ phases:
             echo "Found frontend package.json, installing dependencies..."
             npm install
           fi
+          cd ..
         fi
 
   build:
@@ -42,16 +43,21 @@ phases:
             echo "Building frontend..."
             npm run build
           fi
+          cd ..
         fi
 
   post_build:
     commands:
       - echo "Post-build phase in root deployspec.yml"
+      - echo "Listing contents of frontend/build directory:"
+      - ls -la frontend/build || echo "frontend/build directory not found"
+      - echo "Deployment artifacts ready in frontend/build/"
 
 artifacts:
-  base-directory: frontend/build
   files:
-    - '**/*'
+    - appspec.yml
+    - scripts/**/*
+    - frontend/build/**/*
   discard-paths: no
 
 cache:

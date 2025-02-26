@@ -257,7 +257,7 @@ Resources:
             Value: !Ref FrontendStackName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: frontend/deployspec.yml
+        BuildSpec: deployspec.yml
       TimeoutInMinutes: 15
       Tags:
         - Key: Name
