@@ -1,0 +1,23 @@
+{
+    "post": {
+        "id": "t3_1iy8m1l",
+        "category": "finance1",
+        "query": "(JPMorgan OR JPM OR Goldman Sachs OR GS OR Morgan Stanley OR MS OR Bank of America OR BAC OR Citigroup OR C OR Wells Fargo OR WFC)",
+        "subreddit": "investing",
+        "title": "Can only deduct $3k of losses?",
+        "body": "What is the 'wisdom' of the tax code allowing one to deduct only $3k/yr of losses? If you lose $30k or whatever, why shouldn't you be able to deduct it? Was it ever different from this? This is pertinent to stocks. What if you lose $30k some other way other than buying stocks, can you deduct all of it?",
+        "url": "https://www.reddit.com/r/investing/comments/1iy8m1l/can_only_deduct_3k_of_losses/",
+        "upVotes": 43,
+        "upVoteRatio": 0.68
+    },
+    "comments": [
+        {
+            "id": "t1_mesezsu",
+            "username": "ketralnis",
+            "body": "You can deduct all of the losses you incur against the gains, and even carry over additional losses to next year.\n\nWhere the $3k comes in is that you can only use $3k of capital losses against _regular income_ in the same year. But you can deduct $30k of losses over $30k of gains just fine.",
+            "url": "https://www.reddit.com/r/investing/comments/1iy8m1l/can_only_deduct_3k_of_losses/mesezsu/",
+            "upVotes": 207,
+            "upVoteRatio": null
+        }
+    ]
+}
