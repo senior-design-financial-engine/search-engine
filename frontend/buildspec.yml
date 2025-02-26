@@ -23,12 +23,12 @@ phases:
   post_build:
     commands:
       - echo Copying deployspec.yml to expected location...
-      - echo "Current directory: $(pwd)"
-      - echo "Files in current directory: $(ls -la)"
-      - echo "Files in frontend directory: $(ls -la frontend)"
-      - mkdir -p /codebuild/output/src2785146540/src/frontend/ || true
-      - cp frontend/deployspec.yml /codebuild/output/src2785146540/src/frontend/ || echo "Failed to copy deployspec.yml, continuing anyway"
-      - echo "Contents of target directory (if accessible): $(ls -la /codebuild/output/src2785146540/src/frontend/ 2>/dev/null || echo 'Cannot access target directory')"
+      - echo "Current directory is $(pwd)"
+      - ls -la
+      - ls -la frontend || echo "Cannot access frontend directory"
+      - mkdir -p /codebuild/output/src492692500/src/frontend || true
+      - cp frontend/deployspec.yml /codebuild/output/src492692500/src/frontend || echo "Failed to copy deployspec.yml"
+      - ls -la /codebuild/output/src492692500/src/frontend || echo "Cannot access target directory"
 
 artifacts:
   base-directory: frontend/build
