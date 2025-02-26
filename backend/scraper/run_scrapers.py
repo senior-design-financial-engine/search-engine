@@ -1,4 +1,4 @@
-from .scrapers import APNewsScraper, RSSFeedScraper
+from scrapers import APNewsScraper, RSSFeedScraper
 import schedule
 import time
 
