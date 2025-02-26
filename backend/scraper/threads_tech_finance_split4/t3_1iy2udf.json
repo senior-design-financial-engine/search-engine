@@ -1,0 +1,31 @@
+{
+    "post": {
+        "id": "t3_1iy2udf",
+        "category": "tech2",
+        "query": "(Nvidia OR NVDA OR Amazon OR AMZN OR Meta OR META OR Facebook OR OpenAI OR Intel OR INTC)",
+        "subreddit": "technology",
+        "title": "Amazon Teases Big Alexa AI Upgrade Tomorrow, but 73% of Users Have Privacy Concerns, CNET Survey Finds",
+        "body": "Images:\n\thttps://external-preview.redd.it/jwmYsZENeysDLZpOyC_6o9DlbJQ5L-iUqnLZuytTvYQ.jpg?auto=webp&amp;s=ba05bfd64961cbbf4887a79d081cf17613eadb7e\n",
+        "url": "https://www.reddit.com/r/technology/comments/1iy2udf/amazon_teases_big_alexa_ai_upgrade_tomorrow_but/",
+        "upVotes": 15,
+        "upVoteRatio": 0.78
+    },
+    "comments": [
+        {
+            "id": "t1_mer4bxc",
+            "username": "Sbiri_Guda",
+            "body": "I never used a normal assistent, since the (maybe unmotivated), fear of been listened. Knowing how the companies began greedy about data to train their AI it would be even worse.",
+            "url": "https://www.reddit.com/r/technology/comments/1iy2udf/amazon_teases_big_alexa_ai_upgrade_tomorrow_but/mer4bxc/",
+            "upVotes": 3,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_merenar",
+            "username": "BadOdd1861",
+            "body": "If you use Alexa or any sort of \"smart\" device or assistant you already lost your privacy.",
+            "url": "https://www.reddit.com/r/technology/comments/1iy2udf/amazon_teases_big_alexa_ai_upgrade_tomorrow_but/merenar/",
+            "upVotes": 3,
+            "upVoteRatio": null
+        }
+    ]
+}

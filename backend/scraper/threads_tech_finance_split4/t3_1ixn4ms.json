@@ -1,0 +1,47 @@
+{
+    "post": {
+        "id": "t3_1ixn4ms",
+        "category": "tech1",
+        "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+        "subreddit": "investing",
+        "title": "50k to fund a newly opened self directed IRA. Scale of 1-10 how we looking\u2026",
+        "body": "1. Broad Market Equity Exposure:\n- Vanguard Total Stock Market ETF (VTI): $15,000\n- Vanguard Total International Stock ETF (VXUS): $5,000\n\n2. Sector-Specific Equity Exposure \n- Vanguard Information Technology ETF (VGT): $5,000\n- Vanguard Real Estate Index Fund (VNQ): $5,000\n\t\n3. Dividend-Focused Investments\n- Vanguard High Dividend Yield Index ETF (VYM): $5,000\n\n4. Fixed Income and Cash Equivalents:\n- Vanguard Total Bond Market ETF (BND): $10,000\n\n5. Individual Stocks:\n- Apple (AAPL): $2,500\n- Microsoft (MSFT): $2,500\n",
+        "url": "https://www.reddit.com/r/investing/comments/1ixn4ms/50k_to_fund_a_newly_opened_self_directed_ira/",
+        "upVotes": 6,
+        "upVoteRatio": 0.75
+    },
+    "comments": [
+        {
+            "id": "t1_menku84",
+            "username": "erasergunz",
+            "body": "Overdoing it in my opinion. Tech already makes up a HUGE portion of any total market fund, so there's no real need to expose yourself any further. I like something like VOO/VXUS/AVUV personally and you can add some bonds or certain individual stocks if you have strong conviction in them. I would only allocate maybe 3-5% of a portfolio on individuals. You don't need more than a few ETFs, anything more than that is going to end up having a lot of overlap. More exposure to the same things isn't diverse.",
+            "url": "https://www.reddit.com/r/investing/comments/1ixn4ms/50k_to_fund_a_newly_opened_self_directed_ira/menku84/",
+            "upVotes": 5,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_menmryb",
+            "username": "SchemeAgile2012",
+            "body": "I appreciate this feedback. I like the mix you suggested as well. VOO was an oversight on my end.",
+            "url": "https://www.reddit.com/r/investing/comments/1ixn4ms/50k_to_fund_a_newly_opened_self_directed_ira/menmryb/",
+            "upVotes": 2,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_mennoz1",
+            "username": "erasergunz",
+            "body": "If you are interested in the dividend paying ETFs, take a look at JEPI/JEPQ. You can add something like that to the mix. Perhaps VOO/JEPQ split if dividends are a big deal to you. Should you need bonds, I recommend looking into \"bond ladders\" and SGOV. Looking to the near-term future of the market, I think (and many firms would agree) that we'll be entering an interesting time soon. International investments, especially in Asia, are looking very attractive. Just some food for thought.\n\nUS value stocks are another thing to consider. Particularly mid and small caps. AVUV provides this, but there may be some other options to look into. Avantis has a few other good ones. At the end of the day, just keep it simple. If you need to, there are some tools online that will compare ETF holdings for you so you can verify your diversity is true. Try to find just a few ETFs that hold different things. Put a good amount of money in money market funds/bond ladders for a safety net should you require, and consider putting some extra weight in international markets for the near-term. Good luck! Feel free to ask any other questions you might have",
+            "url": "https://www.reddit.com/r/investing/comments/1ixn4ms/50k_to_fund_a_newly_opened_self_directed_ira/mennoz1/",
+            "upVotes": 0,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_menk2am",
+            "username": "Jonas42",
+            "body": "Without more context, It's a 6.5. You could do much, much worse.\n\nBut why target tech with VGT when sector categorizations are fairly arbitrary (e.g., Google is not a tech company) and when you're already massively exposed to tech via VTI and VXUS? What do you know about tech that the market doesn't already know?\n\nSame question with VNQ and VYM. Sector and strategy -focused funds generally increase expense ratios and/or expose you to uncompensated risk. What do you know that the broader market doesn't? If you don't have a *great* answer to that question, just stick to VT, or VTI and VXUS. (The question also applies to individual stocks)",
+            "url": "https://www.reddit.com/r/investing/comments/1ixn4ms/50k_to_fund_a_newly_opened_self_directed_ira/menk2am/",
+            "upVotes": 2,
+            "upVoteRatio": null
+        }
+    ]
+}

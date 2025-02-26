@@ -1,0 +1,47 @@
+{
+    "post": {
+        "id": "t3_1ixvyru",
+        "category": "tech2",
+        "query": "(Nvidia OR NVDA OR Amazon OR AMZN OR Meta OR META OR Facebook OR OpenAI OR Intel OR INTC)",
+        "subreddit": "stocks",
+        "title": "These are the stocks on my watchlist (02/25)",
+        "body": "This is a daily watchlist for short-term trading: I might trade all/none of the stocks listed, and even stocks not listed!\n\nI am targeting potentially good candidates for short-term trading; I have no opinion on them as investments.\n\nThe potential of the stock moving today is what makes it interesting, everything else is secondary.\n\nI'm back. Crazy how I miss a few days and that's when everything is going nuts lol.\n\nNews: [Trump Administration Seeks More Restrictions On China Tech Weighs Nvidia Curbs](https://www.bloomberg.com/news/articles/2025-02-25/trump-administration-seeks-more-restrictions-on-china-tech-weighs-nvidia-curbs)\n\n**Ticker:** [**SMH**](https://finviz.com/quote.ashx?t=SMH&amp;p=d)**,** [**NVDA**](https://finviz.com/quote.ashx?t=NVDA&amp;p=d)**,** [**AMD**](https://finviz.com/quote.ashx?t=AMD&amp;p=d)\n\n**Catalyst:** The Trump administration is planning to strengthen semiconductor export controls to China, aiming to strengthen the CHIPS act from Biden's term.\n\nAdditionally, DeepSeek is accelerating the release of its new AI model, R2, following the success of its R1 model. (Most of their training is done on NVDA chips)\n\n**Technicals:** Mainly interested to see if we can hold above $130 for NVDA- note that earnings are tomorrow so the short-term performance of the stock hinges on that. Currently long and sold 155C to hedge my position against it.\n\n**Catalyst/Sector Context:** We've seen the CHIPS act actually affect the way that semiconductor companies sell to China- most of those restrictions are bypassed, so this strengthening of export controls might actually affect the industry.\n\n**Risks:** More export controls may lead to China giving tariffs in retaliation- but again, most semis are supply constrained rather than demand constrained so I don't see it as a significant catalyst until more details are released.\n\n**Related Tickers:** [INTC](https://finviz.com/quote.ashx?t=INTC&amp;p=d), [QCOM](https://finviz.com/quote.ashx?t=QCOM&amp;p=d), [ASML](https://finviz.com/quote.ashx?t=ASML&amp;p=d)\n\n**Ticker:** [**BABA**](https://finviz.com/quote.ashx?t=BABA&amp;p=d)**,** [**FXI (FTSE China 50 Index)**](https://finviz.com/quote.ashx?t=FXI&amp;p=d)\n\n**Catalyst:** BABA has introduced its own AI reasoning model within the Qwen framework (like how META has the Llama framework), while we have a surge of all Chinese stock performance following the Chinese government's announcement of liquidity measures.\n\n**Technicals:** It seems as if we've peaked (BABA has gone up close to 50% since the start of this month) for most Chinese stocks in the past few days, I would be interested in being short but I was on vacation this weekend. Interested in shorting BABA specifically if we make another large up move like we did on 2/20.\n\n**Catalyst/Sector Context:** BABA is one of the major competitors that is working on AI models, and is notably using NVDA cards to train its models. \n\n**Risks:** Mainly tariff news and news from other rivals with better models. Straightforward.\n\n**Related Tickers:** [JD](https://finviz.com/quote.ashx?t=JD&amp;p=d), [BIDU](https://finviz.com/quote.ashx?t=BIDU&amp;p=d)\n\n**Ticker:** [**PLTR (Palantir Technologies Inc)**](https://finviz.com/quote.ashx?t=PLTR&amp;p=d)\n\n**Catalyst:** Previously, PLTR faced concerns due to defense budget cuts and CEO Alex Karp reducing his stake in the company. We've seen it make a massive run from retail and fall just as quickly.\n\n**Technicals:** Interested in playing a small bounce- we're up \\~10% since last earnings report (and pre-crazy move), there is potential for a small bounce here but only entering a small position since it looks like we bottomed early premarket today. \n\n**Catalyst/Sector Context:** Trump directed the government to make significant cuts to the defense budget. (This is a far more significant catalyst than Alex Karp selling shares)\n\n**Risks:** PLTR lives and dies on defense contract money, so obviously further cuts/expansions will affect stock price.\n\n**Related Tickers:** [BA](https://finviz.com/quote.ashx?t=BA&amp;p=d), [GD](https://finviz.com/quote.ashx?t=GD&amp;p=d), [RTX](https://finviz.com/quote.ashx?t=RTX&amp;p=d)\n\n**Ticker:** [**COIN**](https://finviz.com/quote.ashx?t=COIN&amp;p=d)**,** [**HOOD**](https://finviz.com/quote.ashx?t=HOOD&amp;p=d)**,** [**MSTR**](https://finviz.com/quote.ashx?t=MSTR&amp;p=d)\n\n**Catalyst:** The CC market is experiencing heightened volatility due to proposed tariffs and a significant security breach at Bybit, resulting in the loss of approximately $1.5 billion.\n\n**Technicals:** Not too interested in playing this long- still watching to see how we perform but the sell off resulting in the biggest Coin going to $90K has me watching the stock related proxies that deal with the market. \n\n**Catalyst/Sector Context:** CC platforms are highly susceptible to regulatory changes and security incidents.\n\nProposed tariffs affecting digital assets can lead to market vol, while large-scale hacks undermine investor trust and lead to sell-offs in the market as it spreads fear and people wanting to cash out.\n\n**Risks:** Regulatory interventions impose additional compliance costs and operational constraints on CC exchanges.\n\nSecurity breaches not only result in financial losses but also lead to decreased user adoption and revenue.\n\n**Related Tickers:** [MARA](https://finviz.com/quote.ashx?t=MARA&amp;p=d), [RIOT](https://finviz.com/quote.ashx?t=RIOT&amp;p=d)\n\n**Earnings:** [WDAY](https://finviz.com/quote.ashx?t=WDAY&amp;p=d), [INTU](https://finviz.com/quote.ashx?t=INTU&amp;p=d), [CPNG](https://finviz.com/quote.ashx?t=CPNG&amp;p=d)",
+        "url": "https://www.reddit.com/r/stocks/comments/1ixvyru/these_are_the_stocks_on_my_watchlist_0225/",
+        "upVotes": 43,
+        "upVoteRatio": 0.86
+    },
+    "comments": [
+        {
+            "id": "t1_mepfo8m",
+            "username": "drkuttimama",
+            "body": "Good thoughts . Keep posting",
+            "url": "https://www.reddit.com/r/stocks/comments/1ixvyru/these_are_the_stocks_on_my_watchlist_0225/mepfo8m/",
+            "upVotes": 10,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_mephz0m",
+            "username": "WinningWatchlist",
+            "body": "THANK YOU for reading.",
+            "url": "https://www.reddit.com/r/stocks/comments/1ixvyru/these_are_the_stocks_on_my_watchlist_0225/mephz0m/",
+            "upVotes": 8,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_mepdbb7",
+            "username": "krevtrading",
+            "body": "Made some money on pltr while u were taking a break, hope ur doing well!",
+            "url": "https://www.reddit.com/r/stocks/comments/1ixvyru/these_are_the_stocks_on_my_watchlist_0225/mepdbb7/",
+            "upVotes": 2,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_mepdj3b",
+            "username": "WinningWatchlist",
+            "body": "Why does everything happen while I'm gone lol :(\n\n  \nGlad to hear you made money!! :)))",
+            "url": "https://www.reddit.com/r/stocks/comments/1ixvyru/these_are_the_stocks_on_my_watchlist_0225/mepdj3b/",
+            "upVotes": 2,
+            "upVoteRatio": null
+        }
+    ]
+}
