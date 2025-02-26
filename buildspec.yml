@@ -1,0 +1,68 @@
+version: 0.2
+# Root-level buildspec.yml that works for both CodeBuild and CodeDeploy
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 16
+    commands:
+      - echo "Running root buildspec.yml..."
+      - echo "Current directory: $(pwd)"
+      - ls -la
+      
+      # Copy any needed files for CodeDeploy
+      - |
+        if [ ! -f "appspec.yml" ] && [ -f "frontend/appspec.yml" ]; then
+          echo "Copying appspec.yml to root directory for CodeDeploy..."
+          cp frontend/appspec.yml ./appspec.yml
+        fi
+      
+  pre_build:
+    commands:
+      - echo "Pre-build phase in root buildspec.yml"
+      - |
+        if [ -d "frontend" ]; then
+          cd frontend
+          echo "Installing frontend dependencies..."
+          npm install
+          cd ..
+        fi
+
+  build:
+    commands:
+      - echo "Build phase in root buildspec.yml"
+      - |
+        if [ -d "frontend" ]; then
+          cd frontend
+          echo "Building frontend..."
+          npm run build
+          cd ..
+        fi
+
+  post_build:
+    commands:
+      - echo "Post-build phase in root buildspec.yml"
+      - |
+        # Ensure all necessary files are in the build artifacts
+        echo "Preparing deployment artifacts..."
+        if [ -d "frontend/build" ]; then
+          echo "Frontend build exists"
+        else
+          echo "WARNING: Frontend build directory not found!"
+        fi
+        
+        # Make sure scripts are executable
+        if [ -d "scripts" ]; then
+          chmod +x scripts/*.sh || echo "No scripts to make executable"
+        fi
+
+artifacts:
+  files:
+    - appspec.yml
+    - scripts/**/*
+    - frontend/build/**/*
+  discard-paths: no
+
+cache:
+  paths:
+    - 'frontend/node_modules/**/*' 
