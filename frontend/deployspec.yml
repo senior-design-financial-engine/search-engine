@@ -12,18 +12,19 @@ phases:
       - ls -la
       - ls -la frontend || echo "Cannot find frontend directory"
       
-      # If we're in a CodeBuild environment
-      - if [ -d "/codebuild" ]; then
-      - echo "In CodeBuild environment, setting up paths..."
-      - CODEBUILD_SRC_DIR_PATH=$(echo $CODEBUILD_SRC_DIR)
-      - echo "CodeBuild source directory: $CODEBUILD_SRC_DIR_PATH"
-      
-      # If a buildspec.yml exists, tell CodeBuild to use it for the next phase
-      - if [ -f "frontend/buildspec.yml" ]; then
-      - echo "Found buildspec.yml, using it for the build process..."
-      - cp frontend/buildspec.yml $CODEBUILD_SRC_DIR_PATH/buildspec.yml
-      - fi
-      - fi
+      # CodeBuild environment setup
+      - |
+        if [ -d "/codebuild" ]; then
+          echo "In CodeBuild environment, setting up paths..."
+          CODEBUILD_SRC_DIR_PATH=$(echo $CODEBUILD_SRC_DIR)
+          echo "CodeBuild source directory: $CODEBUILD_SRC_DIR_PATH"
+          
+          # If a buildspec.yml exists, tell CodeBuild to use it for the next phase
+          if [ -f "frontend/buildspec.yml" ]; then
+            echo "Found buildspec.yml, using it for the build process..."
+            cp frontend/buildspec.yml $CODEBUILD_SRC_DIR_PATH/buildspec.yml
+          fi
+        fi
 
   pre_build:
     commands:

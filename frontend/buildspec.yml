@@ -7,12 +7,13 @@ phases:
     commands:
       - echo "Installing dependencies..."
       - pwd
-      # If running from the root directory or frontend directory
-      - if [ -d "frontend" ]; then
-      - cd frontend
-      - elif [ -d "../frontend" ]; then
-      - cd ../frontend
-      - fi
+      # Check directory structure and navigate appropriately
+      - |
+        if [ -d "frontend" ]; then
+          cd frontend
+        elif [ -d "../frontend" ]; then
+          cd ../frontend
+        fi
       - npm install
 
   pre_build:
