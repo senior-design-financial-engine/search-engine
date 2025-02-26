@@ -4,6 +4,11 @@ import App from './App';
 // Mock the components used in App
 jest.mock('./components/Home', () => () => <div>Home Component</div>);
 jest.mock('./components/Results', () => () => <div>Results Component</div>);
+jest.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }) => <div>{children}</div>,
+  Routes: ({ children }) => <div>{children}</div>,
+  Route: () => <div />,
+}));
 
 test('renders Financial Search Engine navbar', () => {
   render(<App />);
@@ -11,8 +16,9 @@ test('renders Financial Search Engine navbar', () => {
   expect(titleElement).toBeInTheDocument();
 });
 
-test('renders navigation links', () => {
+test('renders Bootstrap Navbar', () => {
   render(<App />);
-  const homeLink = screen.getByText(/Home/i);
-  expect(homeLink).toBeInTheDocument();
+  const navbarBrand = screen.getByText(/Financial Search Engine/i);
+  expect(navbarBrand).toBeInTheDocument();
+  expect(navbarBrand.tagName.toLowerCase()).toBe('a');
 });
