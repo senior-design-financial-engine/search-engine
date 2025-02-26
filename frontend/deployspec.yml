@@ -1,0 +1,39 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 16
+    commands:
+      - echo Installing deployment tools...
+      - pip install --upgrade awscli
+
+  pre_build:
+    commands:
+      - echo Retrieving deployment credentials...
+      - export CREDENTIALS=$(aws secretsmanager get-secret-value --secret-id financial-news-frontend-deployer-credentials-$ENVIRONMENT --query 'SecretString' --output text)
+      - export ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.AccessKey')
+      - export SECRET_KEY=$(echo $CREDENTIALS | jq -r '.SecretKey')
+      - aws configure set aws_access_key_id $ACCESS_KEY
+      - aws configure set aws_secret_access_key $SECRET_KEY
+      - aws configure set default.region $AWS_REGION
+
+  build:
+    commands:
+      - echo Getting S3 bucket and CloudFront distribution...
+      - export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+      - export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
+      - echo Deploying to bucket $BUCKET_NAME and CloudFront $CLOUDFRONT_ID
+
+  post_build:
+    commands:
+      - echo Uploading to S3...
+      - aws s3 sync . s3://$BUCKET_NAME/ --delete
+      - echo Creating CloudFront invalidation...
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+      - echo Deployment completed on `date`
+
+artifacts:
+  files:
+    - appspec.yml
+  discard-paths: yes 

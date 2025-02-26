@@ -1,0 +1,485 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Backend Infrastructure for Financial News Engine'
+
+Parameters:
+  EnvironmentName:
+    Description: Environment name
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+  
+  InstanceType:
+    Description: EC2 instance type for the backend servers
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+  
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+  
+  AMIId:
+    Description: AMI ID for the EC2 instances
+    Type: AWS::EC2::Image::Id
+    Default: ami-0261755bbcb8c4a84  # Amazon Linux 2 in us-east-1 (update for your region)
+  
+  ElasticsearchEndpoint:
+    Description: Endpoint URL for Elasticsearch
+    Type: String
+    Default: https://your-elasticsearch-endpoint.es.amazonaws.com
+  
+  MinSize:
+    Description: Minimum number of EC2 instances in the Auto Scaling Group
+    Type: Number
+    Default: 2
+    MinValue: 1
+  
+  MaxSize:
+    Description: Maximum number of EC2 instances in the Auto Scaling Group
+    Type: Number
+    Default: 6
+    MinValue: 1
+  
+  DesiredCapacity:
+    Description: Desired number of EC2 instances in the Auto Scaling Group
+    Type: Number
+    Default: 2
+    MinValue: 1
+  
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0261755bbcb8c4a84  # Amazon Linux 2
+    us-east-2:
+      AMI: ami-0430580de6244e02e  # Amazon Linux 2
+    us-west-1:
+      AMI: ami-04669a22aad391419  # Amazon Linux 2
+    us-west-2:
+      AMI: ami-0efa651876de2a5ce  # Amazon Linux 2
+    eu-west-1:
+      AMI: ami-0a8e758f5e873d1c1  # Amazon Linux 2
+
+Resources:
+  # IAM Role for EC2 instances
+  BackendInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Path: /
+      Policies:
+        - PolicyName: ESAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'es:ESHttpGet'
+                  - 'es:ESHttpPost'
+                  - 'es:ESHttpPut'
+                  - 'es:ESHttpDelete'
+                Resource: '*'
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource: 
+                  - 'arn:aws:s3:::financial-news-assets/*'
+                  - 'arn:aws:s3:::financial-news-assets'
+
+  # Instance Profile for EC2 instances
+  BackendInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref BackendInstanceRole
+
+  # Security Group for Backend EC2 instances
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for backend servers
+      VpcId: 
+        Fn::ImportValue: !Sub "financial-news-vpc-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+        - IpProtocol: tcp
+          FromPort: 5000  # Flask default port
+          ToPort: 5000
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-sg
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Security Group for Application Load Balancer
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Application Load Balancer
+      VpcId:
+        Fn::ImportValue: !Sub "financial-news-vpc-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-alb-sg
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Launch Template for Auto Scaling Group
+  BackendLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${EnvironmentName}-backend-lt
+      VersionDescription: Initial version
+      LaunchTemplateData:
+        ImageId: !Ref AMIId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref BackendSecurityGroup
+        IamInstanceProfile:
+          Name: !Ref BackendInstanceProfile
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            
+            # Update system packages
+            yum update -y
+            
+            # Install Python and development tools
+            yum install -y python3 python3-pip python3-devel gcc git
+            
+            # Install CloudWatch agent
+            yum install -y amazon-cloudwatch-agent
+            
+            # Create app directory
+            mkdir -p /opt/financial-news-engine
+            cd /opt/financial-news-engine
+            
+            # Clone application code (replace with your Git repository URL)
+            # git clone https://github.com/yourusername/financial-news-engine.git .
+            
+            # For demo purposes, create a simple Flask app
+            cat > app.py << 'EOL'
+            from flask import Flask, jsonify
+            import os
+            import logging
+            from elasticsearch import Elasticsearch
+            
+            app = Flask(__name__)
+            
+            # Configure logging
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            logger = logging.getLogger(__name__)
+            
+            # Connect to Elasticsearch
+            es_endpoint = os.environ.get('ES_ENDPOINT', '${ElasticsearchEndpoint}')
+            try:
+                es = Elasticsearch([es_endpoint])
+                logger.info(f"Connected to Elasticsearch at {es_endpoint}")
+            except Exception as e:
+                logger.error(f"Failed to connect to Elasticsearch: {str(e)}")
+                es = None
+            
+            @app.route('/health', methods=['GET'])
+            def health_check():
+                return jsonify({"status": "healthy"})
+            
+            @app.route('/search', methods=['GET'])
+            def search():
+                if es is None:
+                    return jsonify({"error": "Elasticsearch connection not available"}), 503
+                
+                try:
+                    # Simple search to test ES connection
+                    result = es.info()
+                    return jsonify({
+                        "message": "Elasticsearch connection successful",
+                        "es_info": result
+                    })
+                except Exception as e:
+                    logger.error(f"Search error: {str(e)}")
+                    return jsonify({"error": str(e)}), 500
+            
+            if __name__ == '__main__':
+                app.run(host='0.0.0.0', port=5000)
+            EOL
+            
+            # Create requirements.txt
+            cat > requirements.txt << 'EOL'
+            flask==2.3.3
+            elasticsearch==8.9.0
+            requests==2.31.0
+            python-dotenv==1.0.0
+            gunicorn==21.2.0
+            EOL
+            
+            # Install dependencies
+            pip3 install -r requirements.txt
+            
+            # Create systemd service
+            cat > /etc/systemd/system/financial-news.service << 'EOL'
+            [Unit]
+            Description=Financial News Engine Flask App
+            After=network.target
+            
+            [Service]
+            User=root
+            WorkingDirectory=/opt/financial-news-engine
+            ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
+            Restart=always
+            Environment=ES_ENDPOINT=${ElasticsearchEndpoint}
+            
+            [Install]
+            WantedBy=multi-user.target
+            EOL
+            
+            # Enable and start service
+            systemctl enable financial-news.service
+            systemctl start financial-news.service
+            
+            # Configure CloudWatch agent
+            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOL'
+            {
+              "agent": {
+                "metrics_collection_interval": 60,
+                "run_as_user": "root"
+              },
+              "logs": {
+                "logs_collected": {
+                  "files": {
+                    "collect_list": [
+                      {
+                        "file_path": "/var/log/messages",
+                        "log_group_name": "/financial-news/system",
+                        "log_stream_name": "{instance_id}"
+                      },
+                      {
+                        "file_path": "/var/log/financial-news.log",
+                        "log_group_name": "/financial-news/application",
+                        "log_stream_name": "{instance_id}"
+                      }
+                    ]
+                  }
+                }
+              },
+              "metrics": {
+                "metrics_collected": {
+                  "disk": {
+                    "measurement": [
+                      "used_percent"
+                    ],
+                    "resources": [
+                      "/"
+                    ]
+                  },
+                  "mem": {
+                    "measurement": [
+                      "mem_used_percent"
+                    ]
+                  }
+                }
+              }
+            }
+            EOL
+            
+            # Start CloudWatch agent
+            systemctl enable amazon-cloudwatch-agent
+            systemctl start amazon-cloudwatch-agent
+            
+            # Signal completion
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource BackendAutoScalingGroup --region ${AWS::Region}
+
+  # Auto Scaling Group for Backend Servers
+  BackendAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: LoadBalancerListener
+    Properties:
+      AutoScalingGroupName: !Sub ${EnvironmentName}-backend-asg
+      LaunchTemplate:
+        LaunchTemplateId: !Ref BackendLaunchTemplate
+        Version: !GetAtt BackendLaunchTemplate.LatestVersionNumber
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "financial-news-vpc-PrivateSubnet1ID"
+        - Fn::ImportValue: !Sub "financial-news-vpc-PrivateSubnet2ID"
+      TargetGroupARNs:
+        - !Ref BackendTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-instance
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref EnvironmentName
+          PropagateAtLaunch: true
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${EnvironmentName}-backend-alb
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+      Subnets:
+        - Fn::ImportValue: !Sub "financial-news-vpc-PublicSubnet1ID"
+        - Fn::ImportValue: !Sub "financial-news-vpc-PublicSubnet2ID"
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-alb
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Target Group for Backend Servers
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${EnvironmentName}-backend-tg
+      Port: 5000
+      Protocol: HTTP
+      VpcId:
+        Fn::ImportValue: !Sub "financial-news-vpc-VPCID"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-tg
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Listener for Application Load Balancer (HTTP)
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Auto Scaling Policies
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref BackendAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 70.0
+
+  # CloudWatch Alarms
+  HighCPUAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm if CPU too high for more than 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 85
+      AlarmActions:
+        - !Ref BackendSNSTopic
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref BackendAutoScalingGroup
+      ComparisonOperator: GreaterThanThreshold
+
+  # SNS Topic for Alarms
+  BackendSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${EnvironmentName}-backend-alerts
+      TopicName: !Sub ${EnvironmentName}-backend-alerts
+
+Outputs:
+  BackendALBDNSName:
+    Description: DNS Name of the Application Load Balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendALBDNSName"
+  
+  BackendALBFullQualifiedDNSName:
+    Description: Full DNS Name of the Application Load Balancer
+    Value: !Sub https://${ApplicationLoadBalancer.DNSName}
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendALBURL"
+  
+  BackendAutoScalingGroupName:
+    Description: Auto Scaling Group Name
+    Value: !Ref BackendAutoScalingGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendASGName"
+  
+  BackendSecurityGroupId:
+    Description: Security Group ID for Backend Servers
+    Value: !Ref BackendSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendSGID"
+  
+  BackendSNSTopicArn:
+    Description: ARN of the SNS Topic for Backend Alerts
+    Value: !Ref BackendSNSTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendSNSTopicARN" 

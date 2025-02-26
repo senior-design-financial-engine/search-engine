@@ -1,0 +1,410 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CI/CD Pipeline for Financial News Engine'
+
+Parameters:
+  EnvironmentName:
+    Description: Environment name
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+  
+  GitHubOwner:
+    Description: GitHub repository owner
+    Type: String
+  
+  GitHubRepo:
+    Description: GitHub repository name
+    Type: String
+  
+  GitHubBranch:
+    Description: GitHub repository branch
+    Type: String
+    Default: main
+  
+  GitHubToken:
+    Description: GitHub OAuth token for repository access
+    Type: String
+    NoEcho: true
+  
+  FrontendStackName:
+    Description: Name of the frontend CloudFormation stack
+    Type: String
+    Default: financial-news-frontend
+  
+  BackendStackName:
+    Description: Name of the backend CloudFormation stack
+    Type: String
+    Default: financial-news-backend
+
+Resources:
+  # S3 bucket for storing pipeline artifacts
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-artifacts
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # IAM role for CodePipeline
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess
+      Policies:
+        - PolicyName: CodePipelineAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub "${ArtifactBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - 'cloudformation:CreateStack'
+                  - 'cloudformation:DescribeStacks'
+                  - 'cloudformation:DeleteStack'
+                  - 'cloudformation:UpdateStack'
+                  - 'cloudformation:CreateChangeSet'
+                  - 'cloudformation:ExecuteChangeSet'
+                  - 'cloudformation:DeleteChangeSet'
+                  - 'cloudformation:DescribeChangeSet'
+                  - 'cloudformation:SetStackPolicy'
+                  - 'cloudformation:ValidateTemplate'
+                Resource: 
+                  - !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${FrontendStackName}/*'
+                  - !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${BackendStackName}/*'
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService:
+                      - cloudformation.amazonaws.com
+                      - elasticbeanstalk.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:*'
+                  - 'sns:*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:*'
+                  - 'ec2:*'
+                  - 'elasticloadbalancing:*'
+                Resource: '*'
+
+  # IAM role for CodeBuild
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudFrontFullAccess
+      Policies:
+        - PolicyName: CodeBuildAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:DescribeDhcpOptions'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'ec2:DescribeSubnets'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeVpcs'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:CreateNetworkInterfacePermission'
+                Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*'
+                Condition:
+                  StringEquals:
+                    ec2:AuthorizedService: codebuild.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameters'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'secretsmanager:GetSecretValue'
+                Resource: 
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:financial-news-frontend-deployer-credentials-${EnvironmentName}*'
+
+  # Frontend CodeBuild Project
+  FrontendBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-frontend-build
+      Description: 'Build and test the frontend'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: frontend/buildspec.yml
+      TimeoutInMinutes: 15
+      Cache:
+        Type: LOCAL
+        Modes:
+          - LOCAL_CUSTOM_CACHE
+          - LOCAL_SOURCE_CACHE
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-frontend-build
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Backend CodeBuild Project
+  BackendBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-backend-build
+      Description: 'Build and test the backend'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+        PrivilegedMode: true
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: backend/buildspec.yml
+      TimeoutInMinutes: 15
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-backend-build
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Frontend Deployment CodeBuild Project
+  FrontendDeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-frontend-deploy
+      Description: 'Deploy the frontend to S3 and create CloudFront invalidation'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: ENVIRONMENT
+            Value: !Ref EnvironmentName
+          - Name: FRONTEND_STACK_NAME
+            Value: !Ref FrontendStackName
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: frontend/deployspec.yml
+      TimeoutInMinutes: 15
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-frontend-deploy
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Backend Deployment CodeBuild Project
+  BackendDeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-backend-deploy
+      Description: 'Deploy the backend to EC2 instances'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: ENVIRONMENT
+            Value: !Ref EnvironmentName
+          - Name: BACKEND_STACK_NAME
+            Value: !Ref BackendStackName
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: backend/deployspec.yml
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-backend-deploy
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # CodePipeline for CI/CD
+  FinancialNewsPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-pipeline
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubToken
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceCode
+        
+        - Name: BuildAndTest
+          Actions:
+            - Name: BuildFrontend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref FrontendBuildProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: FrontendBuildOutput
+              RunOrder: 1
+            
+            - Name: BuildBackend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BackendBuildProject
+              InputArtifacts:
+                - Name: SourceCode
+              OutputArtifacts:
+                - Name: BackendBuildOutput
+              RunOrder: 1
+        
+        - Name: Deploy
+          Actions:
+            - Name: DeployFrontend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref FrontendDeployProject
+              InputArtifacts:
+                - Name: FrontendBuildOutput
+              RunOrder: 1
+            
+            - Name: DeployBackend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BackendDeployProject
+              InputArtifacts:
+                - Name: BackendBuildOutput
+              RunOrder: 2
+      
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-pipeline
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # GitHub webhook for automatic pipeline triggering
+  GitHubWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubToken
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: !Sub refs/heads/${GitHubBranch}
+      TargetPipeline: !Ref FinancialNewsPipeline
+      TargetAction: Source
+      TargetPipelineVersion: !GetAtt FinancialNewsPipeline.Version
+      RegisterWithThirdParty: true
+
+Outputs:
+  PipelineURL:
+    Description: URL for the CI/CD pipeline
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${FinancialNewsPipeline}
+  
+  ArtifactBucketName:
+    Description: Name of the S3 bucket storing artifacts
+    Value: !Ref ArtifactBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ArtifactBucketName" 

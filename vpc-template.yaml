@@ -1,266 +1,205 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'VPC Infrastructure for Search Engine Application'
+Description: 'VPC Infrastructure for Financial News Engine'
 
 Parameters:
-  EnvironmentName:
-    Description: Environment name that will be prefixed to resource names
+  VPCName:
+    Description: Name of the VPC
     Type: String
-    Default: search-engine
+    Default: FinancialNewsVPC
+  
+  EnvironmentName:
+    Description: Environment name
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
 
-  VpcCIDR:
+  VPCCidrBlock:
     Description: CIDR block for the VPC
     Type: String
     Default: 10.0.0.0/16
 
-  PublicSubnet1CIDR:
-    Description: CIDR block for Public Subnet 1
+  ElasticsearchServiceName:
+    Description: The service name for the Elasticsearch service in the current region
     Type: String
-    Default: 10.0.1.0/24
-
-  PublicSubnet2CIDR:
-    Description: CIDR block for Public Subnet 2
-    Type: String
-    Default: 10.0.2.0/24
-
-  PrivateSubnet1CIDR:
-    Description: CIDR block for Private Subnet 1
-    Type: String
-    Default: 10.0.11.0/24
-
-  PrivateSubnet2CIDR:
-    Description: CIDR block for Private Subnet 2
-    Type: String
-    Default: 10.0.12.0/24
-
-  DatabaseSubnet1CIDR:
-    Description: CIDR block for Database Subnet 1
-    Type: String
-    Default: 10.0.21.0/24
-
-  DatabaseSubnet2CIDR:
-    Description: CIDR block for Database Subnet 2
-    Type: String
-    Default: 10.0.22.0/24
-
-  ElasticCloudVpcId:
-    Description: VPC ID of the Elastic Cloud deployment
-    Type: String
-
-  ElasticCloudVpcCidr:
-    Description: CIDR block of the Elastic Cloud VPC
-    Type: String
-
-  ElasticCloudAccountId:
-    Description: AWS Account ID where Elastic Cloud is deployed
-    Type: String
-
-  ElasticCloudRegion:
-    Description: AWS Region where Elastic Cloud is deployed
-    Type: String
-    Default: us-east-1
-
-  ElasticCloudServiceName:
-    Description: Elastic Cloud PrivateLink service name for the region
-    Type: String
-    Default: com.amazonaws.vpce.us-east-1.vpce-svc-0e42e1e06ed010238
+    Default: com.amazonaws.us-east-1.elasticsearch
 
 Resources:
-  # VPC
-  VPC:
+  # The VPC
+  FinanceNewsVPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCIDR
-      EnableDnsHostnames: true
+      CidrBlock: !Ref VPCCidrBlock
       EnableDnsSupport: true
+      EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-vpc
+          Value: !Ref VPCName
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  # Internet Gateway
+  # Internet Gateway to allow internet access
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-igw
+          Value: !Sub ${VPCName}-IGW
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  InternetGatewayAttachment:
+  # Attach the Internet Gateway to the VPC
+  VPCGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
+      VpcId: !Ref FinanceNewsVPC
       InternetGatewayId: !Ref InternetGateway
-      VpcId: !Ref VPC
 
-  # Public Subnets
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs '']
-      CidrBlock: !Ref PublicSubnet1CIDR
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-public-subnet-1
-
-  PublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs '']
-      CidrBlock: !Ref PublicSubnet2CIDR
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-public-subnet-2
-
-  # Private Subnets
-  PrivateSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs '']
-      CidrBlock: !Ref PrivateSubnet1CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-private-subnet-1
-
-  PrivateSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs '']
-      CidrBlock: !Ref PrivateSubnet2CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-private-subnet-2
-
-  # Database Subnets
-  DatabaseSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [0, !GetAZs '']
-      CidrBlock: !Ref DatabaseSubnet1CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-database-subnet-1
-
-  DatabaseSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [1, !GetAZs '']
-      CidrBlock: !Ref DatabaseSubnet2CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-database-subnet-2
-
-  # NAT Gateways with Elastic IPs
-  NatGateway1EIP:
-    Type: AWS::EC2::EIP
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      Domain: vpc
-
-  NatGateway2EIP:
-    Type: AWS::EC2::EIP
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      Domain: vpc
-
-  NatGateway1:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGateway1EIP.AllocationId
-      SubnetId: !Ref PublicSubnet1
-
-  NatGateway2:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGateway2EIP.AllocationId
-      SubnetId: !Ref PublicSubnet2
-
-  # Route Tables
+  # Create a Public Route Table
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
-      VpcId: !Ref VPC
+      VpcId: !Ref FinanceNewsVPC
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-public-routes
+          Value: !Sub ${VPCName}-Public-RT
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  DefaultPublicRoute:
+  # Create a Private Route Table
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Private-RT
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Public Route for Internet Access
+  PublicRoute:
     Type: AWS::EC2::Route
-    DependsOn: InternetGatewayAttachment
+    DependsOn: VPCGatewayAttachment
     Properties:
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
+  # Public Subnets - For load balancers and public-facing components
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Public-Subnet-1
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Public-Subnet-2
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Private Subnets - For application servers, databases, and Elasticsearch
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Private-Subnet-1
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Private-Subnet-2
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Associate Public Subnets with Public Route Table
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
 
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
 
-  PrivateRouteTable1:
-    Type: AWS::EC2::RouteTable
+  # NAT Gateway for Private Subnets to access the internet
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPC
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-private-routes-1
+          Value: !Sub ${VPCName}-NAT-GW
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  DefaultPrivateRoute1:
+  # Private Route for NAT Gateway
+  PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref PrivateRouteTable1
+      RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway1
+      NatGatewayId: !Ref NatGateway
 
+  # Associate Private Subnets with Private Route Table
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet1
-
-  PrivateRouteTable2:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-private-routes-2
-
-  DefaultPrivateRoute2:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable2
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway2
+      RouteTableId: !Ref PrivateRouteTable
 
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable2
       SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
 
   # Security Groups
-  LoadBalancerSecurityGroup:
+  AppServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Load Balancer Security Group
-      VpcId: !Ref VPC
+      GroupDescription: Security group for application servers
+      VpcId: !Ref FinanceNewsVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -270,61 +209,37 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # In production, restrict this to your IP
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-lb-sg
-
-  ApplicationSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Application Security Group
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-app-sg
-
-  DatabaseSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Database Security Group
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-db-sg
+          Value: !Sub ${VPCName}-AppServer-SG
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
   ElasticsearchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Elastic Cloud PrivateLink endpoint
-      VpcId: !Ref VPC
+      GroupDescription: Security group for Elasticsearch
+      VpcId: !Ref FinanceNewsVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
+          FromPort: 9200
+          ToPort: 9300
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
         - IpProtocol: tcp
-          FromPort: 9243
-          ToPort: 9243
-          SourceSecurityGroupId: !Ref ApplicationSecurityGroup
+          FromPort: 5601
+          ToPort: 5601
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-es-sg
+          Value: !Sub ${VPCName}-Elasticsearch-SG
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  # VPC Endpoints
+  # VPC Endpoints for AWS services
   S3VPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -334,106 +249,91 @@ Resources:
           - Effect: Allow
             Principal: '*'
             Action:
-              - 's3:*'
+              - 's3:GetObject'
+              - 's3:PutObject'
             Resource: '*'
       RouteTableIds:
-        - !Ref PrivateRouteTable1
-        - !Ref PrivateRouteTable2
+        - !Ref PrivateRouteTable
+        - !Ref PublicRouteTable
       ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
-      VpcId: !Ref VPC
-
-  # Replace VPC Peering with PrivateLink resources
-  ElasticCloudVPCEndpoint:
+      VpcId: !Ref FinanceNewsVPC
+      
+  # PrivateLink Endpoint for Elasticsearch
+  ElasticsearchVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
-      VpcId: !Ref VPC
-      ServiceName: com.amazonaws.vpce.us-east-1.vpce-svc-0e42e1e06ed010238
       VpcEndpointType: Interface
+      PrivateDnsEnabled: false
       SubnetIds:
         - !Ref PrivateSubnet1
         - !Ref PrivateSubnet2
       SecurityGroupIds:
-        - !Ref ElasticsearchSecurityGroup
-      PrivateDnsEnabled: false
-
-  # Private DNS Zone for Elastic Cloud
-  ElasticCloudPrivateHostedZone:
-    Type: AWS::Route53::HostedZone
+        - !Ref ElasticsearchEndpointSecurityGroup
+      ServiceName: !Ref ElasticsearchServiceName
+      VpcId: !Ref FinanceNewsVPC
+      
+  # Security Group for Elasticsearch PrivateLink Endpoint
+  ElasticsearchEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      Name: vpce.us-east-1.aws.elastic-cloud.com
-      VPCs:
-        - VPCId: !Ref VPC
-          VPCRegion: !Ref AWS::Region
-      HostedZoneConfig:
-        Comment: Private hosted zone for Elastic Cloud PrivateLink
-
-  ElasticCloudDNSRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref ElasticCloudPrivateHostedZone
-      Name: "*.vpce.us-east-1.aws.elastic-cloud.com"
-      Type: CNAME
-      TTL: 300
-      ResourceRecords:
-        - !Select [1, !Split [":", !Select [0, !GetAtt ElasticCloudVPCEndpoint.DnsEntries]]]
+      GroupDescription: Security group for Elasticsearch PrivateLink endpoint
+      VpcId: !Ref FinanceNewsVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-ES-Endpoint-SG
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
 Outputs:
   VPC:
     Description: VPC ID
-    Value: !Ref VPC
+    Value: !Ref FinanceNewsVPC
     Export:
-      Name: !Sub ${EnvironmentName}-VPCID
+      Name: !Sub ${AWS::StackName}-VPCID
 
-  PublicSubnets:
-    Description: A list of public subnets
-    Value: !Join [",", [!Ref PublicSubnet1, !Ref PublicSubnet2]]
+  PublicSubnet1:
+    Description: Public Subnet 1 ID
+    Value: !Ref PublicSubnet1
     Export:
-      Name: !Sub ${EnvironmentName}-PUBLIC-SUBNETS
+      Name: !Sub ${AWS::StackName}-PublicSubnet1ID
 
-  PrivateSubnets:
-    Description: A list of private subnets
-    Value: !Join [",", [!Ref PrivateSubnet1, !Ref PrivateSubnet2]]
+  PublicSubnet2:
+    Description: Public Subnet 2 ID
+    Value: !Ref PublicSubnet2
     Export:
-      Name: !Sub ${EnvironmentName}-PRIVATE-SUBNETS
+      Name: !Sub ${AWS::StackName}-PublicSubnet2ID
 
-  DatabaseSubnets:
-    Description: A list of database subnets
-    Value: !Join [",", [!Ref DatabaseSubnet1, !Ref DatabaseSubnet2]]
+  PrivateSubnet1:
+    Description: Private Subnet 1 ID
+    Value: !Ref PrivateSubnet1
     Export:
-      Name: !Sub ${EnvironmentName}-DATABASE-SUBNETS
+      Name: !Sub ${AWS::StackName}-PrivateSubnet1ID
 
-  LoadBalancerSecurityGroup:
-    Description: Security group for load balancer
-    Value: !Ref LoadBalancerSecurityGroup
+  PrivateSubnet2:
+    Description: Private Subnet 2 ID
+    Value: !Ref PrivateSubnet2
     Export:
-      Name: !Sub ${EnvironmentName}-LB-SG
+      Name: !Sub ${AWS::StackName}-PrivateSubnet2ID
 
-  ApplicationSecurityGroup:
-    Description: Security group for application servers
-    Value: !Ref ApplicationSecurityGroup
+  AppServerSecurityGroup:
+    Description: Security Group for Application Servers
+    Value: !Ref AppServerSecurityGroup
     Export:
-      Name: !Sub ${EnvironmentName}-APP-SG
-
-  DatabaseSecurityGroup:
-    Description: Security group for database
-    Value: !Ref DatabaseSecurityGroup
-    Export:
-      Name: !Sub ${EnvironmentName}-DB-SG
+      Name: !Sub ${AWS::StackName}-AppServerSG
 
   ElasticsearchSecurityGroup:
-    Description: Security group for Elasticsearch
+    Description: Security Group for Elasticsearch
     Value: !Ref ElasticsearchSecurityGroup
     Export:
-      Name: !Sub ${EnvironmentName}-ES-SG
+      Name: !Sub ${AWS::StackName}-ElasticsearchSG
 
-  ElasticCloudVPCEndpointId:
-    Description: VPC Endpoint ID for Elastic Cloud
-    Value: !Ref ElasticCloudVPCEndpoint
+  ElasticsearchVPCEndpoint:
+    Description: Elasticsearch PrivateLink Endpoint
+    Value: !Ref ElasticsearchVPCEndpoint
     Export:
-      Name: !Sub ${EnvironmentName}-ES-VPCE-ID
-
-  ElasticCloudVPCEndpointDNS:
-    Description: DNS entries for Elastic Cloud VPC Endpoint
-    Value: !Select [0, !GetAtt ElasticCloudVPCEndpoint.DnsEntries]
-    Export:
-      Name: !Sub ${EnvironmentName}-ES-VPCE-DNS 
+      Name: !Sub ${AWS::StackName}-ElasticsearchEndpoint 
