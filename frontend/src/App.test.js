@@ -10,3 +10,9 @@ test('renders Financial Search Engine navbar', () => {
   const titleElement = screen.getByText(/Financial Search Engine/i);
   expect(titleElement).toBeInTheDocument();
 });
+
+test('renders navigation links', () => {
+  render(<App />);
+  const homeLink = screen.getByText(/Home/i);
+  expect(homeLink).toBeInTheDocument();
+});

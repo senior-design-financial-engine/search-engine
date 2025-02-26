@@ -1,51 +1,87 @@
 version: 0.2
-# This file serves as an entry point for CodeBuild when it's looking for deployspec.yml
-# It ensures the correct paths are set up for the actual build process
+# frontend/deployspec.yml - This file is needed by CodeBuild configuration
 
 phases:
   install:
     runtime-versions:
       nodejs: 16
     commands:
-      - echo "Starting deployment process with deployspec.yml..."
+      - echo "Running from frontend/deployspec.yml"
       - echo "Current directory: $(pwd)"
       - ls -la
-      - ls -la frontend || echo "Cannot find frontend directory"
-      
-      # CodeBuild environment setup
+      # Handle different directory structures
       - |
-        if [ -d "/codebuild" ]; then
-          echo "In CodeBuild environment, setting up paths..."
-          CODEBUILD_SRC_DIR_PATH=$(echo $CODEBUILD_SRC_DIR)
-          echo "CodeBuild source directory: $CODEBUILD_SRC_DIR_PATH"
-          
-          # If a buildspec.yml exists, tell CodeBuild to use it for the next phase
-          if [ -f "frontend/buildspec.yml" ]; then
-            echo "Found buildspec.yml, using it for the build process..."
-            cp frontend/buildspec.yml $CODEBUILD_SRC_DIR_PATH/buildspec.yml
+        # If we're in the project root but need to be in frontend
+        if [ -d "frontend" ] && [ ! -f "package.json" ]; then
+          echo "Changing directory to frontend/"
+          cd frontend
+        # If we're already in the frontend directory, just confirm
+        elif [ -f "package.json" ]; then
+          echo "Already in frontend directory"
+        # If we're in some other structure, try to adapt
+        else
+          echo "Unexpected directory structure, trying to adapt..."
+          # Try to find package.json
+          PACKAGE_JSON_PATH=$(find . -name package.json -not -path "*/node_modules/*" | head -1)
+          if [ -n "$PACKAGE_JSON_PATH" ]; then
+            FRONTEND_DIR=$(dirname "$PACKAGE_JSON_PATH")
+            echo "Found package.json in $FRONTEND_DIR, changing directory"
+            cd "$FRONTEND_DIR"
+          else
+            echo "WARNING: Could not find package.json, build may fail"
           fi
         fi
+      # Now that we're in the right directory, install dependencies
+      - npm install
 
   pre_build:
     commands:
-      - echo "Pre-build phase in deployspec.yml"
-      - echo "Environment variables: ENVIRONMENT=$ENVIRONMENT, AWS_REGION=$AWS_REGION, FRONTEND_STACK_NAME=$FRONTEND_STACK_NAME"
+      - echo "Running tests..."
+      - npm test -- --watchAll=false --testEnvironment=jsdom
 
   build:
     commands:
-      - echo "Build phase in deployspec.yml"
-      # Add any deployment-specific build steps here
+      - echo "Building the frontend..."
+      - npm run build
+      - echo "Build completed on `date`"
+      # Copy the appspec.yml to build directory for deployment
+      - |
+        if [ -f "../appspec.yml" ]; then
+          echo "Copying appspec.yml from parent directory to build/"
+          cp ../appspec.yml build/
+        elif [ -f "appspec.yml" ]; then
+          echo "Copying appspec.yml to build/"
+          cp appspec.yml build/
+        else
+          echo "WARNING: appspec.yml not found, deployment may fail"
+        fi
+      # Copy scripts to build directory for deployment 
+      - |
+        if [ -d "../scripts" ]; then
+          echo "Copying scripts/ from parent directory to build/"
+          mkdir -p build/scripts
+          cp -r ../scripts/* build/scripts/
+        elif [ -d "scripts" ]; then
+          echo "Copying scripts/ to build/"
+          mkdir -p build/scripts
+          cp -r scripts/* build/scripts/
+        else
+          echo "WARNING: scripts directory not found, deployment may fail"
+        fi
 
   post_build:
     commands:
-      - echo "Post-build phase in deployspec.yml"
-      # Add any deployment-specific post-build steps here
+      - echo "Post-build phase completed"
+      - echo "Listing contents of build directory:"
+      - ls -la build
+      - echo "Deployment artifacts ready in build/"
 
 artifacts:
+  base-directory: build
   files:
     - '**/*'
   discard-paths: no
 
 cache:
   paths:
-    - 'frontend/node_modules/**/*' 
+    - 'node_modules/**/*' 
