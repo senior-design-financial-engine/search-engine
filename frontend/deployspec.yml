@@ -1,4 +1,7 @@
 version: 0.2
+# This file should be at frontend/deployspec.yml in the repository
+# If CodeBuild expects it at /codebuild/output/src2785146540/src/frontend/deployspec.yml
+# ensure your build process copies it to that location
 
 phases:
   install:
