@@ -31,6 +31,11 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - Regional news coverage analysis
 - Company mention tracking
 
+### Development Features
+- Mock data generator for frontend development
+- Configurable environment variables to toggle mock/real backends
+- CI/CD integration with AWS deployment
+
 ## Technical Architecture
 
 ### Frontend (React.js)
@@ -44,6 +49,7 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - CORS support
 - Elasticsearch integration
 - Environment-based configuration
+- Mock data generator for development and testing
 
 ### Core Components
 1. **Web Crawler**
@@ -87,6 +93,12 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - Python virtual environment for backend
 - Elasticsearch instance
 - Environment configuration (.env)
+
+### Mock Data Mode
+For development without an Elasticsearch instance:
+1. Set `USE_MOCK_DATA=true` in your environment file
+2. Run the backend server as normal
+3. All API requests will return realistic fake financial news data
 
 ## Differentiators
 

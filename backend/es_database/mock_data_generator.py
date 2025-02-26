@@ -1,27 +1,7 @@
-import os
-import unittest
-from unittest import mock
-from unittest.mock import patch, MagicMock
-from es_database.Engine import Engine
-from es_database.mock_data_generator import (
-    generate_fake_article, 
-    generate_fake_articles,
-    generate_fake_id,
-    generate_mock_search_response
-)
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
 import random
 import json
-from flask import Flask, jsonify, request
-
-# Use the test environment
-load_dotenv('.env.test')
-
-# Create a Flask app for the mock API
-app = Flask(__name__)
-from flask_cors import CORS
-CORS(app)
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
 
 # Sample data for generating fake articles
 sources = ["Bloomberg", "Reuters", "CNBC", "Financial Times", "Wall Street Journal", "MarketWatch", "Barron's"]
@@ -41,12 +21,17 @@ headline_templates = [
     "{sector} Sector Outlook: Focus on {company}"
 ]
 
-# Helper functions to generate random fake articles
+def generate_fake_id():
+    """Generate a fake document ID."""
+    return f"{random.randint(1000, 9999)}-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}"
+
 def generate_fake_date(days_ago_max=30):
+    """Generate a random date within the specified range."""
     days_ago = random.randint(0, days_ago_max)
     return (datetime.now() - timedelta(days=days_ago)).strftime('%Y-%m-%d')
 
 def generate_fake_headline():
+    """Generate a realistic-looking financial news headline."""
     template = random.choice(headline_templates)
     company = random.choice(companies)
     company2 = random.choice([c for c in companies if c != company])
@@ -67,6 +52,7 @@ def generate_fake_headline():
     )
 
 def generate_fake_article():
+    """Generate a single fake financial news article."""
     company = random.choice(companies)
     published_date = generate_fake_date()
     sentiment = random.choice(sentiment_options)
@@ -96,27 +82,35 @@ def generate_fake_article():
     }
 
 def generate_fake_articles(count=10):
+    """Generate multiple fake articles."""
     return [generate_fake_article() for _ in range(count)]
 
-# API routes for frontend testing
-@app.route('/query', methods=['GET'])
-def query():
-    query_text = request.args.get('query', '')
-    source = request.args.get('source', None)
-    time_range = request.args.get('time_range', None)
+def generate_mock_search_response(query_text="", source=None, time_range=None, count=None):
+    """
+    Generate a mock search response that matches the Elasticsearch response format.
     
-    # Generate between 5 and 15 fake results
-    results_count = random.randint(5, 15)
+    Args:
+        query_text: The search query text
+        source: Optional source filter
+        time_range: Optional time range filter
+        count: Number of results to generate (if None, generates a random number)
+        
+    Returns:
+        Dict that mimics Elasticsearch search response
+    """
+    # Generate between 5 and 15 fake results if count not specified
+    results_count = count if count is not None else random.randint(5, 15)
     
-    # Filter by source if specified
+    # Generate fake articles
     fake_articles = generate_fake_articles(results_count)
     
+    # Filter by source if specified
     if source:
         fake_articles = [article for article in fake_articles if article["_source"]["source"] == source]
     
     # If query contains a company name, bias results toward that company
     for company in companies:
-        if company.lower() in query_text.lower():
+        if query_text and company.lower() in query_text.lower():
             for article in fake_articles[:3]:  # Modify first few results
                 article["_source"]["headline"] = article["_source"]["headline"].replace(
                     random.choice(companies), company
@@ -124,86 +118,70 @@ def query():
                 article["_source"]["companies"][0]["name"] = company
                 article["_source"]["companies"][0]["ticker"] = company[:3].upper()
     
-    response = {
+    # Return in Elasticsearch response format
+    return {
         "hits": {
             "total": {"value": len(fake_articles)},
             "hits": fake_articles
         }
     }
-    
-    return jsonify(response)
 
-# Mock the elasticsearch client for testing
-@mock.patch('es_database.Engine.Elasticsearch')
-class TestElasticsearch(unittest.TestCase):
-    def setUp(self, mock_es):
-        # Configure the mock
-        mock_es.return_value = MagicMock()
-        self.mock_es = mock_es.return_value
-        
-        # Setup index operations mock
-        self.mock_es.indices.exists.return_value = True
-        self.mock_es.indices.get_mapping.return_value = {'test_index': {'mappings': {}}}
-        self.mock_es.indices.create.return_value = {'acknowledged': True}
-        
-        # Setup search mock with our fake article generator
-        def mock_search(*args, **kwargs):
-            fake_articles = generate_fake_articles(5)
-            return {
-                'hits': {
-                    'total': {'value': len(fake_articles)},
-                    'hits': fake_articles
-                }
-            }
-        
-        self.mock_es.search.side_effect = mock_search
-        
-        # Initialize the engine with the mock
-        self.engine = Engine()
-        
-    def test_engine_initialization(self, mock_es):
-        """Test that the engine initializes correctly."""
-        self.assertIsNotNone(self.engine)
-        self.assertIsNotNone(self.engine.config)
-        
-    def test_search_articles(self, mock_es):
-        """Test the search functionality with fake articles."""
-        try:
-            results = self.engine.search_news("test query")
-            self.assertIsNotNone(results)
-            self.assertIn('hits', results)
-            self.assertGreater(len(results['hits']['hits']), 0)
-        except AttributeError:
-            # If search_news method doesn't exist, try other method names
-            try:
-                results = self.engine.search("test query")
-                self.assertIsNotNone(results)
-            except AttributeError:
-                pass
-        
-    def test_index_article(self, mock_es):
-        """Test indexing an article."""
-        article = generate_fake_article()["_source"]
-        self.mock_es.index.return_value = {'result': 'created', '_id': generate_fake_id()}
-        
-        # Call the index method with our fake article
-        try:
-            result = self.engine.add_article(article)
-            self.assertIsNotNone(result)
-        except AttributeError:
-            # If add_article method doesn't exist, try other potential method names
-            try:
-                result = self.engine.index(article)
-                self.assertIsNotNone(result)
-            except AttributeError:
-                pass
-
-if __name__ == '__main__':
-    # Run as API server if called directly
-    print("Starting mock Elasticsearch API server for frontend testing...")
-    print("Generating fake articles for search results")
-    print("Access the API at: http://127.0.0.1:5001/query?query=your+search+query")
-    app.run(host='127.0.0.1', port=5001, debug=True)
+# Mock Engine class that mimics the real Engine but uses fake data
+class MockEngine:
+    """
+    A mock implementation of the Engine class that returns fake data.
+    This can be used as a drop-in replacement for the real Engine.
+    """
     
-    # To run the tests instead, use unittest.main()
-    unittest.main() 
+    def __init__(self):
+        """Initialize the mock engine."""
+        # We don't need actual Elasticsearch connection
+        pass
+    
+    def search_news(self, query_text=None, filters=None, time_range=None):
+        """
+        Mock implementation of search_news that returns fake articles.
+        
+        Args:
+            query_text: Search query text
+            filters: Optional filters dictionary
+            time_range: Optional time range dictionary
+            
+        Returns:
+            Dict containing fake search results in Elasticsearch format
+        """
+        source = None
+        if filters and 'source' in filters:
+            source = filters['source']
+            
+        return generate_mock_search_response(query_text, source, time_range)
+    
+    def add_article(self, article, embeddings=None, custom_id=None):
+        """
+        Mock implementation of add_article.
+        
+        Args:
+            article: Article data dictionary
+            embeddings: Optional embeddings
+            custom_id: Optional custom ID
+            
+        Returns:
+            Fake document ID
+        """
+        # Just return a fake ID as if we indexed the document
+        return generate_fake_id()
+    
+    def get_article_by_id(self, article_id):
+        """
+        Mock implementation of get_article_by_id.
+        
+        Args:
+            article_id: Article ID
+            
+        Returns:
+            Fake article data
+        """
+        # Generate a deterministic article based on the ID
+        article = generate_fake_article()
+        article["_id"] = article_id
+        return article["_source"] 

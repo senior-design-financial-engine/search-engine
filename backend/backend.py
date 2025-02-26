@@ -2,11 +2,16 @@ from flask import Flask, request, jsonify
 from typing import Dict, Optional, List
 from scraper import WebScraper
 from indexer import Indexer
-from es_database import Engine
 from dotenv import load_dotenv
 import logging
 import os
 from flask_cors import CORS
+
+# Load environment variables
+load_dotenv()
+
+# Check if we should use mock data
+USE_MOCK_DATA = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -15,15 +20,20 @@ logger = logging.getLogger(__name__)
 class BackEnd:
     def __init__(self, embedding_model_path: str, num_dim: int):
         try:
-            # Load environment variables
-            load_dotenv()
-            
             # Initialize components
             # self.web_scraper = WebScraper()
             # self.indexer = Indexer(embedding_model_path, num_dim)
-            self.engine = Engine()
-            self.engine.config.validate_config()
-            logger.info("Backend initialized successfully")
+            
+            # Use mock or real Engine based on environment variable
+            if USE_MOCK_DATA:
+                from es_database.mock_data_generator import MockEngine
+                self.engine = MockEngine()
+                logger.info("Backend initialized with MOCK Elasticsearch engine")
+            else:
+                from es_database import Engine
+                self.engine = Engine()
+                self.engine.config.validate_config()
+                logger.info("Backend initialized with real Elasticsearch engine")
         except Exception as e:
             logger.error(f"Failed to initialize backend: {str(e)}")
             raise
@@ -34,7 +44,6 @@ class BackEnd:
         filters: Optional[Dict] = None,
         time_range: Optional[Dict] = None
     ) -> Dict:
-        logger.info(msg=f"hello {filters}")
         """Process a search query with optional filters and time range."""
         try:
             results = self.engine.search_news(query_text, filters, time_range)
@@ -54,12 +63,20 @@ class BackEnd:
         filters: Optional[Dict] = None,
         time_range: Optional[Dict] = None
     ):
-        dummy_results = [
-            { "url": 'https://example.com/1', "snippet": 'Result 1 summary...', "sentiment": 'Positive', "date": '2024-11-01' },
-            { "url": 'https://example.com/2', "snippet": 'Result 2 summary...', "sentiment": 'Neutral', "date": '2024-11-02' },
-            { "url": 'https://example.com/3', "snippet": 'Result 3 summary...', "sentiment": 'Negative', "date": '2024-11-03' }
-            ]
-        return dummy_results
+        # This method is deprecated in favor of the MockEngine
+        # but kept for backward compatibility
+        if USE_MOCK_DATA:
+            from es_database.mock_data_generator import generate_mock_search_response
+            return generate_mock_search_response(query_text, 
+                                               filters.get('source') if filters else None, 
+                                               time_range)['hits']['hits']
+        else:
+            dummy_results = [
+                { "url": 'https://example.com/1', "snippet": 'Result 1 summary...', "sentiment": 'Positive', "date": '2024-11-01' },
+                { "url": 'https://example.com/2', "snippet": 'Result 2 summary...', "sentiment": 'Neutral', "date": '2024-11-02' },
+                { "url": 'https://example.com/3', "snippet": 'Result 3 summary...', "sentiment": 'Negative', "date": '2024-11-03' }
+                ]
+            return dummy_results
 
 # Initialize the backend
 embedding_model_path = 'models/embedding_model.pth'
@@ -73,13 +90,12 @@ def query():
         source = request.args.get('source', None)
         time_range = request.args.get('time_range', None)
         
-        filters = {
-            "source": source
-        }
-        
-        logger.info(msg=f"hello {filters}")
+        filters = {}
+        if source:
+            filters["source"] = source
         
         results = backend.process_search_query(query_text, filters, time_range)
+        # This line is commented out in favor of the integrated mock support
         # results = backend.dummy_search(query_text, filters, time_range)
         return jsonify(results)
     except Exception as e:
