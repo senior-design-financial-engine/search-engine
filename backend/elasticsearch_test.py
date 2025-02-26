@@ -133,10 +133,16 @@ def query():
     
     return jsonify(response)
 
-# Mock the elasticsearch client for testing
-@mock.patch('es_database.Engine.Elasticsearch')
+# Test class for Elasticsearch
 class TestElasticsearch(unittest.TestCase):
-    def setUp(self, mock_es):
+    def setUp(self):
+        """Setup test environment without requiring mock_es parameter"""
+        # This will be populated in the test methods with patch
+        self.mock_es = None
+        self.engine = None
+        
+    def setup_mock_es(self, mock_es):
+        """Configure the ES mock - to be called inside test methods"""
         # Configure the mock
         mock_es.return_value = MagicMock()
         self.mock_es = mock_es.return_value
@@ -160,14 +166,18 @@ class TestElasticsearch(unittest.TestCase):
         
         # Initialize the engine with the mock
         self.engine = Engine()
-        
+
+    @patch('es_database.Engine.Elasticsearch')
     def test_engine_initialization(self, mock_es):
         """Test that the engine initializes correctly."""
+        self.setup_mock_es(mock_es)
         self.assertIsNotNone(self.engine)
         self.assertIsNotNone(self.engine.config)
-        
+    
+    @patch('es_database.Engine.Elasticsearch')    
     def test_search_articles(self, mock_es):
         """Test the search functionality with fake articles."""
+        self.setup_mock_es(mock_es)
         try:
             results = self.engine.search_news("test query")
             self.assertIsNotNone(results)
@@ -180,9 +190,11 @@ class TestElasticsearch(unittest.TestCase):
                 self.assertIsNotNone(results)
             except AttributeError:
                 pass
-        
+    
+    @patch('es_database.Engine.Elasticsearch')
     def test_index_article(self, mock_es):
         """Test indexing an article."""
+        self.setup_mock_es(mock_es)
         article = generate_fake_article()["_source"]
         self.mock_es.index.return_value = {'result': 'created', '_id': generate_fake_id()}
         
@@ -199,11 +211,14 @@ class TestElasticsearch(unittest.TestCase):
                 pass
 
 if __name__ == '__main__':
-    # Run as API server if called directly
-    print("Starting mock Elasticsearch API server for frontend testing...")
-    print("Generating fake articles for search results")
-    print("Access the API at: http://127.0.0.1:5001/query?query=your+search+query")
-    app.run(host='127.0.0.1', port=5001, debug=True)
-    
-    # To run the tests instead, use unittest.main()
-    unittest.main() 
+    # Check if we should run the API server or tests
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '--server':
+        # Run as API server if flag is provided
+        print("Starting mock Elasticsearch API server for frontend testing...")
+        print("Generating fake articles for search results")
+        print("Access the API at: http://127.0.0.1:5001/query?query=your+search+query")
+        app.run(host='127.0.0.1', port=5001, debug=True)
+    else:
+        # Run tests by default
+        unittest.main() 
