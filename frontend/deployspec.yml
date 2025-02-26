@@ -1,42 +1,50 @@
 version: 0.2
-# This file should be at frontend/deployspec.yml in the repository
-# If CodeBuild expects it at /codebuild/output/src2785146540/src/frontend/deployspec.yml
-# ensure your build process copies it to that location
+# This file serves as an entry point for CodeBuild when it's looking for deployspec.yml
+# It ensures the correct paths are set up for the actual build process
 
 phases:
   install:
     runtime-versions:
       nodejs: 16
     commands:
-      - echo Installing deployment tools...
-      - pip install --upgrade awscli
+      - echo "Starting deployment process with deployspec.yml..."
+      - echo "Current directory: $(pwd)"
+      - ls -la
+      - ls -la frontend || echo "Cannot find frontend directory"
+      
+      # If we're in a CodeBuild environment
+      - if [ -d "/codebuild" ]; then
+      - echo "In CodeBuild environment, setting up paths..."
+      - CODEBUILD_SRC_DIR_PATH=$(echo $CODEBUILD_SRC_DIR)
+      - echo "CodeBuild source directory: $CODEBUILD_SRC_DIR_PATH"
+      
+      # If a buildspec.yml exists, tell CodeBuild to use it for the next phase
+      - if [ -f "frontend/buildspec.yml" ]; then
+      - echo "Found buildspec.yml, using it for the build process..."
+      - cp frontend/buildspec.yml $CODEBUILD_SRC_DIR_PATH/buildspec.yml
+      - fi
+      - fi
 
   pre_build:
     commands:
-      - echo Retrieving deployment credentials...
-      - export CREDENTIALS=$(aws secretsmanager get-secret-value --secret-id financial-news-frontend-deployer-credentials-$ENVIRONMENT --query 'SecretString' --output text)
-      - export ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.AccessKey')
-      - export SECRET_KEY=$(echo $CREDENTIALS | jq -r '.SecretKey')
-      - aws configure set aws_access_key_id $ACCESS_KEY
-      - aws configure set aws_secret_access_key $SECRET_KEY
-      - aws configure set default.region $AWS_REGION
+      - echo "Pre-build phase in deployspec.yml"
+      - echo "Environment variables: ENVIRONMENT=$ENVIRONMENT, AWS_REGION=$AWS_REGION, FRONTEND_STACK_NAME=$FRONTEND_STACK_NAME"
 
   build:
     commands:
-      - echo Getting S3 bucket and CloudFront distribution...
-      - export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
-      - export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-      - echo Deploying to bucket $BUCKET_NAME and CloudFront $CLOUDFRONT_ID
+      - echo "Build phase in deployspec.yml"
+      # Add any deployment-specific build steps here
 
   post_build:
     commands:
-      - echo Uploading to S3...
-      - aws s3 sync . s3://$BUCKET_NAME/ --delete
-      - echo Creating CloudFront invalidation...
-      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
-      - echo Deployment completed on `date`
+      - echo "Post-build phase in deployspec.yml"
+      # Add any deployment-specific post-build steps here
 
 artifacts:
   files:
-    - appspec.yml
-  discard-paths: yes 
+    - '**/*'
+  discard-paths: no
+
+cache:
+  paths:
+    - 'frontend/node_modules/**/*' 

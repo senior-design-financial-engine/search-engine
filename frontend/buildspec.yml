@@ -5,30 +5,30 @@ phases:
     runtime-versions:
       nodejs: 16
     commands:
-      - echo Installing dependencies...
+      - echo "Installing dependencies..."
+      - pwd
+      # If running from the root directory or frontend directory
+      - if [ -d "frontend" ]; then
       - cd frontend
+      - elif [ -d "../frontend" ]; then
+      - cd ../frontend
+      - fi
       - npm install
 
   pre_build:
     commands:
-      - echo Running tests...
+      - echo "Running tests..."
       - npm test -- --watchAll=false --testEnvironment=jsdom
 
   build:
     commands:
-      - echo Building the frontend...
+      - echo "Building the frontend..."
       - npm run build
-      - echo Build completed on `date`
+      - echo "Build completed on `date`"
       
   post_build:
     commands:
-      - echo Copying deployspec.yml to expected location...
-      - echo "Current directory is $(pwd)"
-      - ls -la
-      - ls -la frontend || echo "Cannot access frontend directory"
-      - mkdir -p /codebuild/output/src492692500/src/frontend || true
-      - cp frontend/deployspec.yml /codebuild/output/src492692500/src/frontend || echo "Failed to copy deployspec.yml"
-      - ls -la /codebuild/output/src492692500/src/frontend || echo "Cannot access target directory"
+      - echo "Post-build phase completed successfully"
 
 artifacts:
   base-directory: frontend/build
