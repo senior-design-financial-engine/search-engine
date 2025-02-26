@@ -21,7 +21,7 @@ phases:
     commands:
       - echo Building the backend deployment package...
       - mkdir -p dist
-      - zip -r ../dist/backend.zip .
+      - zip -r dist/backend.zip .
       - echo Build completed on `date`
 
 artifacts:
