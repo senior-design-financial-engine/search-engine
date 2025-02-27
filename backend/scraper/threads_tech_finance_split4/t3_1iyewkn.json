@@ -1,0 +1,39 @@
+{
+    "post": {
+        "id": "t3_1iyewkn",
+        "category": "finance2",
+        "query": "(BlackRock OR BLK OR Visa OR V OR Mastercard OR MA OR American Express OR AXP OR Charles Schwab OR SCHW OR Berkshire Hathaway OR BRK.A OR BRK.B)",
+        "subreddit": "stocks",
+        "title": "Why have the German stocks been rising fairly quickly even though Germany's been in recession since 2023?",
+        "body": "So I'm using DAX PERFORMANCE-INDEX as a reference. I invest in American stocks but because of my general curiosity, I started doing research on other countries' stock markets. According to what I read, Germany has been in \"recession\" since 2023 and their economy either had negative growth or zero growth and yet, their general stock prices have been growing steadily and relatively fast. How so?",
+        "url": "https://www.reddit.com/r/stocks/comments/1iyewkn/why_have_the_german_stocks_been_rising_fairly/",
+        "upVotes": 63,
+        "upVoteRatio": 0.8
+    },
+    "comments": [
+        {
+            "id": "t1_metyzji",
+            "username": "istockusername",
+            "body": "The stock market is forward looking and people are looking for cheaper valuations compared to US stocks.",
+            "url": "https://www.reddit.com/r/stocks/comments/1iyewkn/why_have_the_german_stocks_been_rising_fairly/metyzji/",
+            "upVotes": 146,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_meu0gmc",
+            "username": "Diamondhands4dagainz",
+            "body": "Lol cheaper valuations yet the shit that is being pumped in Germany all have P/E\u2018s of over 100",
+            "url": "https://www.reddit.com/r/stocks/comments/1iyewkn/why_have_the_german_stocks_been_rising_fairly/meu0gmc/",
+            "upVotes": -64,
+            "upVoteRatio": null
+        },
+        {
+            "id": "t1_meuiibk",
+            "username": "BenMic81",
+            "body": "The shit that is pumped - yes. Many pretty healthy major companies - no.\n\nTake BASF for example: PE rate is under 12, dividend was over 6% before upwards trend (I went in @ ~43) and is still above 4%. While it has a China exposure the core business is pretty solid. Dow Chemical (which is comparable) has a PE of about 25 currently and that\u2019s after it went down from 53 to 39.\n\nOr take Mercedes and compare the valuation to Tesla (ok, special case I know). But let\u2019s stick with others:\n\nAllianz for example. PE is 13. CIGNA has a PE of 30.\n\nWhich companies have more than 100 Pe? SAP as a software company has a PE of 104. Rheinmetall has one of 80. The latter is easier to explain for me.\n\nThe overall PE of the DAX40 is about 14. The overall PE of the S&amp;P500 is about 30.",
+            "url": "https://www.reddit.com/r/stocks/comments/1iyewkn/why_have_the_german_stocks_been_rising_fairly/meuiibk/",
+            "upVotes": 52,
+            "upVoteRatio": null
+        }
+    ]
+}
