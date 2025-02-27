@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, ProgressBar, Badge } from 'react-bootstrap';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement } from 'chart.js';
+import { Pie, Bar, Line } from 'react-chartjs-2';
 import '../styles/SideMenu.css';
+
+// Register Chart.js components
+ChartJS.register(
+  ArcElement, 
+  Tooltip, 
+  Legend, 
+  CategoryScale, 
+  LinearScale, 
+  BarElement, 
+  Title,
+  PointElement,
+  LineElement
+);
 
 const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [sentimentCounts, setSentimentCounts] = useState({ positive: 0, negative: 0, neutral: 0 });
@@ -8,6 +23,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [timeDistribution, setTimeDistribution] = useState({});
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
+  const [monthlyTrends, setMonthlyTrends] = useState({});
 
   useEffect(() => {
     if (results && results.length > 0) {
@@ -33,14 +49,42 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Calculate time distribution
       const times = {};
+      const monthlyData = {};
+      
+      // Initialize months array for the last 6 months
+      const months = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthName = date.toLocaleString('default', { month: 'short' });
+        months.push(monthName);
+        monthlyData[monthName] = { articles: 0, positive: 0, negative: 0, neutral: 0 };
+      }
+      
       results.forEach(article => {
         if (article.published_at) {
           const date = new Date(article.published_at);
           const month = date.toLocaleString('default', { month: 'short' });
           times[month] = (times[month] || 0) + 1;
+          
+          // Add to monthly trends if within last 6 months
+          if (monthlyData[month]) {
+            monthlyData[month].articles += 1;
+            
+            if (article.sentiment) {
+              const sentiment = article.sentiment.toLowerCase();
+              if (sentiment === 'positive' || sentiment === 'negative' || sentiment === 'neutral') {
+                monthlyData[month][sentiment] += 1;
+              }
+            } else {
+              monthlyData[month].neutral += 1;
+            }
+          }
         }
       });
+      
       setTimeDistribution(times);
+      setMonthlyTrends(monthlyData);
 
       // Find top companies mentioned
       const companies = {};
@@ -107,6 +151,83 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
   // Calculate total for percentages
   const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
+  
+  // Prepare chart data
+  const sentimentChartData = {
+    labels: ['Positive', 'Neutral', 'Negative'],
+    datasets: [
+      {
+        data: [sentimentCounts.positive, sentimentCounts.neutral, sentimentCounts.negative],
+        backgroundColor: ['rgba(40, 167, 69, 0.7)', 'rgba(23, 162, 184, 0.7)', 'rgba(220, 53, 69, 0.7)'],
+        borderColor: ['rgba(40, 167, 69, 1)', 'rgba(23, 162, 184, 1)', 'rgba(220, 53, 69, 1)'],
+        borderWidth: 1,
+      },
+    ],
+  };
+  
+  const sourceChartData = {
+    labels: Object.keys(sourceCounts).slice(0, 5),
+    datasets: [
+      {
+        label: 'Articles',
+        data: Object.values(sourceCounts).slice(0, 5),
+        backgroundColor: 'rgba(13, 110, 253, 0.7)',
+        borderColor: 'rgba(13, 110, 253, 1)',
+        borderWidth: 1,
+      },
+    ],
+  };
+  
+  const timelineChartData = {
+    labels: Object.keys(monthlyTrends),
+    datasets: [
+      {
+        label: 'Articles',
+        data: Object.values(monthlyTrends).map(month => month.articles),
+        borderColor: 'rgba(108, 117, 125, 1)',
+        backgroundColor: 'rgba(108, 117, 125, 0.2)',
+        tension: 0.3,
+        fill: true,
+      },
+    ],
+  };
+  
+  const sentimentTrendChartData = {
+    labels: Object.keys(monthlyTrends),
+    datasets: [
+      {
+        label: 'Positive',
+        data: Object.values(monthlyTrends).map(month => month.positive),
+        borderColor: 'rgba(40, 167, 69, 1)',
+        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+        tension: 0.3,
+      },
+      {
+        label: 'Neutral',
+        data: Object.values(monthlyTrends).map(month => month.neutral),
+        borderColor: 'rgba(23, 162, 184, 1)',
+        backgroundColor: 'rgba(23, 162, 184, 0.1)',
+        tension: 0.3,
+      },
+      {
+        label: 'Negative',
+        data: Object.values(monthlyTrends).map(month => month.negative),
+        borderColor: 'rgba(220, 53, 69, 1)',
+        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+        tension: 0.3,
+      },
+    ],
+  };
+  
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+      },
+    },
+  };
 
   return (
     <>
@@ -145,36 +266,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                 </h5>
               </Card.Header>
               <Card.Body>
-                <div className="mb-3">
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Positive</span>
-                    <span>{sentimentCounts.positive} ({Math.round((sentimentCounts.positive / totalSentiments) * 100)}%)</span>
-                  </div>
-                  <ProgressBar 
-                    variant="success" 
-                    now={(sentimentCounts.positive / totalSentiments) * 100} 
-                    className="mb-2"
-                  />
-                  
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Neutral</span>
-                    <span>{sentimentCounts.neutral} ({Math.round((sentimentCounts.neutral / totalSentiments) * 100)}%)</span>
-                  </div>
-                  <ProgressBar 
-                    variant="info" 
-                    now={(sentimentCounts.neutral / totalSentiments) * 100} 
-                    className="mb-2"
-                  />
-                  
-                  <div className="d-flex justify-content-between mb-1">
-                    <span>Negative</span>
-                    <span>{sentimentCounts.negative} ({Math.round((sentimentCounts.negative / totalSentiments) * 100)}%)</span>
-                  </div>
-                  <ProgressBar 
-                    variant="danger" 
-                    now={(sentimentCounts.negative / totalSentiments) * 100} 
-                    className="mb-2"
-                  />
+                <div className="chart-container mb-3">
+                  <Pie data={sentimentChartData} options={chartOptions} />
                 </div>
               </Card.Body>
             </Card>
@@ -188,24 +281,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                 </h5>
               </Card.Header>
               <Card.Body>
-                <div className="mb-3">
-                  {Object.entries(sourceCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([source, count], index) => (
-                      <div key={index} className="mb-2">
-                        <div className="d-flex justify-content-between mb-1">
-                          <span>{source}</span>
-                          <span>{count} ({Math.round((count / results.length) * 100)}%)</span>
-                        </div>
-                        <ProgressBar 
-                          variant="primary" 
-                          now={(count / results.length) * 100} 
-                          className="mb-2"
-                        />
-                      </div>
-                    ))
-                  }
+                <div className="chart-container mb-3">
+                  <Bar data={sourceChartData} options={chartOptions} />
                 </div>
               </Card.Body>
             </Card>
@@ -265,8 +342,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               </Card.Body>
             </Card>
 
-            {/* Time Distribution */}
-            <Card className="analytics-card shadow-sm">
+            {/* Publication Timeline */}
+            <Card className="analytics-card shadow-sm mb-4">
               <Card.Header className="bg-white">
                 <h5 className="mb-0">
                   <i className="bi bi-calendar-date me-2 text-primary"></i>
@@ -274,23 +351,23 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                 </h5>
               </Card.Header>
               <Card.Body>
-                <div className="mb-3">
-                  {Object.entries(timeDistribution)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([month, count], index) => (
-                      <div key={index} className="mb-2">
-                        <div className="d-flex justify-content-between mb-1">
-                          <span>{month}</span>
-                          <span>{count} articles</span>
-                        </div>
-                        <ProgressBar 
-                          variant="secondary" 
-                          now={(count / results.length) * 100} 
-                          className="mb-2"
-                        />
-                      </div>
-                    ))
-                  }
+                <div className="chart-container mb-3">
+                  <Line data={timelineChartData} options={chartOptions} />
+                </div>
+              </Card.Body>
+            </Card>
+            
+            {/* Sentiment Trends */}
+            <Card className="analytics-card shadow-sm">
+              <Card.Header className="bg-white">
+                <h5 className="mb-0">
+                  <i className="bi bi-graph-up me-2 text-primary"></i>
+                  Sentiment Trends
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                <div className="chart-container mb-3">
+                  <Line data={sentimentTrendChartData} options={chartOptions} />
                 </div>
               </Card.Body>
             </Card>
