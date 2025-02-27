@@ -160,8 +160,7 @@ function Results() {
   const getArticleHits = () => {
     if (!results) return [];
     if (Array.isArray(results)) return results;
-    if (results.hits && results.hits.hits) return results.hits.hits;
-    return [];
+    return results.hits?.hits || [];
   };
 
   // Get sorted results based on current sort setting
