@@ -217,12 +217,7 @@ Resources:
                 - echo "Installing frontend dependencies..."
                 - pwd
                 - echo "Checking directory structure"
-                - |
-                  if [ -d "frontend" ]; then 
-                    cd frontend
-                  elif [ -d "../frontend" ]; then 
-                    cd ../frontend
-                  fi
+                - "if [ -d \"frontend\" ]; then cd frontend; elif [ -d \"../frontend\" ]; then cd ../frontend; fi"
                 - npm install
             
             pre_build:
