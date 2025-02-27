@@ -142,3 +142,54 @@ aws s3 sync build/ s3://your-bucket-name/ --delete
 # Create CloudFront invalidation
 aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
 ```
+
+## AWS Integration with Mock API
+
+For development purposes, this frontend includes a mock API implementation that can be used in the AWS environment when needed. This allows the dev team to test the frontend independently of the backend availability.
+
+### Toggling Between Mock and Real API in AWS
+
+The frontend can be configured to use either the real backend API or the mock API implementation in AWS deployments:
+
+1. **Using the Real Backend (Default)**
+
+   The production environment is configured to use the real backend API by default. The `.env.production` file contains:
+
+   ```
+   REACT_APP_USE_MOCK_API=false
+   ```
+
+2. **Using the Mock API for Testing**
+
+   To deploy with mock API enabled, you can either:
+
+   - Modify the `.env.production` file and set:
+     ```
+     REACT_APP_USE_MOCK_API=true
+     ```
+
+   - Or pass it as an environment variable during the build:
+     ```
+     USE_MOCK_API=true npm run build
+     ```
+
+   - For AWS CodeBuild, set the `USE_MOCK_API` environment variable in the build project.
+
+### Mock API Features in AWS
+
+The mock API implementation is optimized for AWS production use:
+
+- Pre-generates a cache of mock articles for better performance
+- Reduces artificial delays compared to development environment
+- Includes automatic fallback to mock data if the real API fails
+- Shows a visual indicator when mock data is being used
+
+### Deployment Verification
+
+After deploying to AWS, you can verify the API configuration:
+
+1. Open the application in a browser
+2. If using mock data, a small info message will appear on the homepage
+3. Search for content to validate that results are returned correctly
+
+If you need to quickly verify which mode the application is running in, check the browser console logs in the development tools.

@@ -7,19 +7,36 @@ phases:
       nodejs: 16
     commands:
       - echo "Installing dependencies"
+      - npm --version
   
   pre_build:
     commands:
       - echo "Running pre-build steps"
+      - cd frontend
+      - echo "Installing frontend dependencies"
+      - npm install --production=false
+      - echo "Validating package installation"
+      - npm list date-fns || npm install date-fns@2.30.0
+      - cd ..
   
   build:
     commands:
       - echo "Building the application"
-      - cd frontend && npm install && npm run build || echo "Build failed but continuing"
+      - cd frontend
+      - echo "Building with environment variables"
+      - |
+        if [ "${USE_MOCK_API}" = "true" ]; then
+          echo "Using mock API for this build"
+          echo "REACT_APP_USE_MOCK_API=true" >> .env.production
+        fi
+      - npm run build
+      - echo "Build completed"
+      - cd ..
   
   post_build:
     commands:
       - echo "Post-build completed"
+      - echo "Checking if mock API is enabled: ${USE_MOCK_API}"
 
 artifacts:
   files:
