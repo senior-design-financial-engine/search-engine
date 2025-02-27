@@ -28,6 +28,42 @@ The pipeline is designed to handle both frontend and backend deployments:
    - Backend stack (created with `backend-template.yaml`)
    - Frontend stack (created with `frontend-template.yaml`)
 
+## Stack Naming Conventions
+
+When deploying to multiple environments (development, staging, production), it's important to include the environment name in the stack name itself, not just as a parameter. This ensures proper cross-stack references and prevents conflicts.
+
+**Recommended naming pattern:**
+```
+financial-news-cicd-{environment}
+```
+
+For example:
+- `financial-news-cicd-development`
+- `financial-news-cicd-staging`
+- `financial-news-cicd-production`
+
+When referencing other stacks, ensure their names also include the environment:
+- `financial-news-vpc-{environment}`
+- `financial-news-backend-{environment}`
+- `financial-news-frontend-{environment}`
+
+This would be reflected in your stack creation command:
+
+```powershell
+python -m awscli cloudformation create-stack `
+  --stack-name financial-news-cicd-staging `
+  --template-body file://cicd-template.yaml `
+  --parameters `
+    ParameterKey=EnvironmentName,ParameterValue=staging `
+    ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-staging `
+    ParameterKey=BackendStackName,ParameterValue=financial-news-backend-staging `
+    ParameterKey=FrontendStackName,ParameterValue=financial-news-frontend-staging `
+    # Other parameters...
+  --capabilities CAPABILITY_IAM
+```
+
+Using just the EnvironmentName parameter without including it in the stack name will cause conflicts, as CloudFormation doesn't allow multiple stacks with the same name regardless of parameter values.
+
 ## Deployment Steps
 
 ### 1. Configure AWS CLI
@@ -52,26 +88,38 @@ python -m awscli cloudformation validate-template --template-body file://cicd-te
 
 ### 3. Create the Stack
 
+Make sure you have your GitHub personal access token ready. Then run:
+
 ```powershell
 python -m awscli cloudformation create-stack `
-  --stack-name financial-news-cicd `
+  --stack-name financial-news-cicd-staging `
   --template-body file://cicd-template.yaml `
-  --parameters ParameterKey=EnvironmentName,ParameterValue=production `
-              ParameterKey=GitHubOwner,ParameterValue=your-github-username `
-              ParameterKey=GitHubRepo,ParameterValue=financial-news-engine `
-              ParameterKey=GitHubBranch,ParameterValue=main `
-              ParameterKey=GitHubToken,ParameterValue=your-github-token `
-              ParameterKey=FrontendStackName,ParameterValue=financial-news-frontend `
-              ParameterKey=BackendStackName,ParameterValue=financial-news-backend `
+  --parameters `
+    ParameterKey=EnvironmentName,ParameterValue=staging `
+    ParameterKey=GitHubOwner,ParameterValue=your-github-username `
+    ParameterKey=GitHubRepo,ParameterValue=financial-news-engine `
+    ParameterKey=GitHubBranch,ParameterValue=main `
+    ParameterKey=GitHubToken,ParameterValue=your-github-token `
+    ParameterKey=FrontendStackName,ParameterValue=financial-news-frontend-staging `
+    ParameterKey=BackendStackName,ParameterValue=financial-news-backend-staging `
+    ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-staging `
   --capabilities CAPABILITY_IAM
 ```
 
-> **IMPORTANT:** The `--capabilities CAPABILITY_IAM` flag is required because the template creates IAM resources.
+Parameters explanation:
+- `EnvironmentName`: Deployment environment (development, staging, or production)
+- `GitHubOwner`: Your GitHub username or organization
+- `GitHubRepo`: Name of the GitHub repository
+- `GitHubBranch`: Repository branch to monitor (usually main or master)
+- `GitHubToken`: Personal access token for GitHub API access
+- `FrontendStackName`: Name of the frontend CloudFormation stack
+- `BackendStackName`: Name of the backend CloudFormation stack
+- `VpcStackName`: Name of the VPC CloudFormation stack
 
 ### 4. Monitor Stack Creation
 
 ```powershell
-python -m awscli cloudformation describe-stacks --stack-name financial-news-cicd
+python -m awscli cloudformation describe-stacks --stack-name financial-news-cicd-staging
 ```
 
 ### 5. Get Stack Outputs
@@ -79,7 +127,7 @@ python -m awscli cloudformation describe-stacks --stack-name financial-news-cicd
 After the stack is created, retrieve the outputs (including the pipeline URL):
 
 ```powershell
-python -m awscli cloudformation describe-stacks --stack-name financial-news-cicd --query "Stacks[0].Outputs"
+python -m awscli cloudformation describe-stacks --stack-name financial-news-cicd-staging --query "Stacks[0].Outputs"
 ```
 
 ## Required Repository Structure
@@ -205,7 +253,7 @@ python -m awscli s3 rm s3://your-artifact-bucket-name/ --recursive
 Then delete the stack:
 
 ```powershell
-python -m awscli cloudformation delete-stack --stack-name financial-news-cicd
+python -m awscli cloudformation delete-stack --stack-name financial-news-cicd-staging
 ```
 
 If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above.
@@ -344,4 +392,19 @@ When updating an existing CI/CD pipeline:
 5. Monitor the stack update:
    ```bash
    python -m awscli cloudformation describe-stack-events --stack-name financial-news-cicd
-   ``` 
+   ```
+
+## Parameters Reference
+
+The CI/CD template accepts the following parameters:
+
+| Parameter | Description | Default | Required |
+|-----------|-------------|---------|----------|
+| EnvironmentName | Deployment environment | production | No |
+| GitHubOwner | GitHub repository owner | | Yes |
+| GitHubRepo | GitHub repository name | | Yes |
+| GitHubBranch | GitHub repository branch | main | No |
+| GitHubToken | GitHub OAuth token | | Yes |
+| FrontendStackName | Name of the frontend stack | financial-news-frontend | No |
+| BackendStackName | Name of the backend stack | financial-news-backend | No |
+| VpcStackName | Name of the VPC stack | financial-news-vpc | No | 
