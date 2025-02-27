@@ -9,13 +9,24 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
 
+  // Get article hits from results
+  const getArticleHits = () => {
+    if (!results) return [];
+    if (Array.isArray(results)) return results;
+    if (results.hits && results.hits.hits) return results.hits.hits;
+    return [];
+  };
+
   useEffect(() => {
-    if (results && results.length > 0) {
+    const articleHits = getArticleHits();
+    
+    if (articleHits && articleHits.length > 0) {
       // Calculate sentiment distribution
       const sentiments = { positive: 0, negative: 0, neutral: 0 };
-      results.forEach(article => {
-        if (article.sentiment) {
-          sentiments[article.sentiment.toLowerCase()] = (sentiments[article.sentiment.toLowerCase()] || 0) + 1;
+      articleHits.forEach(article => {
+        const sentiment = article._source?.sentiment?.toLowerCase();
+        if (sentiment) {
+          sentiments[sentiment] = (sentiments[sentiment] || 0) + 1;
         } else {
           sentiments.neutral = (sentiments.neutral || 0) + 1;
         }
@@ -24,18 +35,18 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Calculate source distribution
       const sources = {};
-      results.forEach(article => {
-        if (article.source) {
-          sources[article.source] = (sources[article.source] || 0) + 1;
+      articleHits.forEach(article => {
+        if (article._source?.source) {
+          sources[article._source.source] = (sources[article._source.source] || 0) + 1;
         }
       });
       setSourceCounts(sources);
 
       // Calculate time distribution
       const times = {};
-      results.forEach(article => {
-        if (article.published_at) {
-          const date = new Date(article.published_at);
+      articleHits.forEach(article => {
+        if (article._source?.published_at) {
+          const date = new Date(article._source.published_at);
           const month = date.toLocaleString('default', { month: 'short' });
           times[month] = (times[month] || 0) + 1;
         }
@@ -44,8 +55,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Find top companies mentioned
       const companies = {};
-      results.forEach(article => {
-        const articleCompanies = getCompanyData(article);
+      articleHits.forEach(article => {
+        const articleCompanies = getCompanyData(article._source);
         articleCompanies.forEach(company => {
           const companyName = typeof company === 'string' ? company : company.name;
           if (companyName) {
@@ -63,8 +74,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Find top categories
       const categories = {};
-      results.forEach(article => {
-        const articleCategories = getCategories(article);
+      articleHits.forEach(article => {
+        const articleCategories = getCategories(article._source);
         articleCategories.forEach(category => {
           if (category) {
             categories[category] = (categories[category] || 0) + 1;
@@ -83,6 +94,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
   // Helper function to extract company data from an article
   const getCompanyData = (article) => {
+    if (!article) return [];
     if (article.companies && Array.isArray(article.companies)) {
       return article.companies;
     } else if (article.company_mentions && Array.isArray(article.company_mentions)) {
@@ -106,7 +118,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   };
 
   // Calculate total for percentages
-  const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
+  const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0) || 1; // Avoid division by zero
 
   // Extract time analysis data from results
   const timeAnalysis = results && results.aggregations ? results.aggregations.time_analysis : null;
@@ -199,11 +211,11 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                       <div key={index} className="mb-2">
                         <div className="d-flex justify-content-between mb-1">
                           <span>{source}</span>
-                          <span>{count} ({Math.round((count / results.length) * 100)}%)</span>
+                          <span>{count} ({Math.round((count / getArticleHits().length) * 100)}%)</span>
                         </div>
                         <ProgressBar 
                           variant="primary" 
-                          now={(count / results.length) * 100} 
+                          now={(count / getArticleHits().length) * 100} 
                           className="mb-2"
                         />
                       </div>

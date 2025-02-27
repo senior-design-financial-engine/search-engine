@@ -57,7 +57,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				sentiment
 			}
 		});
-		return response.data.hits.hits;
+		return response.data;
 	} catch (error) {
 		console.error('Error searching articles:', error);
 		

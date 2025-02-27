@@ -488,7 +488,21 @@ export const searchArticles = async (query, source, timeRange, sentiment) => {
         const randomArticles = generateRelevantArticles(15, []);
         
         // Apply filters
-        return applyFilters(randomArticles, source, timeRange, sentiment);
+        const filteredArticles = applyFilters(randomArticles, source, timeRange, sentiment);
+        
+        // Generate time analysis
+        const timeAnalysis = generateTimeAnalysis(filteredArticles);
+        
+        // Return in Elasticsearch response format
+        return {
+            hits: {
+                total: { value: filteredArticles.length },
+                hits: filteredArticles
+            },
+            aggregations: {
+                time_analysis: timeAnalysis
+            }
+        };
     }
     
     // Extract keywords and search terms for relevant article generation
@@ -538,8 +552,69 @@ export const searchArticles = async (query, source, timeRange, sentiment) => {
     
     console.log(`Returning ${filteredArticles.length} articles after filtering and sorting`);
     
+    // Generate time analysis
+    const timeAnalysis = generateTimeAnalysis(filteredArticles);
+    
     // Return in Elasticsearch response format
-    return filteredArticles;
+    return {
+        hits: {
+            total: { value: filteredArticles.length },
+            hits: filteredArticles
+        },
+        aggregations: {
+            time_analysis: timeAnalysis
+        }
+    };
+};
+
+// Helper function to generate time analysis
+const generateTimeAnalysis = (articles) => {
+    const today = new Date();
+    
+    // Initialize counters
+    const timeBuckets = {
+        last_24_hours: 0,
+        last_week: 0,
+        last_month: 0
+    };
+    
+    // Count articles in each time bucket
+    articles.forEach(article => {
+        const publishedDateStr = article._source.published_at.split('T')[0];
+        const publishedDate = new Date(publishedDateStr);
+        const daysAgo = Math.floor((today - publishedDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysAgo < 1) {
+            timeBuckets.last_24_hours += 1;
+        }
+        
+        if (daysAgo < 7) {
+            timeBuckets.last_week += 1;
+        }
+        
+        if (daysAgo < 30) {
+            timeBuckets.last_month += 1;
+        }
+    });
+    
+    // Calculate daily average
+    timeBuckets.daily_average = timeBuckets.last_month > 0 
+        ? Math.round((timeBuckets.last_month / 30) * 10) / 10 
+        : 0;
+    
+    // Add time distribution percentages
+    const totalArticles = articles.length;
+    if (totalArticles > 0) {
+        timeBuckets.last_24_hours_pct = Math.round((timeBuckets.last_24_hours / totalArticles) * 100);
+        timeBuckets.last_week_pct = Math.round((timeBuckets.last_week / totalArticles) * 100);
+        timeBuckets.last_month_pct = Math.round((timeBuckets.last_month / totalArticles) * 100);
+    } else {
+        timeBuckets.last_24_hours_pct = 0;
+        timeBuckets.last_week_pct = 0;
+        timeBuckets.last_month_pct = 0;
+    }
+    
+    return timeBuckets;
 };
 
 // Helper function to apply filters
