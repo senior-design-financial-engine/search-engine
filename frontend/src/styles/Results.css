@@ -1,7 +1,7 @@
 /* src/styles/Results.css */
 .container {
     text-align: center;
-    margin-top: 50px;
+    margin-top: 2rem;
   }
   .resultItem {
     border: 1px solid #ddd;
@@ -11,3 +11,86 @@
   .pagination {
     margin-top: 20px;
   }
+
+/* Card styling */
+.card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+.card-title {
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.card-text {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+/* Badge styling */
+.badge {
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+/* Filter badges */
+.badge span.cursor-pointer {
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.badge span.cursor-pointer:hover {
+  opacity: 1;
+}
+
+/* Source and date info */
+.text-muted {
+  font-size: 0.8rem;
+}
+
+/* Button styling */
+.btn-outline-primary:hover {
+  transform: translateY(-1px);
+}
+
+/* Cursor styling for filter removal */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Add custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card-deck {
+    display: block;
+  }
+  
+  .card {
+    margin-bottom: 1rem;
+  }
+}

@@ -1,7 +1,83 @@
 /* src/styles/App.css */
+/* Global styles for the application */
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  font-family: 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
+  color: #333;
+}
+
+/* Main content area */
+.app-content {
+  min-height: calc(100vh - 160px);
+}
+
+/* Smooth link transitions */
+a {
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+/* Button hover effects */
+.btn {
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Navbar styling */
+.navbar {
+  padding: 0.7rem 1rem;
+}
+
+.navbar-brand {
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* Card styles for consistent look */
+.card {
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+}
+
+.card-header {
+  font-weight: 600;
+}
+
+/* Form control styling */
+.form-control:focus,
+.form-select:focus {
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+  border-color: #86b7fe;
+}
+
+/* Active nav links */
+.nav-link.active {
+  font-weight: 500;
+}
+
+/* Footer styling */
+footer {
+  border-top: 1px solid #eee;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 15px;
   }
+  
+  h1, .h1 {
+    font-size: 1.8rem;
+  }
+  
+  h2, .h2 {
+    font-size: 1.5rem;
+  }
+}
