@@ -197,6 +197,14 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
         PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: REACT_APP_API_URL
+            Value: !Sub 
+              - "https://${ApiDomainName}"
+              - ApiDomainName: 
+                  Fn::ImportValue: !Sub "${BackendStackName}-ApiGatewayUrl"
+          - Name: ENVIRONMENT
+            Value: !Ref EnvironmentName
       Source:
         Type: CODEPIPELINE
         BuildSpec: |
@@ -417,13 +425,13 @@ Resources:
                 - ls -la build
                 - echo "Deployment artifacts ready in build/"
                 - echo "Retrieving S3 bucket name from CloudFormation stack output..."
-                - export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+                - "export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue\" --output text)"
                 - echo "Retrieved bucket name: $BUCKET_NAME"
                 - echo "Syncing build files to S3 bucket..."
-                - aws s3 sync build/ s3://$BUCKET_NAME/ --delete
+                - "aws s3 sync build/ s3://$BUCKET_NAME/ --delete"
                 - echo "Creating CloudFront invalidation..."
-                - export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-                - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+                - "export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue\" --output text)"
+                - "aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths \"/*\""
                 - echo "Frontend deployment to S3 completed successfully!"
           
           artifacts:

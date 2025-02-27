@@ -207,8 +207,18 @@ Resources:
             import os
             import logging
             from elasticsearch import Elasticsearch
+            from flask_cors import CORS
             
             app = Flask(__name__)
+            
+            # Configure CORS
+            cors_origins = [
+                "http://localhost:3000",                                     # Local development
+                "https://financial-news-frontend-*.s3.amazonaws.com",        # S3 bucket
+                "https://*.cloudfront.net",                                  # CloudFront distribution
+                "https://*.amazonaws.com"                                    # Any AWS domain
+            ]
+            CORS(app, resources={r"/*": {"origins": cors_origins}})
             
             # Configure logging
             logging.basicConfig(
@@ -253,6 +263,7 @@ Resources:
             # Create requirements.txt
             cat > requirements.txt << 'EOL'
             flask==2.3.3
+            flask-cors==4.0.0
             elasticsearch==8.9.0
             requests==2.31.0
             python-dotenv==1.0.0
@@ -482,4 +493,10 @@ Outputs:
     Description: ARN of the SNS Topic for Backend Alerts
     Value: !Ref BackendSNSTopic
     Export:
-      Name: !Sub "${AWS::StackName}-BackendSNSTopicARN" 
+      Name: !Sub "${AWS::StackName}-BackendSNSTopicARN"
+  
+  ApiGatewayUrl:
+    Description: "URL of the Backend API endpoint"
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiGatewayUrl" 

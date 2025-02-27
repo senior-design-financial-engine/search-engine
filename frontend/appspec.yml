@@ -1,9 +1,6 @@
 version: 0.0
-Resources:
-  - TargetService:
-      Type: AWS::S3::Bucket
-      Properties:
-        Name: !Ref FrontendBucketName
-Files:
-  - source: build
-    destination: / 
+os: linux
+files:
+  - source: /
+    destination: /
+# No hooks needed for S3 deployment 

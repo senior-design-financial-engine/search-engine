@@ -68,3 +68,42 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Cloud Deployment Configuration
+
+When deploying the frontend to AWS, ensure the following steps are completed:
+
+### API Endpoint Configuration
+
+The frontend needs to connect to your deployed backend API. Update the `.env.production` file with the correct backend URL:
+
+```
+REACT_APP_API_URL=https://your-actual-api-domain.com
+```
+
+For AWS deployments, this will typically be:
+- CloudFront distribution domain for your backend API
+- API Gateway endpoint URL
+- Load balancer URL for your backend service
+
+### CloudFront Configuration
+
+If you're using CloudFront with S3, ensure the following:
+1. CloudFront distribution has proper origin settings for your S3 bucket
+2. CloudFront behavior settings include proper cache policy and forwarded headers
+3. Error pages are configured to return `index.html` for 403/404 errors (required for SPA routing)
+
+### CORS Configuration
+
+If your frontend and backend are on different domains, ensure:
+1. Backend API has proper CORS headers configured
+2. API Gateway (if used) has CORS enabled for the frontend domain
+
+### Environment Variables
+
+Before building, ensure all required environment variables are set:
+```
+npm run build
+```
+
+This will create production-ready files in the `build/` directory that will be deployed to S3.

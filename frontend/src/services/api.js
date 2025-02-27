@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000'; // Replace with your backend URL
+// Use environment variable with fallback to development URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+console.log('Using API endpoint:', API_BASE_URL);
 
 export const searchArticles = async (query, source, time_range) => {
 	try {
