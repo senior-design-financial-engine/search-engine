@@ -4,9 +4,8 @@ import { Form, Button, Container, Row, Col, Card, Alert } from 'react-bootstrap'
 
 // Environment settings
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
-const USE_MOCK_API = process.env.REACT_APP_USE_MOCK_API === 'true';
 
-// Sample sources from our mock data for the dropdown
+// Sample sources for the dropdown
 const availableSources = [
 	"Bloomberg", "Reuters", "CNBC", "Financial Times", 
 	"Wall Street Journal", "MarketWatch", "Barron's"
@@ -49,11 +48,6 @@ function Home() {
 					<p className="lead text-muted">
 						Search for financial news across multiple sources
 					</p>
-					{IS_PRODUCTION && USE_MOCK_API && (
-						<Alert variant="info" className="mt-3">
-							<small>Running with mock data in production environment</small>
-						</Alert>
-					)}
 				</Col>
 			</Row>
 			
