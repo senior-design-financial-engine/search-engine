@@ -168,9 +168,86 @@ const generateRelevantContent = (headline, company, sentiment) => {
     return `This article discusses ${company}'s recent developments. The company has been ${phrase1} in the ${sectors[Math.floor(Math.random() * sectors.length)]} sector. Analysts note that ${company} is ${phrase2} compared to its competitors. ${headline} This news comes as the industry faces rapid changes and evolving consumer demands. Investors are closely monitoring the situation to determine long-term implications for the company's market position.`;
 };
 
-const generateFakeArticle = (keyword = null, forceCompany = null, forceSentiment = null) => {
-    // Determine company - either forced or random
-    const company = forceCompany || companies[Math.floor(Math.random() * companies.length)];
+// Calculate a true relevance score based on how well the article matches the query
+const calculateRelevanceScore = (article, queryTerms) => {
+    if (!queryTerms || queryTerms.length === 0) {
+        return 0.5; // Default moderate relevance when no query
+    }
+    
+    let score = 0;
+    const content = article._source.content.toLowerCase();
+    const headline = article._source.headline.toLowerCase();
+    const company = article._source.companies?.[0]?.name.toLowerCase() || '';
+    const categories = article._source.categories?.map(c => c.toLowerCase()) || [];
+    
+    // Check each query term for matches
+    queryTerms.forEach(term => {
+        const termLower = term.toLowerCase();
+        
+        // Headline match is most important (3x weight)
+        if (headline.includes(termLower)) {
+            score += 0.3;
+        }
+        
+        // Company name match is very important (2x weight)
+        if (company === termLower) {
+            score += 0.25;
+        } else if (company.includes(termLower)) {
+            score += 0.15;
+        }
+        
+        // Category/sector match is important
+        if (categories.some(cat => cat === termLower || cat.includes(termLower))) {
+            score += 0.15;
+        }
+        
+        // Content match
+        if (content.includes(termLower)) {
+            score += 0.1;
+        }
+    });
+    
+    // Normalize score between 0.1 and 1.0
+    score = Math.min(1.0, Math.max(0.1, score));
+    
+    // Add a small random factor (max 10% of score) to prevent exact ties
+    const randomFactor = (Math.random() * 0.1) * score;
+    score = Math.min(1.0, score + randomFactor);
+    
+    return score;
+};
+
+// Generate an article with specific relevance to provided search terms
+const generateFakeArticle = (queryTerms = [], keyword = null, forceCompany = null, forceSentiment = null) => {
+    // Determine company - either forced, from query terms, or random
+    let company = forceCompany;
+    
+    if (!company && queryTerms.length > 0) {
+        // Try to use a company from the query terms
+        const companyTerm = queryTerms.find(term => 
+            companies.some(c => c.toLowerCase() === term.toLowerCase())
+        );
+        
+        if (companyTerm) {
+            company = companies.find(c => c.toLowerCase() === companyTerm.toLowerCase());
+        }
+    }
+    
+    if (!company) {
+        // Find specific companies for specific keywords
+        if (keyword === 'ai') {
+            // For AI queries, bias toward tech companies
+            const aiCompanies = ["Microsoft", "Google", "Nvidia", "Meta", "IBM"];
+            company = aiCompanies[Math.floor(Math.random() * aiCompanies.length)];
+        } else if (keyword === 'energy') {
+            // Non-tech companies for energy
+            company = companies.filter(c => !["Microsoft", "Google", "Apple", "Meta"].includes(c))[
+                Math.floor(Math.random() * (companies.length - 4))
+            ];
+        } else {
+            company = companies[Math.floor(Math.random() * companies.length)];
+        }
+    }
     
     // Generate appropriate sentiment (biased if keyword/company specific pattern exists)
     let sentiment;
@@ -247,7 +324,8 @@ const generateFakeArticle = (keyword = null, forceCompany = null, forceSentiment
         }
     }
     
-    return {
+    // Create the article object
+    const article = {
         "_id": generateFakeId(),
         "_source": {
             "headline": headline,
@@ -267,22 +345,40 @@ const generateFakeArticle = (keyword = null, forceCompany = null, forceSentiment
                 }
             ],
             "categories": articleSectors,
-            "relevance_score": Math.random() * 0.5 + 0.5 // Range from 0.5 to 1.0
+            "relevance_score": 0.5 // Will be calculated properly later
         }
     };
+    
+    // Calculate and set the proper relevance score
+    article._source.relevance_score = calculateRelevanceScore(article, queryTerms);
+    
+    return article;
 };
 
-const generateFakeArticles = (count = 10, keyword = null) => {
+// Generate multiple articles with specific relevance to query
+const generateRelevantArticles = (count, queryTerms, keyword = null) => {
     const articles = [];
-    for (let i = 0; i < count; i++) {
-        articles.push(generateFakeArticle(keyword));
+    
+    // Create a higher number of articles to allow for filtering irrelevant ones
+    const targetCount = count * 1.5;
+    
+    for (let i = 0; i < targetCount; i++) {
+        articles.push(generateFakeArticle(queryTerms, keyword));
     }
-    return articles;
+    
+    // Filter out articles with low relevance
+    const relevantArticles = articles.filter(article => 
+        article._source.relevance_score > 0.2
+    );
+    
+    // Sort by relevance score (higher is better)
+    relevantArticles.sort((a, b) => 
+        b._source.relevance_score - a._source.relevance_score
+    );
+    
+    // Return the requested count (or fewer if not enough relevant articles)
+    return relevantArticles.slice(0, count);
 };
-
-// AWS-specific optimization - pregenerate a set of articles for production
-// to avoid excessive computation on each request in production
-const CACHED_ARTICLES = IS_AWS ? generateFakeArticles(30) : null;
 
 // Extract keywords from query for smarter search results
 const extractKeywords = (query) => {
@@ -315,64 +411,105 @@ const extractKeywords = (query) => {
     return keywords;
 };
 
+// Extract individual search terms from the query
+const extractSearchTerms = (query) => {
+    if (!query) return [];
+    
+    // Split the query into individual terms
+    const terms = query.split(/\s+/)
+        .map(term => term.toLowerCase())
+        .filter(term => 
+            // Filter out common stop words and very short terms
+            term.length > 2 && 
+            !['the', 'and', 'for', 'with', 'about', 'from', 'that', 'this'].includes(term)
+        );
+    
+    // Add additional terms from our keyword mappings if applicable
+    const additionalTerms = [];
+    terms.forEach(term => {
+        if (keywordMappings[term]) {
+            // Add related companies for known keywords
+            const mapping = keywordMappings[term];
+            if (mapping.companies) {
+                additionalTerms.push(...mapping.companies.map(c => c.toLowerCase()));
+            }
+            if (mapping.sectors) {
+                additionalTerms.push(...mapping.sectors.map(s => s.toLowerCase()));
+            }
+        }
+    });
+    
+    // Combine original terms with additional ones, removing duplicates
+    return [...new Set([...terms, ...additionalTerms])];
+};
+
 // Main mock API functions
 export const searchArticles = async (query, source, timeRange, sentiment) => {
     // Simulate network delay (shorter in production)
     await new Promise(resolve => setTimeout(resolve, IS_AWS ? 200 : 500));
     
-    // Extract keywords for smarter search
-    const keywords = extractKeywords(query);
-    
-    // Generate more relevant articles based on query keywords
-    let fakeArticles = [];
-    
-    if (IS_AWS) {
-        // In production, use cached articles but filter them
-        fakeArticles = [...CACHED_ARTICLES];
-    } else {
-        // In development, generate articles based on the query
-        const articleCount = Math.floor(Math.random() * 11) + 10; // Generate 10-20 articles
+    // If no query, return a diverse set of random articles
+    if (!query || query.trim() === '') {
+        const randomArticles = generateRelevantArticles(15, []);
         
-        if (keywords.length > 0) {
-            // If we have keywords, generate more relevant results
-            const primaryKeyword = keywords[0];
-            
-            if (keywordMappings[primaryKeyword]) {
-                // If it's a known keyword (not a company or sector), use that
-                fakeArticles = generateFakeArticles(articleCount, primaryKeyword);
-            } else if (companies.includes(primaryKeyword)) {
-                // If it's a company, ensure most articles are about that company
-                for (let i = 0; i < articleCount; i++) {
-                    // 70% chance of articles about the searched company
-                    if (i < articleCount * 0.7) {
-                        fakeArticles.push(generateFakeArticle(null, primaryKeyword));
-                    } else {
-                        fakeArticles.push(generateFakeArticle());
-                    }
+        // Apply filters
+        return applyFilters(randomArticles, source, timeRange, sentiment);
+    }
+    
+    // Extract keywords and search terms for relevant article generation
+    const keywords = extractKeywords(query);
+    const searchTerms = extractSearchTerms(query);
+    
+    // Generate relevant articles based on query terms
+    const articleCount = Math.floor(Math.random() * 11) + 15; // Generate 15-25 articles
+    let relevantArticles = [];
+    
+    if (keywords.length > 0) {
+        // If we have specific keywords, generate articles based on them
+        const primaryKeyword = keywords[0];
+        
+        // Generate company-specific, sector-specific, or keyword-specific articles
+        if (companies.includes(primaryKeyword)) {
+            // Company-specific search
+            for (let i = 0; i < articleCount; i++) {
+                relevantArticles.push(generateFakeArticle(searchTerms, null, primaryKeyword));
+            }
+        } else if (sectors.includes(primaryKeyword)) {
+            // Sector-specific search
+            for (let i = 0; i < articleCount; i++) {
+                const article = generateFakeArticle(searchTerms);
+                if (i < articleCount * 0.8) {
+                    // 80% of articles match the sector
+                    article._source.categories = [primaryKeyword];
                 }
-            } else if (sectors.includes(primaryKeyword)) {
-                // If it's a sector, generate sector-specific articles
-                for (let i = 0; i < articleCount; i++) {
-                    const article = generateFakeArticle();
-                    if (i < articleCount * 0.7) {
-                        // 70% chance of setting the sector to the searched sector
-                        article._source.categories = [primaryKeyword];
-                    }
-                    fakeArticles.push(article);
-                }
-            } else {
-                // Default case - just generate random articles
-                fakeArticles = generateFakeArticles(articleCount);
+                relevantArticles.push(article);
             }
         } else {
-            // No specific keywords found, generate random articles
-            fakeArticles = generateFakeArticles(articleCount);
+            // Keyword-specific search (ai, earnings, etc.)
+            relevantArticles = generateRelevantArticles(articleCount, searchTerms, primaryKeyword);
         }
+    } else {
+        // General search based on the terms
+        relevantArticles = generateRelevantArticles(articleCount, searchTerms);
     }
+    
+    // Apply filters and sort by relevance
+    const filteredArticles = applyFilters(relevantArticles, source, timeRange, sentiment);
+    
+    // Always sort by relevance score
+    filteredArticles.sort((a, b) => b._source.relevance_score - a._source.relevance_score);
+    
+    // Return in Elasticsearch response format
+    return filteredArticles;
+};
+
+// Helper function to apply filters
+const applyFilters = (articles, source, timeRange, sentiment) => {
+    let filteredArticles = [...articles];
     
     // Apply source filter if specified
     if (source) {
-        fakeArticles = fakeArticles.filter(article => article._source.source === source);
+        filteredArticles = filteredArticles.filter(article => article._source.source === source);
     }
     
     // Apply time range filter if specified
@@ -398,7 +535,7 @@ export const searchArticles = async (query, source, timeRange, sentiment) => {
         }
         
         if (cutoffDate) {
-            fakeArticles = fakeArticles.filter(article => {
+            filteredArticles = filteredArticles.filter(article => {
                 const articleDate = new Date(article._source.published_at);
                 return articleDate >= cutoffDate;
             });
@@ -407,41 +544,35 @@ export const searchArticles = async (query, source, timeRange, sentiment) => {
     
     // Apply sentiment filter if specified
     if (sentiment && sentiment !== 'all') {
-        fakeArticles = fakeArticles.filter(article => 
+        filteredArticles = filteredArticles.filter(article => 
             article._source.sentiment?.toLowerCase() === sentiment.toLowerCase()
         );
     }
     
-    // Make sure we always have some results even after filtering
-    if (fakeArticles.length === 0) {
+    // Ensure minimum number of results after filtering (if possible)
+    if (filteredArticles.length < 3 && articles.length > 0) {
+        // Generate a few articles that match all filters
         const minResults = Math.floor(Math.random() * 3) + 3; // 3-5 results
+        const searchTerms = articles[0]._source.headline.split(' ');
         
-        // Generate articles that match all filters
         for (let i = 0; i < minResults; i++) {
-            const keyword = keywords.length > 0 ? keywords[0] : null;
-            const company = companies.find(c => query?.toLowerCase().includes(c.toLowerCase())) || null;
+            const newArticle = generateFakeArticle(searchTerms);
             
-            fakeArticles.push(generateFakeArticle(
-                keyword, 
-                company,
-                sentiment !== 'all' ? sentiment : null
-            ));
-        }
-        
-        // Apply source filter again if specified
-        if (source) {
-            fakeArticles = fakeArticles.map(article => {
-                article._source.source = source;
-                return article;
-            });
+            // Apply source filter if specified
+            if (source) {
+                newArticle._source.source = source;
+            }
+            
+            // Apply sentiment filter if specified
+            if (sentiment && sentiment !== 'all') {
+                newArticle._source.sentiment = sentiment;
+            }
+            
+            filteredArticles.push(newArticle);
         }
     }
     
-    // Randomize order slightly to simulate real search behavior
-    fakeArticles.sort(() => Math.random() - 0.5);
-    
-    // Return in Elasticsearch response format (similar to the backend)
-    return fakeArticles;
+    return filteredArticles;
 };
 
 // Export additional mock API functions as needed
