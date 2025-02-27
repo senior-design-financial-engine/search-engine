@@ -4,7 +4,7 @@
 The Financial News Engine is an open-source, customizable search platform designed to provide real-time financial news aggregation and analysis. The system aims to democratize access to financial information by offering a free alternative to expensive terminals while incorporating advanced machine learning capabilities for enhanced news processing and analysis.
 
 ## Project Status
-Currently in development by Team 14 at Boston University's Electrical & Computer Engineering department as part of the EC463/EC464 Capstone Senior Design Project.
+Currently in active development by Team 14 at Boston University's Electrical & Computer Engineering department as part of the EC463/EC464 Capstone Senior Design Project. The MVP features are implemented and functional.
 
 ## Key Features
 
@@ -171,6 +171,58 @@ See the dedicated README files for detailed deployment instructions:
 - Backend setup: [backend-setup-readme.md](backend-setup-readme.md)
 - Frontend setup: [frontend-setup-readme.md](frontend-setup-readme.md)
 - CI/CD setup: [cicd-setup-readme.md](cicd-setup-readme.md)
+
+## Deployment Quick Start
+
+Follow these steps to quickly deploy the entire application:
+
+1. **Set up VPC infrastructure**
+   ```bash
+   aws cloudformation create-stack --stack-name vpc-stack --template-body file://vpc-template.yaml
+   ```
+
+2. **Deploy backend services**
+   ```bash
+   aws cloudformation create-stack --stack-name backend-stack --template-body file://backend-template.yaml
+   ```
+
+3. **Deploy frontend application**
+   ```bash
+   aws cloudformation create-stack --stack-name frontend-stack --template-body file://frontend-template.yaml
+   ```
+
+4. **Set up CI/CD pipeline**
+   ```bash
+   aws cloudformation create-stack --stack-name cicd-stack --template-body file://cicd-template.yaml
+   ```
+
+For detailed setup instructions, refer to the dedicated README files:
+- [VPC Setup](vpc-setup-readme.md)
+- [Backend Setup](backend-setup-readme.md)
+- [Frontend Setup](frontend-setup-readme.md)
+- [CI/CD Pipeline Setup](cicd-setup-readme.md)
+
+## Development Environment
+
+To set up a local development environment:
+
+1. **Backend**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+
+2. **Frontend**
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
+
+3. **Mock data mode**
+   Set `USE_MOCK_DATA=true` in your `.env` file to develop without an Elasticsearch instance.
 
 ## Troubleshooting
 

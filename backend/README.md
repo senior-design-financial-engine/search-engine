@@ -6,7 +6,7 @@ This directory contains the backend services for the Financial News Engine, incl
 
 The backend consists of several key components:
 
-1. **API Service** (`app.py`)
+1. **API Service** (`backend.py`)
    - Flask-based RESTful API
    - Handles search queries and data retrieval
    - Provides CORS support for cross-domain requests
@@ -21,11 +21,24 @@ The backend consists of several key components:
    - Manages indices and document storage
    - Handles search queries and aggregations
 
-4. **Recommender System** (`recommender/`)
-   - Provides news recommendations based on user preferences
-   - Implements content-based filtering algorithms
+4. **Machine Learning Utils** (`ml_utils/`)
+   - Provides sentiment analysis
+   - Generates article summarization
+   - Processes text data for insights
+
+5. **Indexer** (`indexer/`)
+   - Processes and indexes documents
+   - Manages document metadata
+   - Handles real-time updates
 
 ## Setup and Development
+
+### Prerequisites
+
+- Python 3.8+
+- Elasticsearch 8.11.0
+- Access to internet for article scraping
+- AWS credentials (for cloud deployment)
 
 ### Local Development
 
@@ -45,14 +58,23 @@ The backend consists of several key components:
    ```
    ELASTICSEARCH_HOST=localhost
    ELASTICSEARCH_PORT=9200
-   FLASK_APP=app.py
+   FLASK_APP=backend.py
    FLASK_ENV=development
+   USE_MOCK_DATA=false
    ```
 
 4. **Run the development server**:
    ```bash
    flask run
    ```
+
+### Mock Data Mode
+
+For development without Elasticsearch:
+
+1. Set `USE_MOCK_DATA=true` in your `.env` file
+2. Run the backend server normally
+3. API endpoints will return realistic sample data
 
 ### Running Tests
 
@@ -91,30 +113,33 @@ The backend is automatically deployed through a CI/CD pipeline defined in `cicd-
   - `query` (string) - Search query
   - `source` (string, optional) - Filter by news source
   - `time_range` (string, optional) - Filter by time range
+- `GET /sources` - Get list of available news sources
+- `GET /categories` - Get list of available news categories
 
-### Example Request
+### Example Requests
 
 ```
 GET /query?query=finance&source=bbc&time_range=day
+GET /sources
+GET /categories
 ```
 
-### Example Response
+## Maintenance
 
-```json
-{
-  "results": [
-    {
-      "id": "12345",
-      "title": "Financial Markets Update",
-      "content": "...",
-      "source": "BBC",
-      "publish_date": "2023-02-15T12:30:00Z",
-      "url": "https://www.bbc.com/news/article-12345"
-    }
-  ],
-  "count": 1,
-  "query_time_ms": 42
-}
+### Updating Scrapers
+
+When adding a new news source:
+
+1. Create a new scraper in `scraper/`
+2. Update the scraper configuration in `scraper/config.py`
+3. Test with mock data mode before deploying
+
+### Database Management
+
+To reindex the Elasticsearch database:
+
+```bash
+python update_database.py --reset-index
 ```
 
 ## Troubleshooting
@@ -122,7 +147,7 @@ GET /query?query=finance&source=bbc&time_range=day
 ### Common Issues
 
 - **Elasticsearch Connection Errors**: Check security group rules and ensure Elasticsearch is running
-- **CORS Issues**: Verify CORS settings in app.py match the frontend origin
+- **CORS Issues**: Verify CORS settings in backend.py match the frontend origin
 - **Deployment Failures**: Check CodeBuild logs for details
 
 ### Logs
