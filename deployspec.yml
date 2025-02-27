@@ -10,8 +10,7 @@ phases:
       - echo "Root-level deployspec.yml found"
       - echo "Current directory: $(pwd)"
       - ls -la
-      
-      # If frontend/deployspec.yml exists, use its contents
+      - echo "Checking for frontend/deployspec.yml file"
       - |
         if [ -f "frontend/deployspec.yml" ]; then
           echo "Found frontend/deployspec.yml, noting its existence..."
