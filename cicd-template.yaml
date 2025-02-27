@@ -347,7 +347,23 @@ Resources:
                 - echo "Current directory: $(pwd)"
                 - ls -la
                 - echo "Handling directory structure"
-                - if [ -d "frontend" ] && [ ! -f "package.json" ]; then echo "Changing directory to frontend/"; cd frontend; elif [ -f "package.json" ]; then echo "Already in frontend directory"; else echo "Unexpected directory structure, trying to adapt..."; PACKAGE_JSON_PATH=$(find . -name package.json -not -path "*/node_modules/*" | head -1); if [ -n "$PACKAGE_JSON_PATH" ]; then FRONTEND_DIR=$(dirname "$PACKAGE_JSON_PATH"); echo "Found package.json in $FRONTEND_DIR, changing directory"; cd "$FRONTEND_DIR"; else echo "WARNING: Could not find package.json, build may fail"; fi; fi
+                - |
+                  if [ -d "frontend" ] && [ ! -f "package.json" ]; then 
+                    echo "Changing directory to frontend/"
+                    cd frontend
+                  elif [ -f "package.json" ]; then 
+                    echo "Already in frontend directory"
+                  else 
+                    echo "Unexpected directory structure, trying to adapt..."
+                    PACKAGE_JSON_PATH=$(find . -name package.json -not -path "*/node_modules/*" | head -1)
+                    if [ -n "$PACKAGE_JSON_PATH" ]; then 
+                      FRONTEND_DIR=$(dirname "$PACKAGE_JSON_PATH")
+                      echo "Found package.json in $FRONTEND_DIR, changing directory"
+                      cd "$FRONTEND_DIR"
+                    else 
+                      echo "WARNING: Could not find package.json, build may fail"
+                    fi
+                  fi
                 - npm install
             
             pre_build:
@@ -361,9 +377,29 @@ Resources:
                 - npm run build
                 - echo "Build completed on `date`"
                 - echo "Checking for appspec.yml"
-                - if [ -f "../appspec.yml" ]; then echo "Copying appspec.yml from parent directory to build/"; cp ../appspec.yml build/; elif [ -f "appspec.yml" ]; then echo "Copying appspec.yml to build/"; cp appspec.yml build/; else echo "WARNING: appspec.yml not found, deployment may fail"; fi
+                - |
+                  if [ -f "../appspec.yml" ]; then 
+                    echo "Copying appspec.yml from parent directory to build/"
+                    cp ../appspec.yml build/
+                  elif [ -f "appspec.yml" ]; then 
+                    echo "Copying appspec.yml to build/"
+                    cp appspec.yml build/
+                  else 
+                    echo "WARNING: appspec.yml not found, deployment may fail"
+                  fi
                 - echo "Checking for scripts directory"
-                - if [ -d "../scripts" ]; then echo "Copying scripts/ from parent directory to build/"; mkdir -p build/scripts; cp -r ../scripts/* build/scripts/; elif [ -d "scripts" ]; then echo "Copying scripts/ to build/"; mkdir -p build/scripts; cp -r scripts/* build/scripts/; else echo "WARNING: scripts directory not found, deployment may fail"; fi
+                - |
+                  if [ -d "../scripts" ]; then 
+                    echo "Copying scripts/ from parent directory to build/"
+                    mkdir -p build/scripts
+                    cp -r ../scripts/* build/scripts/
+                  elif [ -d "scripts" ]; then 
+                    echo "Copying scripts/ to build/"
+                    mkdir -p build/scripts
+                    cp -r scripts/* build/scripts/
+                  else 
+                    echo "WARNING: scripts directory not found, deployment may fail"
+                  fi
             
             post_build:
               commands:
