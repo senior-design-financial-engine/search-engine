@@ -7,28 +7,20 @@ phases:
     runtime-versions:
       nodejs: 16
     commands:
-      - echo "Root-level deployspec.yml found"
-      - echo "Current directory: $(pwd)"
-      - ls -la
-      - echo "Checking for frontend/deployspec.yml file"
-      - if [ -f "frontend/deployspec.yml" ]; then echo "Found frontend/deployspec.yml, noting its existence..."; else echo "WARNING: frontend/deployspec.yml not found, but continuing with root version"; fi
-
+      - echo "Installing dependencies"
+  
   pre_build:
     commands:
-      - echo "Pre-build phase in root deployspec.yml"
-      - if [ -d "frontend" ]; then cd frontend; if [ -f "package.json" ]; then echo "Found frontend package.json, installing dependencies..."; npm install; fi; cd ..; fi
-
+      - echo "Starting pre-build phase"
+  
   build:
     commands:
-      - echo "Build phase in root deployspec.yml"
-      - if [ -d "frontend" ]; then cd frontend; if [ -f "package.json" ]; then echo "Building frontend..."; npm run build; fi; cd ..; fi
-
+      - echo "Starting build phase"
+      - cd frontend && npm install && npm run build && cd ..
+  
   post_build:
     commands:
-      - echo "Post-build phase in root deployspec.yml"
-      - echo "Listing contents of frontend/build directory:"
-      - ls -la frontend/build || echo "frontend/build directory not found"
-      - echo "Deployment artifacts ready in frontend/build/"
+      - echo "Starting post-build phase"
 
 artifacts:
   files:
