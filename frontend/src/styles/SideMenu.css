@@ -1,0 +1,79 @@
+/* Side Menu Styles */
+.side-menu {
+  position: fixed;
+  top: 0;
+  right: -350px;
+  width: 350px;
+  height: 100vh;
+  background-color: #fff;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  transition: right 0.3s ease;
+  z-index: 1030;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.side-menu.open {
+  right: 0;
+}
+
+.side-menu-toggle {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 1031;
+  transition: right 0.3s ease;
+}
+
+.side-menu-toggle.open {
+  right: 370px;
+}
+
+.side-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.side-menu-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.side-menu-close:hover {
+  color: #dc3545;
+}
+
+.analytics-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+
+.analytics-card:hover {
+  transform: translateY(-5px);
+}
+
+.chart-container {
+  height: 200px;
+  margin-bottom: 15px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .side-menu {
+    width: 100%;
+    right: -100%;
+  }
+  
+  .side-menu-toggle.open {
+    right: 20px;
+  }
+} 
