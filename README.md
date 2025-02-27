@@ -178,23 +178,27 @@ Follow these steps to quickly deploy the entire application:
 
 1. **Set up VPC infrastructure**
    ```bash
-   aws cloudformation create-stack --stack-name vpc-stack --template-body file://vpc-template.yaml
+   aws cloudformation create-stack --stack-name financial-news-vpc-{environment} --template-body file://vpc-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment}
    ```
 
 2. **Deploy backend services**
    ```bash
-   aws cloudformation create-stack --stack-name backend-stack --template-body file://backend-template.yaml
+   aws cloudformation create-stack --stack-name financial-news-backend-{environment} --template-body file://backend-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment} ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-{environment} --capabilities CAPABILITY_IAM
    ```
 
 3. **Deploy frontend application**
    ```bash
-   aws cloudformation create-stack --stack-name frontend-stack --template-body file://frontend-template.yaml
+   aws cloudformation create-stack --stack-name financial-news-frontend-{environment} --template-body file://frontend-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment} ParameterKey=BackendStackName,ParameterValue=financial-news-backend-{environment} --capabilities CAPABILITY_IAM
    ```
 
 4. **Set up CI/CD pipeline**
    ```bash
-   aws cloudformation create-stack --stack-name cicd-stack --template-body file://cicd-template.yaml
+   aws cloudformation create-stack --stack-name financial-news-cicd-{environment} --template-body file://cicd-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment} ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-{environment} ParameterKey=BackendStackName,ParameterValue=financial-news-backend-{environment} ParameterKey=FrontendStackName,ParameterValue=financial-news-frontend-{environment} --capabilities CAPABILITY_IAM
    ```
+
+Replace `{environment}` with your target environment (e.g., `development`, `staging`, or `production`).
+
+> **Important**: Always include the environment name in the stack name itself, not just as a parameter. This ensures proper cross-stack references and allows you to deploy multiple environments in the same AWS account.
 
 For detailed setup instructions, refer to the dedicated README files:
 - [VPC Setup](vpc-setup-readme.md)
@@ -238,3 +242,26 @@ To set up a local development environment:
 - Use CloudWatch Logs to view application logs
 - Check the CloudFormation stack events for deployment issues
 - Use AWS Systems Manager to connect to EC2 instances for debugging
+
+## AWS Infrastructure (CloudFormation)
+
+The project uses a complete infrastructure-as-code approach with AWS CloudFormation templates:
+
+- **VPC Setup** (`vpc-template.yaml`): Creates a custom VPC with public and private subnets, NAT Gateway, and security groups.
+- **Backend Setup** (`backend-template.yaml`): Deploys EC2 instances with Auto Scaling and an Application Load Balancer.
+- **Frontend Setup** (`frontend-template.yaml`): Configures S3 bucket and CloudFront distribution for the static web frontend.
+- **CI/CD Pipeline** (`cicd-template.yaml`): Sets up AWS CodePipeline with GitHub integration for continuous delivery.
+
+All templates are designed with consistent parameterization, allowing for flexible deployment across different environments. External components and cross-stack references are properly parameterized, enabling clean separation of concerns between stacks.
+
+### Key Infrastructure Parameters
+
+- **VPC Stack Name**: All templates reference the VPC stack by name parameter for import values
+- **Frontend/Backend Stack Names**: Pipeline and other templates reference these by name parameters
+- **CloudFront Hosted Zone ID**: Parameterized for flexibility across different AWS regions
+
+For detailed deployment instructions, see:
+- [VPC Setup Guide](vpc-setup-readme.md)
+- [Backend Setup Guide](backend-setup-readme.md)
+- [Frontend Setup Guide](frontend-setup-readme.md)
+- [CI/CD Setup Guide](cicd-setup-readme.md)

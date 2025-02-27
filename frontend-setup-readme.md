@@ -23,6 +23,27 @@ The infrastructure is designed to provide a secure, scalable, and high-performan
 4. (Optional) Registered domain name if you want to use a custom domain
 5. (Optional) Route 53 hosted zone for your domain
 
+## Stack Naming Conventions
+
+When deploying to multiple environments (development, staging, production), it's important to include the environment name in the stack name itself, not just as a parameter. This ensures proper cross-stack references and prevents conflicts.
+
+**Recommended naming pattern:**
+```
+financial-news-frontend-{environment}
+```
+
+For example:
+- `financial-news-frontend-development`
+- `financial-news-frontend-staging`
+- `financial-news-frontend-production`
+
+When referencing the backend stack, ensure its name also includes the environment:
+- `financial-news-backend-development`
+- `financial-news-backend-staging`
+- `financial-news-backend-production`
+
+Using just the EnvironmentName parameter without including it in the stack name will cause conflicts, as CloudFormation doesn't allow multiple stacks with the same name regardless of parameter values.
+
 ## Deployment Steps
 
 ### 1. Configure AWS CLI
@@ -49,38 +70,32 @@ python -m awscli cloudformation validate-template --template-body file://fronten
 
 ```powershell
 python -m awscli cloudformation create-stack `
-  --stack-name financial-news-frontend `
+  --stack-name financial-news-frontend-{environment} `
   --template-body file://frontend-template.yaml `
-  --capabilities CAPABILITY_NAMED_IAM
+  --parameters `
+    ParameterKey=EnvironmentName,ParameterValue={environment} `
+    ParameterKey=BackendStackName,ParameterValue=financial-news-backend-{environment} `
+    ParameterKey=DomainName,ParameterValue=yourdomain.com `
+    ParameterKey=CreateRoute53Records,ParameterValue=true `
+    ParameterKey=HostedZoneId,ParameterValue=Z1234567890ABC `
+    ParameterKey=CloudFrontHostedZoneId,ParameterValue=Z2FDTNDATAQYW2 `
+  --capabilities CAPABILITY_IAM
 ```
 
-> **IMPORTANT:** The `--capabilities CAPABILITY_NAMED_IAM` flag is required because the template creates IAM resources with specific names.
+Replace `{environment}` with your target environment (e.g., `development`, `staging`, or `production`).
 
-You can customize the deployment with these parameters:
-- `EnvironmentName`: Environment (development, staging, production)
-- `DomainName`: Custom domain name (leave empty to use CloudFront domain)
-- `CreateRoute53Records`: Whether to create Route 53 records (true/false)
-- `HostedZoneId`: Route 53 Hosted Zone ID for your domain
+Parameters explanation:
+- `EnvironmentName`: Deployment environment (development, staging, or production)
 - `BackendStackName`: Name of the backend CloudFormation stack
-
-Example with all parameters specified:
-
-```powershell
-python -m awscli cloudformation create-stack `
-  --stack-name financial-news-frontend `
-  --template-body file://frontend-template.yaml `
-  --parameters ParameterKey=EnvironmentName,ParameterValue=production `
-              ParameterKey=DomainName,ParameterValue=financialnews.example.com `
-              ParameterKey=CreateRoute53Records,ParameterValue=true `
-              ParameterKey=HostedZoneId,ParameterValue=Z1D633PJN98FT9 `
-              ParameterKey=BackendStackName,ParameterValue=financial-news-backend `
-  --capabilities CAPABILITY_NAMED_IAM
-```
+- `DomainName`: (Optional) Custom domain name for your application
+- `CreateRoute53Records`: Whether to create DNS records (true/false)
+- `HostedZoneId`: (Required if CreateRoute53Records is true) Route 53 hosted zone ID
+- `CloudFrontHostedZoneId`: CloudFront's global hosted zone ID (usually Z2FDTNDATAQYW2 but can be different in some regions)
 
 ### 4. Monitor Stack Creation
 
 ```powershell
-python -m awscli cloudformation describe-stacks --stack-name financial-news-frontend
+python -m awscli cloudformation describe-stacks --stack-name financial-news-frontend-{environment}
 ```
 
 ### 5. Get Stack Outputs
@@ -88,7 +103,7 @@ python -m awscli cloudformation describe-stacks --stack-name financial-news-fron
 After the stack is created, retrieve the outputs (including the CloudFront URL):
 
 ```powershell
-python -m awscli cloudformation describe-stacks --stack-name financial-news-frontend --query "Stacks[0].Outputs"
+python -m awscli cloudformation describe-stacks --stack-name financial-news-frontend-{environment} --query "Stacks[0].Outputs"
 ```
 
 ### 6. Deploy the React Application
@@ -104,27 +119,28 @@ Once the stack is created, you need to deploy your React application to the S3 b
 2. Get the deployment credentials from AWS Secrets Manager:
    ```powershell
    python -m awscli secretsmanager get-secret-value `
-     --secret-id financial-news-frontend-deployer-credentials-production | cat
+     --secret-id financial-news-frontend-deployer-credentials-{environment} | cat
    ```
+   Replace `{environment}` with your target environment.
 
 3. Configure AWS CLI with the deployment credentials:
    ```powershell
-   python -m awscli configure --profile financial-news-deployer
+   python -m awscli configure --profile financial-news-deployer-{environment}
    ```
    Provide the AccessKey and SecretKey from the previous step.
 
 4. Upload the build files to the S3 bucket:
    ```powershell
-   python -m awscli s3 sync ./build/ s3://your-frontend-bucket-name/ --profile financial-news-deployer
+   python -m awscli s3 sync ./build/ s3://financial-news-frontend-{AWS_ACCOUNT_ID}-{environment}/ --profile financial-news-deployer-{environment}
    ```
-   Replace `your-frontend-bucket-name` with the actual bucket name from the stack outputs.
+   Replace `{AWS_ACCOUNT_ID}` with your AWS account ID and `{environment}` with your target environment.
 
 5. Create a CloudFront invalidation to clear the cache:
    ```powershell
    python -m awscli cloudfront create-invalidation `
      --distribution-id your-distribution-id `
      --paths "/*" `
-     --profile financial-news-deployer
+     --profile financial-news-deployer-{environment}
    ```
    Replace `your-distribution-id` with the actual distribution ID from the stack outputs.
 
@@ -195,7 +211,7 @@ To update the stack with new parameters or template changes:
 
 ```powershell
 python -m awscli cloudformation update-stack `
-  --stack-name financial-news-frontend `
+  --stack-name financial-news-frontend-{environment} `
   --template-body file://frontend-template.yaml `
   --parameters ParameterKey=DomainName,ParameterValue=newdomain.example.com `
   --capabilities CAPABILITY_NAMED_IAM
@@ -212,12 +228,12 @@ To update the frontend application:
 
 2. Upload to S3:
    ```powershell
-   python -m awscli s3 sync ./build/ s3://your-frontend-bucket-name/ --delete --profile financial-news-deployer
+   python -m awscli s3 sync ./build/ s3://financial-news-frontend-{AWS_ACCOUNT_ID}-{environment}/ --delete --profile financial-news-deployer-{environment}
    ```
 
 3. Invalidate the CloudFront cache:
    ```powershell
-   python -m awscli cloudfront create-invalidation --distribution-id your-distribution-id --paths "/*" --profile financial-news-deployer
+   python -m awscli cloudfront create-invalidation --distribution-id your-distribution-id --paths "/*" --profile financial-news-deployer-{environment}
    ```
 
 ### Deleting the Stack
@@ -225,20 +241,20 @@ To update the frontend application:
 Before deleting the stack, you must empty the S3 bucket:
 
 ```powershell
-python -m awscli s3 rm s3://your-frontend-bucket-name/ --recursive --profile financial-news-deployer
+python -m awscli s3 rm s3://financial-news-frontend-{AWS_ACCOUNT_ID}-{environment}/ --recursive --profile financial-news-deployer-{environment}
 ```
 
 Then delete the stack:
 
 ```powershell
-python -m awscli cloudformation delete-stack --stack-name financial-news-frontend
+python -m awscli cloudformation delete-stack --stack-name financial-news-frontend-{environment}
 ```
 
 ## Troubleshooting
 
 - If the stack creation fails, check the error in the CloudFormation console or using:
   ```powershell
-  python -m awscli cloudformation describe-stack-events --stack-name financial-news-frontend
+  python -m awscli cloudformation describe-stack-events --stack-name financial-news-frontend-{environment}
   ```
 
 - If SSL certificate validation fails:
@@ -256,3 +272,16 @@ python -m awscli cloudformation delete-stack --stack-name financial-news-fronten
   - Ensure the backend is properly deployed and accessible
 
 - If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above 
+
+## Parameters Reference
+
+The frontend template accepts the following parameters:
+
+| Parameter | Description | Default | Required |
+|-----------|-------------|---------|----------|
+| EnvironmentName | Deployment environment | production | No |
+| DomainName | Custom domain name | "" | No |
+| CreateRoute53Records | Whether to create DNS records | "false" | No |
+| HostedZoneId | Route 53 hosted zone ID | "" | Only if CreateRoute53Records is true |
+| BackendStackName | Name of the backend stack | financial-news-backend | No |
+| CloudFrontHostedZoneId | CloudFront's hosted zone ID | Z2FDTNDATAQYW2 | No | 

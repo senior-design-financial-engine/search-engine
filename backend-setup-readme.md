@@ -27,6 +27,27 @@ The Flask application is automatically deployed with Elasticsearch integration, 
 4. An EC2 key pair for SSH access to instances
 5. Elasticsearch endpoint URL (from Elastic Cloud or AWS OpenSearch)
 
+## Stack Naming Conventions
+
+When deploying to multiple environments (development, staging, production), it's important to include the environment name in the stack name itself, not just as a parameter. This ensures proper cross-stack references and prevents conflicts.
+
+**Recommended naming pattern:**
+```
+financial-news-backend-{environment}
+```
+
+For example:
+- `financial-news-backend-development`
+- `financial-news-backend-staging`
+- `financial-news-backend-production`
+
+When referencing the VPC stack, ensure its name also includes the environment:
+- `financial-news-vpc-development`
+- `financial-news-vpc-staging`
+- `financial-news-vpc-production`
+
+Using just the EnvironmentName parameter without including it in the stack name will cause conflicts, as CloudFormation doesn't allow multiple stacks with the same name regardless of parameter values.
+
 ## Deployment Steps
 
 ### 1. Configure AWS CLI
@@ -53,46 +74,32 @@ python -m awscli cloudformation validate-template --template-body file://backend
 
 ```powershell
 python -m awscli cloudformation create-stack `
-  --stack-name financial-news-backend `
+  --stack-name financial-news-backend-{environment} `
   --template-body file://backend-template.yaml `
-  --parameters ParameterKey=KeyName,ParameterValue=your-key-pair `
-              ParameterKey=ElasticsearchEndpoint,ParameterValue=https://your-elasticsearch-endpoint.es.amazonaws.com `
+  --parameters `
+    ParameterKey=EnvironmentName,ParameterValue={environment} `
+    ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-{environment} `
+    ParameterKey=InstanceType,ParameterValue=t3.micro `
+    ParameterKey=KeyName,ParameterValue=your-key-pair-name `
+    ParameterKey=ElasticsearchEndpoint,ParameterValue=https://your-elasticsearch-endpoint.es.amazonaws.com `
+    ParameterKey=SSHLocation,ParameterValue=0.0.0.0/0 `
   --capabilities CAPABILITY_IAM
 ```
 
-> **IMPORTANT:** The `--capabilities CAPABILITY_IAM` flag is required because the template creates IAM resources.
+Replace `{environment}` with your target environment (e.g., `development`, `staging`, or `production`).
 
-You can customize the deployment with these parameters:
-- `EnvironmentName`: Environment (development, staging, production)
-- `InstanceType`: Size of EC2 instances (t3.micro, t3.small, t3.medium, t3.large)
-- `KeyName`: Name of your EC2 key pair for SSH access
-- `AMIId`: AMI ID for the EC2 instances (defaults to Amazon Linux 2)
-- `ElasticsearchEndpoint`: URL of your Elasticsearch/OpenSearch endpoint
-- `MinSize`, `MaxSize`, `DesiredCapacity`: Auto Scaling Group settings
-- `SSHLocation`: IP CIDR range allowed to SSH to instances (default: 0.0.0.0/0)
-
-Example with all parameters specified:
-
-```powershell
-python -m awscli cloudformation create-stack `
-  --stack-name financial-news-backend `
-  --template-body file://backend-template.yaml `
-  --parameters ParameterKey=EnvironmentName,ParameterValue=production `
-              ParameterKey=InstanceType,ParameterValue=t3.medium `
-              ParameterKey=KeyName,ParameterValue=your-key-pair `
-              ParameterKey=AMIId,ParameterValue=ami-0261755bbcb8c4a84 `
-              ParameterKey=ElasticsearchEndpoint,ParameterValue=https://your-elasticsearch-endpoint.es.amazonaws.com `
-              ParameterKey=MinSize,ParameterValue=2 `
-              ParameterKey=MaxSize,ParameterValue=6 `
-              ParameterKey=DesiredCapacity,ParameterValue=2 `
-              ParameterKey=SSHLocation,ParameterValue=203.0.113.0/24 `
-  --capabilities CAPABILITY_IAM
-```
+Parameters explanation:
+- `EnvironmentName`: Deployment environment (development, staging, or production)
+- `VpcStackName`: The name of the VPC CloudFormation stack (used to import VPC resources)
+- `InstanceType`: EC2 instance type for the backend servers
+- `KeyName`: EC2 key pair for SSH access
+- `ElasticsearchEndpoint`: Endpoint URL for Elasticsearch service
+- `SSHLocation`: CIDR block that can SSH to the EC2 instances (restrict this in production)
 
 ### 4. Monitor Stack Creation
 
 ```powershell
-python -m awscli cloudformation describe-stacks --stack-name financial-news-backend
+python -m awscli cloudformation describe-stacks --stack-name financial-news-backend-{environment}
 ```
 
 ### 5. Get Stack Outputs
@@ -100,7 +107,7 @@ python -m awscli cloudformation describe-stacks --stack-name financial-news-back
 After the stack is created, retrieve the outputs (including the ALB DNS name):
 
 ```powershell
-python -m awscli cloudformation describe-stacks --stack-name financial-news-backend --query "Stacks[0].Outputs"
+python -m awscli cloudformation describe-stacks --stack-name financial-news-backend-{environment} --query "Stacks[0].Outputs"
 ```
 
 ### 6. Test the Deployment
@@ -179,7 +186,7 @@ To update the stack with new parameters or template changes:
 
 ```powershell
 python -m awscli cloudformation update-stack `
-  --stack-name financial-news-backend `
+  --stack-name financial-news-backend-{environment} `
   --template-body file://backend-template.yaml `
   --parameters ParameterKey=InstanceType,ParameterValue=t3.medium `
   --capabilities CAPABILITY_IAM
@@ -212,14 +219,14 @@ To connect to backend instances:
 ### Deleting the Stack
 
 ```powershell
-python -m awscli cloudformation delete-stack --stack-name financial-news-backend
+python -m awscli cloudformation delete-stack --stack-name financial-news-backend-{environment}
 ```
 
 ## Troubleshooting
 
 - If the stack creation fails, check the error in the CloudFormation console or using:
   ```powershell
-  python -m awscli cloudformation describe-stack-events --stack-name financial-news-backend
+  python -m awscli cloudformation describe-stack-events --stack-name financial-news-backend-{environment}
   ```
 
 - If instances fail to start, check the user data execution by connecting to an instance and examining the logs:
@@ -238,3 +245,20 @@ python -m awscli cloudformation delete-stack --stack-name financial-news-backend
   - Verify the Elasticsearch credentials and endpoint URL
 
 - If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above 
+
+## Parameters Reference
+
+The backend template accepts the following parameters:
+
+| Parameter | Description | Default | Required |
+|-----------|-------------|---------|----------|
+| EnvironmentName | Deployment environment | production | No |
+| VpcStackName | Name of the VPC CloudFormation stack | financial-news-vpc | No |
+| InstanceType | EC2 instance type | t3.micro | No |
+| KeyName | EC2 key pair name | | Yes |
+| AMIId | AMI ID for EC2 instances | ami-0261755bbcb8c4a84 | No |
+| ElasticsearchEndpoint | Elasticsearch endpoint URL | https://your-elasticsearch-endpoint.es.amazonaws.com | No |
+| MinSize | Minimum number of EC2 instances | 2 | No |
+| MaxSize | Maximum number of EC2 instances | 6 | No |
+| DesiredCapacity | Desired number of EC2 instances | 2 | No |
+| SSHLocation | CIDR block for SSH access | 0.0.0.0/0 | No | 
