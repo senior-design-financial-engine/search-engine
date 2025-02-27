@@ -1,5 +1,5 @@
 // Mock API service for development
-import { format, subDays } from 'date-fns';
+import { format, subDays, subHours, subMinutes } from 'date-fns';
 
 // Get environment settings
 const IS_AWS = process.env.REACT_APP_ENV === 'production';
@@ -67,9 +67,54 @@ const generateFakeId = () => {
     return `${Math.floor(Math.random() * 9000) + 1000}-${Math.floor(Math.random() * 9000) + 1000}-${Math.floor(Math.random() * 9000) + 1000}`;
 };
 
-const generateFakeDate = (daysAgoMax = 30) => {
-    const daysAgo = Math.floor(Math.random() * daysAgoMax);
-    return format(subDays(new Date(), daysAgo), 'yyyy-MM-dd');
+const generateFakeDate = (daysAgoMax = 90) => {
+    // Create a more natural distribution where recent articles are more common
+    // Use a weighted random approach where more recent days have higher probability
+    // Power of 1.8 skews more toward recent dates while still allowing older ones
+    const weightedRandom = Math.pow(Math.random(), 1.8); 
+    const daysAgo = Math.floor(weightedRandom * daysAgoMax);
+    
+    // Generate a realistic time of day
+    // News articles are more commonly published during business hours
+    let baseDate = subDays(new Date(), daysAgo);
+    
+    // Determine if it's a business hour publication (higher probability)
+    const isBusinessHours = Math.random() < 0.7;
+    
+    let hoursAgo;
+    if (isBusinessHours) {
+        // Business hours: 8am to 6pm (with higher frequency around market open/close)
+        const businessHourDistribution = [
+            8, 8, 9, 9, 9, 10, 10, 11, 11, 12, 12, 
+            13, 13, 14, 14, 15, 15, 15, 16, 16, 16, 17, 17, 18
+        ];
+        const hour = businessHourDistribution[Math.floor(Math.random() * businessHourDistribution.length)];
+        
+        // Set the hour and randomize minutes
+        baseDate.setHours(hour);
+        baseDate.setMinutes(Math.floor(Math.random() * 60));
+    } else {
+        // Non-business hours: more random but still realistic
+        const nonBusinessHour = Math.floor(Math.random() * 24);
+        baseDate.setHours(nonBusinessHour);
+        baseDate.setMinutes(Math.floor(Math.random() * 60));
+    }
+    
+    // Add seconds for more realism
+    baseDate.setSeconds(Math.floor(Math.random() * 60));
+    
+    // For very recent articles (last 24 hours), add more precise timing
+    if (daysAgo === 0) {
+        // Random hours ago within the day
+        hoursAgo = Math.floor(Math.random() * 24);
+        baseDate = subHours(baseDate, hoursAgo);
+        
+        // Random minutes for very recent articles
+        const minutesAgo = Math.floor(Math.random() * 60);
+        baseDate = subMinutes(baseDate, minutesAgo);
+    }
+    
+    return format(baseDate, 'yyyy-MM-dd\'T\'HH:mm:ss');
 };
 
 const generateFakeHeadline = (keyword = null, company = null) => {
@@ -127,7 +172,7 @@ const generateFakeHeadline = (keyword = null, company = null) => {
 };
 
 // Generate relevant content based on headline and sentiment
-const generateRelevantContent = (headline, company, sentiment) => {
+const generateRelevantContent = (headline, primaryCompany, sentiment, additionalCompanies = []) => {
     // Base content length
     const contentLength = Math.floor(Math.random() * 300) + 200;
     
@@ -165,7 +210,36 @@ const generateRelevantContent = (headline, company, sentiment) => {
     const phrase2 = phrases.filter(p => p !== phrase1)[Math.floor(Math.random() * (phrases.length - 1))];
     
     // Create a more realistic content based on the headline and sentiment
-    return `This article discusses ${company}'s recent developments. The company has been ${phrase1} in the ${sectors[Math.floor(Math.random() * sectors.length)]} sector. Analysts note that ${company} is ${phrase2} compared to its competitors. ${headline} This news comes as the industry faces rapid changes and evolving consumer demands. Investors are closely monitoring the situation to determine long-term implications for the company's market position.`;
+    let content = `This article discusses ${primaryCompany}'s recent developments. The company has been ${phrase1} in the ${sectors[Math.floor(Math.random() * sectors.length)]} sector. Analysts note that ${primaryCompany} is ${phrase2} compared to its competitors. ${headline}`;
+    
+    // Add references to additional companies if they exist
+    if (additionalCompanies && additionalCompanies.length > 0) {
+        // Relationship phrases between companies
+        const relationshipPhrases = [
+            "is partnering with",
+            "is competing against",
+            "faces competition from",
+            "is outperforming",
+            "is collaborating with",
+            "shares market space with",
+            "is challenging",
+            "has similar market trends to"
+        ];
+        
+        // Add content about each additional company
+        additionalCompanies.forEach((company, index) => {
+            const relationshipPhrase = relationshipPhrases[Math.floor(Math.random() * relationshipPhrases.length)];
+            const companySentiment = sentimentOptions[Math.floor(Math.random() * sentimentOptions.length)];
+            const companyPhrase = sentimentPhrases[companySentiment][Math.floor(Math.random() * sentimentPhrases[companySentiment].length)];
+            
+            // Add a sentence about the relationship between the primary company and this one
+            content += ` ${primaryCompany} ${relationshipPhrase} ${company} in the sector. ${company} has been ${companyPhrase} recently.`;
+        });
+    }
+    
+    content += ` This news comes as the industry faces rapid changes and evolving consumer demands. Investors are closely monitoring the situation to determine long-term implications for the ${additionalCompanies.length > 0 ? 'companies' : 'company'}'s market position.`;
+    
+    return content;
 };
 
 // Calculate a true relevance score based on how well the article matches the query
@@ -177,14 +251,14 @@ const calculateRelevanceScore = (article, queryTerms) => {
     let score = 0;
     const content = article._source.content.toLowerCase();
     const headline = article._source.headline.toLowerCase();
-    const company = article._source.companies?.[0]?.name.toLowerCase() || '';
+    const companies = article._source.companies?.map(c => c.name.toLowerCase()) || [];
     const categories = article._source.categories?.map(c => c.toLowerCase()) || [];
     
     // For debugging
     const scoreBreakdown = {
         headline: 0,
-        company: 0,
-        category: 0,
+        companies: 0,
+        categories: 0,
         content: 0,
         random: 0
     };
@@ -199,20 +273,30 @@ const calculateRelevanceScore = (article, queryTerms) => {
             scoreBreakdown.headline += 0.3;
         }
         
-        // Company name match is very important (2x weight)
-        if (company === termLower) {
-            score += 0.25;
-            scoreBreakdown.company += 0.25;
-        } else if (company.includes(termLower)) {
-            score += 0.15;
-            scoreBreakdown.company += 0.15;
-        }
+        // Company name matches are very important (2x weight)
+        // Check all companies in the article
+        let companyMatchFound = false;
+        companies.forEach(company => {
+            if (company === termLower) {
+                score += 0.25;
+                scoreBreakdown.companies += 0.25;
+                companyMatchFound = true;
+            } else if (company.includes(termLower) && !companyMatchFound) {
+                score += 0.15;
+                scoreBreakdown.companies += 0.15;
+                companyMatchFound = true;
+            }
+        });
         
         // Category/sector match is important
-        if (categories.some(cat => cat === termLower || cat.includes(termLower))) {
-            score += 0.15;
-            scoreBreakdown.category += 0.15;
-        }
+        let categoryMatchFound = false;
+        categories.forEach(category => {
+            if ((category === termLower || category.includes(termLower)) && !categoryMatchFound) {
+                score += 0.15;
+                scoreBreakdown.categories += 0.15;
+                categoryMatchFound = true;
+            }
+        });
         
         // Content match
         if (content.includes(termLower)) {
@@ -233,7 +317,7 @@ const calculateRelevanceScore = (article, queryTerms) => {
     console.debug('Relevance score calculation:', {
         queryTerms,
         headline: article._source.headline,
-        company: article._source.companies?.[0]?.name,
+        companies: article._source.companies?.map(c => c.name),
         categories: article._source.categories,
         scoreBreakdown,
         finalScore: score
@@ -298,19 +382,106 @@ const generateFakeArticle = (queryTerms = [], keyword = null, forceCompany = nul
             sentimentScore = -0.3 + (Math.random() * 0.6); // Range -0.3 to 0.3
     }
     
+    // Determine if this article should have multiple companies (about 30% of articles)
+    const hasMultipleCompanies = Math.random() < 0.3;
+    
+    // Create the companies array
+    let articleCompanies = [];
+    
+    // Add the primary company
+    articleCompanies.push({
+        "name": company,
+        "ticker": company.substring(0, 3).toUpperCase(),
+        "sentiment": sentiment,
+        "mentions": Math.floor(Math.random() * 10) + 1
+    });
+    
+    // Add additional companies if needed
+    if (hasMultipleCompanies) {
+        // Determine how many additional companies (1-2)
+        const additionalCompanyCount = Math.random() < 0.7 ? 1 : 2;
+        
+        // Get companies that are not the primary one
+        const otherCompanies = companies.filter(c => c !== company);
+        
+        // Select random additional companies
+        for (let i = 0; i < additionalCompanyCount; i++) {
+            if (i < otherCompanies.length) {
+                const randomIndex = Math.floor(Math.random() * otherCompanies.length);
+                const additionalCompany = otherCompanies[randomIndex];
+                
+                // Remove the selected company to avoid duplicates
+                otherCompanies.splice(randomIndex, 1);
+                
+                // Determine sentiment for this company (may differ from primary)
+                const companySentiment = Math.random() < 0.3 ? 
+                    sentimentOptions[Math.floor(Math.random() * sentimentOptions.length)] : 
+                    sentiment;
+                
+                // Add to the companies array with fewer mentions than the primary company
+                articleCompanies.push({
+                    "name": additionalCompany,
+                    "ticker": additionalCompany.substring(0, 3).toUpperCase(),
+                    "sentiment": companySentiment,
+                    "mentions": Math.floor(Math.random() * 5) + 1 // Fewer mentions than primary
+                });
+            }
+        }
+    }
+    
+    // Determine categories/sectors
+    let articleSectors = [];
+    
+    // Add primary sector based on the main company
+    if (keyword === 'ai') {
+        articleSectors.push(Math.random() > 0.7 ? "Technology" : "Communications");
+    } else if (keyword === 'energy') {
+        articleSectors.push(Math.random() > 0.3 ? "Energy" : "Utilities");
+    } else {
+        // Find appropriate sector based on company
+        if (["Apple", "Microsoft", "Google", "IBM", "Intel", "AMD", "Nvidia"].includes(company)) {
+            articleSectors.push("Technology");
+        } else if (["Meta"].includes(company)) {
+            articleSectors.push("Communications");
+        } else if (["Amazon"].includes(company)) {
+            articleSectors.push("Consumer Goods");
+        } else if (["Tesla"].includes(company)) {
+            articleSectors.push(Math.random() > 0.5 ? "Technology" : "Consumer Goods");
+        } else {
+            articleSectors.push(sectors[Math.floor(Math.random() * sectors.length)]);
+        }
+    }
+    
+    // Add additional categories for multi-company articles or sometimes for single company articles
+    if (hasMultipleCompanies || Math.random() < 0.2) {
+        // Get sectors not already included
+        const additionalSectors = sectors.filter(s => !articleSectors.includes(s));
+        
+        // Determine how many additional sectors (usually 1, occasionally 2)
+        const additionalSectorCount = Math.random() < 0.8 ? 1 : 2;
+        
+        // Add additional sectors
+        for (let i = 0; i < additionalSectorCount && i < additionalSectors.length; i++) {
+            const randomIndex = Math.floor(Math.random() * additionalSectors.length);
+            articleSectors.push(additionalSectors[randomIndex]);
+            additionalSectors.splice(randomIndex, 1);
+        }
+    }
+    
     // Generate an appropriate headline
     const headline = generateFakeHeadline(keyword, company);
     
     // Generate more realistic content based on the headline and sentiment
-    const content = generateRelevantContent(headline, company, sentiment);
+    const additionalCompanyNames = hasMultipleCompanies ? articleCompanies.slice(1).map(c => c.name) : [];
+    const content = generateRelevantContent(headline, company, sentiment, additionalCompanyNames);
     
     // Create snippet from content
     const snippet = content.substring(0, 120) + "...";
     
     // Generate publication date (more recent for trending topics)
     const publishedDate = keyword === 'market' || keyword === 'ai' 
-        ? generateFakeDate(10) // More recent for trending topics
-        : generateFakeDate(30);
+        ? generateFakeDate(30) // More recent for trending topics
+        : generateFakeDate(90); // Regular topics can go back up to 3 months
     
     // Determine source, making some sources more likely for certain topics
     let source;
@@ -326,27 +497,6 @@ const generateFakeArticle = (queryTerms = [], keyword = null, forceCompany = nul
             : sources[Math.floor(Math.random() * sources.length)];
     } else {
         source = sources[Math.floor(Math.random() * sources.length)];
-    }
-    
-    // Determine categories/sectors
-    let articleSectors;
-    if (keyword === 'ai') {
-        articleSectors = [Math.random() > 0.7 ? "Technology" : "Communications"];
-    } else if (keyword === 'energy') {
-        articleSectors = [Math.random() > 0.3 ? "Energy" : "Utilities"];
-    } else {
-        // Find appropriate sector based on company
-        if (["Apple", "Microsoft", "Google", "IBM", "Intel", "AMD", "Nvidia"].includes(company)) {
-            articleSectors = ["Technology"];
-        } else if (["Meta"].includes(company)) {
-            articleSectors = ["Communications"];
-        } else if (["Amazon"].includes(company)) {
-            articleSectors = ["Consumer Goods"];
-        } else if (["Tesla"].includes(company)) {
-            articleSectors = [Math.random() > 0.5 ? "Technology" : "Consumer Goods"];
-        } else {
-            articleSectors = [sectors[Math.floor(Math.random() * sectors.length)]];
-        }
     }
     
     // Log sentiment calculation for debugging
@@ -369,14 +519,7 @@ const generateFakeArticle = (queryTerms = [], keyword = null, forceCompany = nul
             "snippet": snippet,
             "sentiment": sentiment,
             "sentiment_score": sentimentScore,
-            "companies": [
-                {
-                    "name": company,
-                    "ticker": company.substring(0, 3).toUpperCase(),
-                    "sentiment": sentiment,
-                    "mentions": Math.floor(Math.random() * 10) + 1
-                }
-            ],
+            "companies": articleCompanies,
             "categories": articleSectors,
             "relevance_score": 0.5 // Will be calculated properly later
         }
@@ -395,7 +538,18 @@ const generateRelevantArticles = (count, queryTerms, keyword = null) => {
     // Create a higher number of articles to allow for filtering irrelevant ones
     const targetCount = count * 1.5;
     
-    for (let i = 0; i < targetCount; i++) {
+    // Ensure we have articles distributed across the time range
+    // For about 20% of the articles, we'll explicitly set dates across the 3-month range
+    const timeDistributedCount = Math.floor(targetCount * 0.2);
+    
+    if (timeDistributedCount > 0) {
+        // Generate articles with specific time distributions
+        generateTimeDistributedArticles(timeDistributedCount, queryTerms, keyword, articles);
+    }
+    
+    // Generate the remaining articles with natural time distribution
+    const remainingCount = targetCount - timeDistributedCount;
+    for (let i = 0; i < remainingCount; i++) {
         articles.push(generateFakeArticle(queryTerms, keyword));
     }
     
@@ -411,6 +565,45 @@ const generateRelevantArticles = (count, queryTerms, keyword = null) => {
     
     // Return the requested count (or fewer if not enough relevant articles)
     return relevantArticles.slice(0, count);
+};
+
+// Generate articles distributed across the time range
+const generateTimeDistributedArticles = (count, queryTerms, keyword, articlesArray) => {
+    // Define time buckets (in days ago) to ensure distribution
+    const timeBuckets = [
+        { min: 0, max: 7 },      // Last week
+        { min: 8, max: 30 },     // Last month
+        { min: 31, max: 60 },    // 1-2 months ago
+        { min: 61, max: 90 }     // 2-3 months ago
+    ];
+    
+    // Distribute articles across time buckets
+    let bucketIndex = 0;
+    for (let i = 0; i < count; i++) {
+        // Get the current bucket
+        const bucket = timeBuckets[bucketIndex % timeBuckets.length];
+        bucketIndex++;
+        
+        // Generate an article
+        const article = generateFakeArticle(queryTerms, keyword);
+        
+        // Override the date to fit in this bucket
+        const daysAgo = bucket.min + Math.floor(Math.random() * (bucket.max - bucket.min + 1));
+        let baseDate = subDays(new Date(), daysAgo);
+        
+        // Add realistic time
+        const hour = Math.floor(Math.random() * 24);
+        const minute = Math.floor(Math.random() * 60);
+        baseDate.setHours(hour);
+        baseDate.setMinutes(minute);
+        baseDate.setSeconds(Math.floor(Math.random() * 60));
+        
+        // Set the date
+        article._source.published_at = format(baseDate, 'yyyy-MM-dd\'T\'HH:mm:ss');
+        
+        // Add to the articles array
+        articlesArray.push(article);
+    }
 };
 
 // Extract keywords from query for smarter search results
@@ -566,6 +759,9 @@ const applyFilters = (articles, source, timeRange, sentiment) => {
             case 'month':
                 cutoffDate = new Date(now.setMonth(now.getMonth() - 1));
                 break;
+            case 'three_months':
+                cutoffDate = new Date(now.setMonth(now.getMonth() - 3));
+                break;
             case 'year':
                 cutoffDate = new Date(now.setFullYear(now.getFullYear() - 1));
                 break;
@@ -605,6 +801,34 @@ const applyFilters = (articles, source, timeRange, sentiment) => {
             // Apply sentiment filter if specified
             if (sentiment && sentiment !== 'all') {
                 newArticle._source.sentiment = sentiment;
+            }
+            
+            // Apply time range filter if specified
+            if (timeRange && timeRange !== 'all') {
+                // Generate a date within the specified time range
+                let maxDaysAgo;
+                switch (timeRange) {
+                    case 'day':
+                        maxDaysAgo = 1;
+                        break;
+                    case 'week':
+                        maxDaysAgo = 7;
+                        break;
+                    case 'month':
+                        maxDaysAgo = 30;
+                        break;
+                    case 'three_months':
+                        maxDaysAgo = 90;
+                        break;
+                    case 'year':
+                        maxDaysAgo = 365;
+                        break;
+                    default:
+                        maxDaysAgo = 90;
+                }
+                
+                // Generate a date within the specified range
+                newArticle._source.published_at = generateFakeDate(maxDaysAgo);
             }
             
             filteredArticles.push(newArticle);
