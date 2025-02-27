@@ -25,6 +25,8 @@ function Results() {
     timeRange,
     sentiment
   });
+  // Add sorting state
+  const [sortBy, setSortBy] = useState('relevance');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,10 +42,18 @@ function Results() {
           const normalizedResults = searchResults.map(article => {
             // Handle both direct properties and Elasticsearch-like _source structure
             if (article._source) {
-              return { ...article._source, id: article._id };
+              return { 
+                ...article._source, 
+                id: article._id,
+                // Ensure sentiment_score is properly extracted
+                sentiment_score: article._source.sentiment_score
+              };
             }
             return article;
           });
+          
+          // Log the normalized results for debugging
+          console.log('Normalized search results:', normalizedResults);
           
           setResults(normalizedResults);
         }
@@ -112,6 +122,15 @@ function Results() {
     return isNaN(percentage) ? 'N/A' : `${percentage}%`;
   };
 
+  // Add a function to format sentiment score
+  const formatSentimentScore = (score) => {
+    if (score === undefined || score === null) return '';
+    
+    // Format with one decimal place
+    const formattedScore = parseFloat(score).toFixed(1);
+    return isNaN(formattedScore) ? '' : ` (${formattedScore})`;
+  };
+
   // Helper function to safely get company data
   const getCompanyData = (article) => {
     if (!article) return [];
@@ -137,6 +156,44 @@ function Results() {
     
     return [];
   };
+
+  // Add sorting function
+  const handleSort = (sortType) => {
+    setSortBy(sortType);
+  };
+
+  // Get sorted results based on current sort setting
+  const getSortedResults = () => {
+    if (!results || results.length === 0) return [];
+    
+    const sortedResults = [...results];
+    
+    switch (sortBy) {
+      case 'date':
+        return sortedResults.sort((a, b) => {
+          const dateA = new Date(a.published_at || 0);
+          const dateB = new Date(b.published_at || 0);
+          return dateB - dateA; // Most recent first
+        });
+      case 'sentiment':
+        return sortedResults.sort((a, b) => {
+          const sentimentOrder = { positive: 3, neutral: 2, negative: 1, undefined: 0 };
+          const sentimentA = sentimentOrder[a.sentiment?.toLowerCase()] || 0;
+          const sentimentB = sentimentOrder[b.sentiment?.toLowerCase()] || 0;
+          return sentimentB - sentimentA;
+        });
+      case 'relevance':
+      default:
+        return sortedResults.sort((a, b) => {
+          const scoreA = parseFloat(a.relevance_score || a.relevance || 0);
+          const scoreB = parseFloat(b.relevance_score || b.relevance || 0);
+          return scoreB - scoreA; // Highest relevance first
+        });
+    }
+  };
+
+  // Get the sorted results
+  const sortedResults = getSortedResults();
 
   return (
     <Container className="py-4">
@@ -309,13 +366,28 @@ function Results() {
           </h4>
           <div>
             <span className="me-2 text-muted">Sort by:</span>
-            <Button variant="outline-primary" size="sm" className="me-2 rounded-pill">
+            <Button 
+              variant={sortBy === 'relevance' ? 'primary' : 'outline-primary'} 
+              size="sm" 
+              className="me-2 rounded-pill"
+              onClick={() => handleSort('relevance')}
+            >
               <i className="bi bi-sort-down me-1"></i>Relevance
             </Button>
-            <Button variant="outline-secondary" size="sm" className="me-2 rounded-pill">
+            <Button 
+              variant={sortBy === 'date' ? 'primary' : 'outline-secondary'} 
+              size="sm" 
+              className="me-2 rounded-pill"
+              onClick={() => handleSort('date')}
+            >
               <i className="bi bi-calendar-date me-1"></i>Date
             </Button>
-            <Button variant="outline-secondary" size="sm" className="rounded-pill">
+            <Button 
+              variant={sortBy === 'sentiment' ? 'primary' : 'outline-secondary'} 
+              size="sm" 
+              className="rounded-pill"
+              onClick={() => handleSort('sentiment')}
+            >
               <i className="bi bi-emoji-smile me-1"></i>Sentiment
             </Button>
           </div>
@@ -325,7 +397,7 @@ function Results() {
       {/* Results grid */}
       {!loading && !error && results.length > 0 && (
         <Row>
-          {results.map((article, index) => (
+          {sortedResults.map((article, index) => (
             <Col md={4} key={index} className="mb-4">
               <Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
                 <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
@@ -390,6 +462,7 @@ function Results() {
                     <Badge 
                       bg={getSentimentBadgeVariant(article.sentiment)} 
                       className="px-3 py-2 rounded-pill"
+                      title={`Sentiment score: ${article.sentiment_score || 'N/A'} (Range: -1.0 to 1.0, where negative values indicate negative sentiment and positive values indicate positive sentiment)`}
                     >
                       <i className={`bi bi-${
                         article.sentiment === 'positive' ? 'emoji-smile' : 
@@ -397,6 +470,7 @@ function Results() {
                         'emoji-neutral'
                       } me-1`}></i>
                       {article.sentiment || 'Unknown'}
+                      {formatSentimentScore(article.sentiment_score)}
                     </Badge>
                     <small className="text-muted">
                       <i className="bi bi-graph-up me-1"></i>

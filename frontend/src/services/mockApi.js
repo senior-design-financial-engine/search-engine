@@ -180,6 +180,15 @@ const calculateRelevanceScore = (article, queryTerms) => {
     const company = article._source.companies?.[0]?.name.toLowerCase() || '';
     const categories = article._source.categories?.map(c => c.toLowerCase()) || [];
     
+    // For debugging
+    const scoreBreakdown = {
+        headline: 0,
+        company: 0,
+        category: 0,
+        content: 0,
+        random: 0
+    };
+    
     // Check each query term for matches
     queryTerms.forEach(term => {
         const termLower = term.toLowerCase();
@@ -187,23 +196,28 @@ const calculateRelevanceScore = (article, queryTerms) => {
         // Headline match is most important (3x weight)
         if (headline.includes(termLower)) {
             score += 0.3;
+            scoreBreakdown.headline += 0.3;
         }
         
         // Company name match is very important (2x weight)
         if (company === termLower) {
             score += 0.25;
+            scoreBreakdown.company += 0.25;
         } else if (company.includes(termLower)) {
             score += 0.15;
+            scoreBreakdown.company += 0.15;
         }
         
         // Category/sector match is important
         if (categories.some(cat => cat === termLower || cat.includes(termLower))) {
             score += 0.15;
+            scoreBreakdown.category += 0.15;
         }
         
         // Content match
         if (content.includes(termLower)) {
             score += 0.1;
+            scoreBreakdown.content += 0.1;
         }
     });
     
@@ -212,7 +226,18 @@ const calculateRelevanceScore = (article, queryTerms) => {
     
     // Add a small random factor (max 10% of score) to prevent exact ties
     const randomFactor = (Math.random() * 0.1) * score;
+    scoreBreakdown.random = randomFactor;
     score = Math.min(1.0, score + randomFactor);
+    
+    // Log the score calculation for debugging
+    console.debug('Relevance score calculation:', {
+        queryTerms,
+        headline: article._source.headline,
+        company: article._source.companies?.[0]?.name,
+        categories: article._source.categories,
+        scoreBreakdown,
+        finalScore: score
+    });
     
     return score;
 };
@@ -323,6 +348,14 @@ const generateFakeArticle = (queryTerms = [], keyword = null, forceCompany = nul
             articleSectors = [sectors[Math.floor(Math.random() * sectors.length)]];
         }
     }
+    
+    // Log sentiment calculation for debugging
+    console.debug('Sentiment calculation:', {
+        sentiment,
+        sentimentScore,
+        company,
+        keyword
+    });
     
     // Create the article object
     const article = {
@@ -445,6 +478,8 @@ const extractSearchTerms = (query) => {
 
 // Main mock API functions
 export const searchArticles = async (query, source, timeRange, sentiment) => {
+    console.log('Mock API searchArticles called with:', { query, source, timeRange, sentiment });
+    
     // Simulate network delay (shorter in production)
     await new Promise(resolve => setTimeout(resolve, IS_AWS ? 200 : 500));
     
@@ -459,6 +494,8 @@ export const searchArticles = async (query, source, timeRange, sentiment) => {
     // Extract keywords and search terms for relevant article generation
     const keywords = extractKeywords(query);
     const searchTerms = extractSearchTerms(query);
+    
+    console.log('Extracted search information:', { keywords, searchTerms });
     
     // Generate relevant articles based on query terms
     const articleCount = Math.floor(Math.random() * 11) + 15; // Generate 15-25 articles
@@ -498,6 +535,8 @@ export const searchArticles = async (query, source, timeRange, sentiment) => {
     
     // Always sort by relevance score
     filteredArticles.sort((a, b) => b._source.relevance_score - a._source.relevance_score);
+    
+    console.log(`Returning ${filteredArticles.length} articles after filtering and sorting`);
     
     // Return in Elasticsearch response format
     return filteredArticles;

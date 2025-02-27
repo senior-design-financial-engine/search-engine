@@ -89,6 +89,7 @@ const RecentQueries = ({ onSelectQuery }) => {
 		if (filters.source) {
 			badges.push(
 				<Badge key="source" bg="info" className="me-1" pill>
+					<i className="bi bi-newspaper me-1"></i>
 					{filters.source}
 				</Badge>
 			);
@@ -98,6 +99,7 @@ const RecentQueries = ({ onSelectQuery }) => {
 			const timeLabel = timeRanges.find(t => t.value === filters.time_range)?.label || filters.time_range;
 			badges.push(
 				<Badge key="time" bg="secondary" className="me-1" pill>
+					<i className="bi bi-calendar me-1"></i>
 					{timeLabel}
 				</Badge>
 			);
@@ -109,12 +111,37 @@ const RecentQueries = ({ onSelectQuery }) => {
 			const color = sentimentInfo?.color || 'secondary';
 			badges.push(
 				<Badge key="sentiment" bg={color} className="me-1" pill>
+					<i className="bi bi-emoji-smile me-1"></i>
 					{label}
 				</Badge>
 			);
 		}
 		
 		return badges.length ? <div className="mt-1">{badges}</div> : null;
+	};
+
+	// Function to get a summary of filters for screen readers and tooltips
+	const getFilterSummary = (filters) => {
+		if (!filters || Object.keys(filters).length === 0) return "No filters applied";
+		
+		const filterDescriptions = [];
+		
+		if (filters.source) {
+			filterDescriptions.push(`Source: ${filters.source}`);
+		}
+		
+		if (filters.time_range && filters.time_range !== 'all') {
+			const timeLabel = timeRanges.find(t => t.value === filters.time_range)?.label || filters.time_range;
+			filterDescriptions.push(`Time: ${timeLabel}`);
+		}
+		
+		if (filters.sentiment && filters.sentiment !== 'all') {
+			const sentimentInfo = sentiments.find(s => s.value === filters.sentiment);
+			const label = sentimentInfo?.label || filters.sentiment;
+			filterDescriptions.push(`Sentiment: ${label}`);
+		}
+		
+		return filterDescriptions.join(', ');
 	};
 
 	return (
@@ -141,10 +168,19 @@ const RecentQueries = ({ onSelectQuery }) => {
 						action 
 						onClick={() => handleQueryClick(queryData)}
 						className="d-flex flex-column align-items-start py-3 transition-bg"
+						title={typeof queryData !== 'string' ? getFilterSummary(queryData.filters) : "No filters applied"}
 					>
 						<div className="d-flex align-items-center w-100">
-							<div className="search-query-text fw-medium">{typeof queryData === 'string' ? queryData : queryData.query}</div>
+							<div className="search-query-text fw-medium">
+								{typeof queryData === 'string' ? queryData : queryData.query}
+							</div>
 							<div className="ms-auto">
+								{typeof queryData !== 'string' && Object.keys(queryData.filters || {}).length > 0 && (
+									<Badge bg="light" text="dark" className="me-2 border">
+										<i className="bi bi-funnel-fill me-1 text-secondary"></i>
+										{Object.keys(queryData.filters || {}).length}
+									</Badge>
+								)}
 								<i className="bi bi-search text-muted"></i>
 							</div>
 						</div>
@@ -170,7 +206,8 @@ function Home() {
 		// Create query object with filters
 		const queryData = {
 			query: searchQuery,
-			filters: {}
+			filters: {},
+			timestamp: new Date().toISOString() // Add timestamp for when the search was performed
 		};
 		
 		// Add filters that have non-default values
@@ -204,7 +241,7 @@ function Home() {
 			const updatedQueries = [queryData, ...recentQueries.slice(0, 9)];
 			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
 		} else {
-			// If query exists, move it to the top
+			// If query exists, move it to the top and update timestamp
 			const updatedQueries = [
 				queryData,
 				...recentQueries.filter(existingQuery => {
@@ -266,8 +303,19 @@ function Home() {
 		setQuery(searchQuery);
 		setAdvancedQueries({...advancedQueries, ...filters});
 		
-		// Save the example query to recent searches
-		saveRecentQuery(searchQuery);
+		// Save the example query to recent searches with filters
+		const queryData = {
+			query: searchQuery,
+			filters: filters,
+			timestamp: new Date().toISOString()
+		};
+		
+		// Get existing recent queries
+		const recentQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
+		
+		// Add new query at the beginning
+		const updatedQueries = [queryData, ...recentQueries.slice(0, 9)];
+		localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
 		
 		// Auto-submit after a short delay
 		setTimeout(() => {
