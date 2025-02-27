@@ -75,9 +75,7 @@ function Results() {
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     }).format(date);
   };
   
@@ -104,83 +102,130 @@ function Results() {
 
   return (
     <Container className="py-4">
-      <Row className="mb-4">
-        <Col>
-          <Button 
-            variant="outline-secondary" 
-            onClick={handleBack} 
-            className="mb-3 rounded-pill"
-          >
-            <i className="bi bi-arrow-left me-2"></i>
-            Back to Search
-          </Button>
+      <Button 
+        variant="outline-secondary" 
+        onClick={handleBack} 
+        className="mb-3 rounded-pill"
+      >
+        <i className="bi bi-arrow-left me-2"></i>
+        Back to Search
+      </Button>
+
+      <Card className="mb-4 shadow-sm border-0 rounded-3">
+        <Card.Body className="p-4">
+          <h2 className="mb-3 fw-bold">
+            <i className="bi bi-search text-primary me-2"></i>
+            Results for "<span className="text-primary">{query}</span>"
+          </h2>
           
-          <div className="d-flex flex-wrap align-items-center">
-            <h1 className="me-3 mb-0 fw-bold">
-              <i className="bi bi-search text-primary me-2"></i>
-              Results for "{query}"
-            </h1>
-            
-            {/* Display filters as badges if present */}
-            <div className="d-flex flex-wrap mt-2">
-              {source && (
-                <Badge bg="info" className="me-2 mb-2 rounded-pill py-2 px-3">
-                  <i className="bi bi-newspaper me-1"></i>
-                  Source: {source}
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="text-white p-0 ms-2" 
-                    onClick={() => handleFilterChange('source', null)}
-                  >
-                    <i className="bi bi-x-circle"></i>
-                  </Button>
-                </Badge>
-              )}
-              
-              {timeRange && timeRange !== 'all' && (
-                <Badge bg="secondary" className="me-2 mb-2 rounded-pill py-2 px-3">
-                  <i className="bi bi-calendar me-1"></i>
-                  Time: {timeRange === 'day' ? 'Last 24h' : 
-                         timeRange === 'week' ? 'Last Week' : 
-                         timeRange === 'month' ? 'Last Month' : 
-                         timeRange === 'year' ? 'Last Year' : timeRange}
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="text-white p-0 ms-2" 
-                    onClick={() => handleFilterChange('time_range', null)}
-                  >
-                    <i className="bi bi-x-circle"></i>
-                  </Button>
-                </Badge>
-              )}
-              
-              {sentiment && sentiment !== 'all' && (
-                <Badge 
-                  bg={getSentimentBadgeVariant(sentiment)} 
-                  className="me-2 mb-2 rounded-pill py-2 px-3"
+          <Row className="mt-4">
+            <Col md={4}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-bold">Source</Form.Label>
+                <Form.Select 
+                  value={source || ''}
+                  onChange={(e) => handleFilterChange('source', e.target.value)}
+                  className="rounded-3"
                 >
-                  <i className="bi bi-emoji-smile me-1"></i>
-                  Sentiment: {sentiment}
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="text-white p-0 ms-2" 
-                    onClick={() => handleFilterChange('sentiment', null)}
-                  >
-                    <i className="bi bi-x-circle"></i>
-                  </Button>
-                </Badge>
-              )}
-            </div>
-          </div>
+                  <option value="">All Sources</option>
+                  <option value="Bloomberg">Bloomberg</option>
+                  <option value="Reuters">Reuters</option>
+                  <option value="CNBC">CNBC</option>
+                  <option value="Financial Times">Financial Times</option>
+                  <option value="Wall Street Journal">Wall Street Journal</option>
+                  <option value="MarketWatch">MarketWatch</option>
+                  <option value="Barron's">Barron's</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={4}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-bold">Time Range</Form.Label>
+                <Form.Select 
+                  value={timeRange || 'all'}
+                  onChange={(e) => handleFilterChange('time_range', e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="all">All Time</option>
+                  <option value="day">Last 24 Hours</option>
+                  <option value="week">Last Week</option>
+                  <option value="month">Last Month</option>
+                  <option value="year">Last Year</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={4}>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-bold">Sentiment</Form.Label>
+                <Form.Select 
+                  value={sentiment || 'all'}
+                  onChange={(e) => handleFilterChange('sentiment', e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="all">All Sentiments</option>
+                  <option value="positive">Positive</option>
+                  <option value="negative">Negative</option>
+                  <option value="neutral">Neutral</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
           
-          <p className="text-muted mt-2">
-            Found {results.length} results
-          </p>
-        </Col>
-      </Row>
+          {/* Active filters */}
+          <div className="mt-2 d-flex flex-wrap">
+            {source && (
+              <Badge bg="info" className="me-2 mb-2 rounded-pill py-2 px-3">
+                <i className="bi bi-newspaper me-1"></i>
+                Source: {source}
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="text-white p-0 ms-2" 
+                  onClick={() => handleFilterChange('source', null)}
+                >
+                  <i className="bi bi-x-circle"></i>
+                </Button>
+              </Badge>
+            )}
+            
+            {timeRange && timeRange !== 'all' && (
+              <Badge bg="secondary" className="me-2 mb-2 rounded-pill py-2 px-3">
+                <i className="bi bi-calendar me-1"></i>
+                Time: {timeRange === 'day' ? 'Last 24h' : 
+                       timeRange === 'week' ? 'Last Week' : 
+                       timeRange === 'month' ? 'Last Month' : 
+                       timeRange === 'year' ? 'Last Year' : timeRange}
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="text-white p-0 ms-2" 
+                  onClick={() => handleFilterChange('time_range', null)}
+                >
+                  <i className="bi bi-x-circle"></i>
+                </Button>
+              </Badge>
+            )}
+            
+            {sentiment && sentiment !== 'all' && (
+              <Badge 
+                bg={getSentimentBadgeVariant(sentiment)} 
+                className="me-2 mb-2 rounded-pill py-2 px-3"
+              >
+                <i className="bi bi-emoji-smile me-1"></i>
+                Sentiment: {sentiment}
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="text-white p-0 ms-2" 
+                  onClick={() => handleFilterChange('sentiment', null)}
+                >
+                  <i className="bi bi-x-circle"></i>
+                </Button>
+              </Badge>
+            )}
+          </div>
+        </Card.Body>
+      </Card>
       
       {/* Error message */}
       {error && (
@@ -217,82 +262,126 @@ function Results() {
         </Row>
       )}
       
-      {/* Results list */}
+      {/* Results stats */}
+      {!loading && !error && results.length > 0 && (
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h4 className="mb-0">
+            <i className="bi bi-journal-text me-2 text-primary"></i>
+            Found {results.length} results
+          </h4>
+          <div>
+            <span className="me-2 text-muted">Sort by:</span>
+            <Button variant="outline-primary" size="sm" className="me-2 rounded-pill">
+              <i className="bi bi-sort-down me-1"></i>Relevance
+            </Button>
+            <Button variant="outline-secondary" size="sm" className="me-2 rounded-pill">
+              <i className="bi bi-calendar-date me-1"></i>Date
+            </Button>
+            <Button variant="outline-secondary" size="sm" className="rounded-pill">
+              <i className="bi bi-emoji-smile me-1"></i>Sentiment
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      {/* Results grid */}
       {!loading && !error && results.length > 0 && (
         <Row>
-          <Col md={12}>
-            {results.map((article, index) => (
-              <Card key={index} className="mb-4 border-0 shadow-sm rounded-3 hover-lift">
-                <Card.Body className="p-4">
-                  <Row>
-                    <Col xs={12} md={9}>
-                      <h3 className="mb-2 fw-bold">
-                        <a 
-                          href={article.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary text-decoration-none"
-                        >
-                          {article.headline}
-                        </a>
-                      </h3>
-                      
-                      <p className="text-secondary mb-3">
-                        {article.summary || article.snippet}
-                      </p>
-                      
+          {results.map((article, index) => (
+            <Col md={4} key={index} className="mb-4">
+              <Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+                <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
+                  <Badge bg="secondary" pill className="px-3 py-2">
+                    {article.source || 'Unknown Source'}
+                  </Badge>
+                  <small className="text-muted">
+                    <i className="bi bi-calendar-date me-1"></i>
+                    {formatDate(article.published_at)}
+                  </small>
+                </Card.Header>
+                <Card.Body className="p-3">
+                  <Card.Title className="mb-3 fs-5 fw-bold">
+                    <a 
+                      href={article.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-decoration-none text-primary stretched-link"
+                    >
+                      {article.headline}
+                    </a>
+                  </Card.Title>
+                  <Card.Text className="text-secondary mb-3 small">
+                    {article.summary || article.snippet || (article.content && `${article.content.substring(0, 150)}...`)}
+                  </Card.Text>
+                  
+                  <div className="mt-auto pt-2">
+                    {article.companies && article.companies.length > 0 && (
                       <div className="mb-2">
-                        <Badge 
-                          bg={getSentimentBadgeVariant(article.sentiment)} 
-                          className="me-2 rounded-pill"
-                        >
-                          {article.sentiment || 'Unknown Sentiment'}
-                        </Badge>
-                        
-                        {article.source && (
-                          <Badge bg="secondary" className="me-2 rounded-pill">
-                            {article.source}
+                        <small className="text-muted d-block mb-1">Companies:</small>
+                        {article.companies.map((company, idx) => (
+                          <Badge 
+                            key={idx} 
+                            bg="light" 
+                            text="dark" 
+                            className="me-1 mb-1 border rounded-pill"
+                          >
+                            {company.name} {company.ticker && `(${company.ticker})`}
                           </Badge>
-                        )}
-                        
-                        {article.category && (
-                          <Badge bg="info" className="me-2 rounded-pill">
-                            {article.category}
-                          </Badge>
-                        )}
+                        ))}
                       </div>
-                    </Col>
+                    )}
                     
-                    <Col xs={12} md={3} className="text-md-end mt-3 mt-md-0">
-                      <div className="d-flex flex-column align-items-md-end">
-                        <div className="text-muted mb-2 small">
-                          <i className="bi bi-calendar-date me-1"></i>
-                          {formatDate(article.published_at)}
-                        </div>
-                        
-                        <div className="text-muted mb-3 small">
-                          <i className="bi bi-graph-up me-1"></i>
-                          Relevance: {formatRelevanceScore(article.relevance)}
-                        </div>
-                        
-                        <Button 
-                          variant="outline-primary" 
-                          size="sm"
-                          href={article.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-pill px-3"
-                        >
-                          <i className="bi bi-box-arrow-up-right me-1"></i>
-                          Read Article
-                        </Button>
+                    {article.categories && article.categories.length > 0 && (
+                      <div className="mb-2">
+                        <small className="text-muted d-block mb-1">Categories:</small>
+                        {article.categories.map((category, idx) => (
+                          <Badge 
+                            key={idx} 
+                            bg="info" 
+                            className="me-1 mb-1 rounded-pill"
+                          >
+                            {category}
+                          </Badge>
+                        ))}
                       </div>
-                    </Col>
-                  </Row>
+                    )}
+                  </div>
                 </Card.Body>
+                <Card.Footer className="bg-white pt-0 pb-3 px-3 border-0">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <Badge 
+                      bg={getSentimentBadgeVariant(article.sentiment)} 
+                      className="px-3 py-2 rounded-pill"
+                    >
+                      <i className={`bi bi-${
+                        article.sentiment === 'positive' ? 'emoji-smile' : 
+                        article.sentiment === 'negative' ? 'emoji-frown' : 
+                        'emoji-neutral'
+                      } me-1`}></i>
+                      {article.sentiment || 'Unknown'}
+                    </Badge>
+                    <small className="text-muted">
+                      <i className="bi bi-graph-up me-1"></i>
+                      Relevance: {formatRelevanceScore(article.relevance)}
+                    </small>
+                  </div>
+                  <div className="mt-2">
+                    <Button 
+                      variant="outline-primary" 
+                      size="sm"
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-100 rounded-pill"
+                    >
+                      <i className="bi bi-box-arrow-up-right me-1"></i>
+                      Read Article
+                    </Button>
+                  </div>
+                </Card.Footer>
               </Card>
-            ))}
-          </Col>
+            </Col>
+          ))}
         </Row>
       )}
       
