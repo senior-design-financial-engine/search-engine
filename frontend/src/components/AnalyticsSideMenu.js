@@ -9,24 +9,13 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
 
-  // Get article hits from results
-  const getArticleHits = () => {
-    if (!results) return [];
-    if (Array.isArray(results)) return results;
-    if (results.hits && results.hits.hits) return results.hits.hits;
-    return [];
-  };
-
   useEffect(() => {
-    const articleHits = getArticleHits();
-    
-    if (articleHits && articleHits.length > 0) {
+    if (results && results.length > 0) {
       // Calculate sentiment distribution
       const sentiments = { positive: 0, negative: 0, neutral: 0 };
-      articleHits.forEach(article => {
-        const sentiment = article._source?.sentiment?.toLowerCase();
-        if (sentiment) {
-          sentiments[sentiment] = (sentiments[sentiment] || 0) + 1;
+      results.forEach(article => {
+        if (article.sentiment) {
+          sentiments[article.sentiment.toLowerCase()] = (sentiments[article.sentiment.toLowerCase()] || 0) + 1;
         } else {
           sentiments.neutral = (sentiments.neutral || 0) + 1;
         }
@@ -35,18 +24,18 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Calculate source distribution
       const sources = {};
-      articleHits.forEach(article => {
-        if (article._source?.source) {
-          sources[article._source.source] = (sources[article._source.source] || 0) + 1;
+      results.forEach(article => {
+        if (article.source) {
+          sources[article.source] = (sources[article.source] || 0) + 1;
         }
       });
       setSourceCounts(sources);
 
       // Calculate time distribution
       const times = {};
-      articleHits.forEach(article => {
-        if (article._source?.published_at) {
-          const date = new Date(article._source.published_at);
+      results.forEach(article => {
+        if (article.published_at) {
+          const date = new Date(article.published_at);
           const month = date.toLocaleString('default', { month: 'short' });
           times[month] = (times[month] || 0) + 1;
         }
@@ -55,8 +44,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Find top companies mentioned
       const companies = {};
-      articleHits.forEach(article => {
-        const articleCompanies = getCompanyData(article._source);
+      results.forEach(article => {
+        const articleCompanies = getCompanyData(article);
         articleCompanies.forEach(company => {
           const companyName = typeof company === 'string' ? company : company.name;
           if (companyName) {
@@ -74,8 +63,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
       // Find top categories
       const categories = {};
-      articleHits.forEach(article => {
-        const articleCategories = getCategories(article._source);
+      results.forEach(article => {
+        const articleCategories = getCategories(article);
         articleCategories.forEach(category => {
           if (category) {
             categories[category] = (categories[category] || 0) + 1;
@@ -94,7 +83,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
 
   // Helper function to extract company data from an article
   const getCompanyData = (article) => {
-    if (!article) return [];
     if (article.companies && Array.isArray(article.companies)) {
       return article.companies;
     } else if (article.company_mentions && Array.isArray(article.company_mentions)) {
@@ -118,10 +106,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   };
 
   // Calculate total for percentages
-  const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0) || 1; // Avoid division by zero
-
-  // Extract time analysis data from results
-  const timeAnalysis = results && results.aggregations ? results.aggregations.time_analysis : null;
+  const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
 
   return (
     <>
@@ -211,11 +196,11 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                       <div key={index} className="mb-2">
                         <div className="d-flex justify-content-between mb-1">
                           <span>{source}</span>
-                          <span>{count} ({Math.round((count / getArticleHits().length) * 100)}%)</span>
+                          <span>{count} ({Math.round((count / results.length) * 100)}%)</span>
                         </div>
                         <ProgressBar 
                           variant="primary" 
-                          now={(count / getArticleHits().length) * 100} 
+                          now={(count / results.length) * 100} 
                           className="mb-2"
                         />
                       </div>
@@ -284,71 +269,28 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
             <Card className="analytics-card shadow-sm">
               <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-clock-history me-2 text-primary"></i>
-                  Time Distribution
+                  <i className="bi bi-calendar-date me-2 text-primary"></i>
+                  Publication Timeline
                 </h5>
               </Card.Header>
               <Card.Body>
-                <div className="time-stats">
-                  <div className="time-stat-item">
-                    <div className="d-flex justify-content-between align-items-center mb-1">
-                      <span>Last 24 Hours</span>
-                      <span className="badge bg-primary rounded-pill">{timeAnalysis?.last_24_hours}</span>
-                    </div>
-                    <div className="progress" style={{ height: '8px' }}>
-                      <div 
-                        className="progress-bar bg-primary" 
-                        role="progressbar" 
-                        style={{ width: `${timeAnalysis?.last_24_hours_pct}%` }}
-                        aria-valuenow={timeAnalysis?.last_24_hours_pct} 
-                        aria-valuemin="0" 
-                        aria-valuemax="100"
-                      ></div>
-                    </div>
-                  </div>
-                  
-                  <div className="time-stat-item mt-2">
-                    <div className="d-flex justify-content-between align-items-center mb-1">
-                      <span>Last Week</span>
-                      <span className="badge bg-info rounded-pill">{timeAnalysis?.last_week}</span>
-                    </div>
-                    <div className="progress" style={{ height: '8px' }}>
-                      <div 
-                        className="progress-bar bg-info" 
-                        role="progressbar" 
-                        style={{ width: `${timeAnalysis?.last_week_pct}%` }}
-                        aria-valuenow={timeAnalysis?.last_week_pct} 
-                        aria-valuemin="0" 
-                        aria-valuemax="100"
-                      ></div>
-                    </div>
-                  </div>
-                  
-                  <div className="time-stat-item mt-2">
-                    <div className="d-flex justify-content-between align-items-center mb-1">
-                      <span>Last Month</span>
-                      <span className="badge bg-secondary rounded-pill">{timeAnalysis?.last_month}</span>
-                    </div>
-                    <div className="progress" style={{ height: '8px' }}>
-                      <div 
-                        className="progress-bar bg-secondary" 
-                        role="progressbar" 
-                        style={{ width: `${timeAnalysis?.last_month_pct}%` }}
-                        aria-valuenow={timeAnalysis?.last_month_pct} 
-                        aria-valuemin="0" 
-                        aria-valuemax="100"
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="daily-average mt-3 text-center">
-                  <div className="daily-average-value">
-                    <span className="h3 text-primary">{timeAnalysis?.daily_average}</span>
-                  </div>
-                  <div className="daily-average-label text-muted">
-                    Average articles per day
-                  </div>
+                <div className="mb-3">
+                  {Object.entries(timeDistribution)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([month, count], index) => (
+                      <div key={index} className="mb-2">
+                        <div className="d-flex justify-content-between mb-1">
+                          <span>{month}</span>
+                          <span>{count} articles</span>
+                        </div>
+                        <ProgressBar 
+                          variant="secondary" 
+                          now={(count / results.length) * 100} 
+                          className="mb-2"
+                        />
+                      </div>
+                    ))
+                  }
                 </div>
               </Card.Body>
             </Card>
