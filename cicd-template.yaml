@@ -214,26 +214,26 @@ Resources:
               runtime-versions:
                 nodejs: 16
               commands:
-                - echo "Installing frontend dependencies..."
-                - pwd
-                - echo "Checking directory structure"
+                - "echo \"Installing frontend dependencies...\""
+                - "pwd"
+                - "echo \"Checking directory structure\""
                 - "if [ -d \"frontend\" ]; then cd frontend; elif [ -d \"../frontend\" ]; then cd ../frontend; fi"
-                - npm install
+                - "npm install"
             
             pre_build:
               commands:
-                - echo "Running tests..."
-                - npm test -- --watchAll=false --testEnvironment=jsdom || echo "Some tests failed, but continuing with build..."
+                - "echo \"Running tests...\""
+                - "npm test -- --watchAll=false --testEnvironment=jsdom || echo \"Some tests failed, but continuing with build...\""
             
             build:
               commands:
-                - echo "Building the frontend..."
-                - npm run build
-                - echo "Build completed on `date`"
+                - "echo \"Building the frontend...\""
+                - "npm run build"
+                - "echo \"Build completed on $(date)\""
             
             post_build:
               commands:
-                - echo "Post-build phase completed successfully"
+                - "echo \"Post-build phase completed successfully\""
           
           artifacts:
             base-directory: frontend/build
@@ -278,34 +278,34 @@ Resources:
               runtime-versions:
                 python: 3.9
               commands:
-                - echo Installing dependencies...
-                - cd backend
-                - python -m pip install --upgrade pip
-                - pip install pytest pytest-cov flake8
-                - pip install -r requirements.txt
+                - "echo \"Installing dependencies...\""
+                - "cd backend"
+                - "python -m pip install --upgrade pip"
+                - "pip install pytest pytest-cov flake8"
+                - "pip install -r requirements.txt"
             
             pre_build:
               commands:
-                - echo Running tests and linting...
-                - flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Linting issues found, but continuing..."
-                - pytest --cov=./ --cov-report=xml || echo "Some tests failed, but continuing..."
+                - "echo \"Running tests and linting...\""
+                - "flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || echo \"Linting issues found, but continuing...\""
+                - "pytest --cov=./ --cov-report=xml || echo \"Some tests failed, but continuing...\""
             
             build:
               commands:
-                - echo Building the backend deployment package...
-                - mkdir -p dist
-                - zip -r dist/backend.zip .
-                - echo Build completed on `date`
+                - "echo \"Building the backend deployment package...\""
+                - "mkdir -p dist"
+                - "zip -r dist/backend.zip ."
+                - "echo \"Build completed on $(date)\""
             
             post_build:
               commands:
-                - echo "Backend post-build phase completed"
+                - "echo \"Backend post-build phase completed\""
           
           artifacts:
             files:
-              - backend/dist/backend.zip
-              - appspec.yml
-              - backend/scripts/**/*
+              - "backend/dist/backend.zip"
+              - "appspec.yml"
+              - "backend/scripts/**/*"
             discard-paths: no
           
           cache:
@@ -348,11 +348,11 @@ Resources:
               commands:
                 - echo "Running frontend deployment..."
                 - "echo \"Current directory: $(pwd)\""
-                - ls -la
-                - echo "Checking if we're dealing with source code or built assets"
+                - "ls -la"
+                - "echo \"Checking if we're dealing with source code or built assets\""
                 - "if [ -d \"frontend\" ] && [ ! -f \"package.json\" ]; then echo \"Changing directory to frontend/\"; cd frontend; fi"
-                - "if [ -f \"package.json\" ]; then echo \"Found package.json, this is source code - will build\"; npm install; HAS_SOURCE=true; fi"
-                - "if [ ! -d \"frontend\" ] && [ ! -f \"package.json\" ]; then echo \"No package.json found, assuming these are pre-built assets - skipping build\"; HAS_SOURCE=false; mkdir -p build; cp -r * build/ 2>/dev/null || :; fi"
+                - "if [ -f \"package.json\" ]; then echo \"Found package.json, this is source code - will build\"; npm install; HAS_SOURCE=true; else HAS_SOURCE=false; fi"
+                - "if [ ! -d \"frontend\" ] && [ ! -f \"package.json\" ] && [ \"$HAS_SOURCE\" != \"true\" ]; then echo \"No package.json found, assuming these are pre-built assets - skipping build\"; mkdir -p build; cp -r * build/ 2>/dev/null || true; fi"
             
             pre_build:
               commands:
@@ -360,27 +360,27 @@ Resources:
             
             build:
               commands:
-                - "if [ \"$HAS_SOURCE\" = \"true\" ]; then echo \"Building the frontend...\"; npm run build; echo \"Build completed on `date`\"; else echo \"Using pre-built assets, skipping build step\"; fi"
-                - echo "Checking for appspec.yml"
+                - "if [ \"$HAS_SOURCE\" = \"true\" ]; then echo \"Building the frontend...\"; npm run build; echo \"Build completed on $(date)\"; else echo \"Using pre-built assets, skipping build step\"; fi"
+                - "echo \"Checking for appspec.yml\""
                 - "if [ -f \"../appspec.yml\" ]; then echo \"Copying appspec.yml from parent directory to build/\"; cp ../appspec.yml build/; elif [ -f \"appspec.yml\" ]; then echo \"Copying appspec.yml to build/\"; cp appspec.yml build/; else echo \"WARNING: appspec.yml not found, deployment may fail\"; fi"
-                - echo "Checking for scripts directory"
+                - "echo \"Checking for scripts directory\""
                 - "if [ -d \"../scripts\" ]; then echo \"Copying scripts/ from parent directory to build/\"; mkdir -p build/scripts; cp -r ../scripts/* build/scripts/; elif [ -d \"scripts\" ]; then echo \"Copying scripts/ to build/\"; mkdir -p build/scripts; cp -r scripts/* build/scripts/; else echo \"WARNING: scripts directory not found, deployment may fail\"; fi"
             
             post_build:
               commands:
-                - echo "Post-build phase completed"
-                - echo "Listing contents of build directory:"
-                - ls -la build
-                - echo "Deployment artifacts ready in build/"
-                - echo "Retrieving S3 bucket name from CloudFormation stack output..."
+                - "echo \"Post-build phase completed\""
+                - "echo \"Listing contents of build directory:\""
+                - "ls -la build"
+                - "echo \"Deployment artifacts ready in build/\""
+                - "echo \"Retrieving S3 bucket name from CloudFormation stack output...\""
                 - "export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue\" --output text)"
-                - echo "Retrieved bucket name: $BUCKET_NAME"
-                - echo "Syncing build files to S3 bucket..."
+                - "echo \"Retrieved bucket name: $BUCKET_NAME\""
+                - "echo \"Syncing build files to S3 bucket...\""
                 - "aws s3 sync build/ s3://$BUCKET_NAME/ --delete"
-                - echo "Creating CloudFront invalidation..."
+                - "echo \"Creating CloudFront invalidation...\""
                 - "export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue\" --output text)"
                 - "aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths \"/*\""
-                - echo "Frontend deployment to S3 completed successfully!"
+                - "echo \"Frontend deployment to S3 completed successfully!\""
           
           artifacts:
             base-directory: build
