@@ -133,3 +133,56 @@ For development without an Elasticsearch instance:
 - Enhanced visualization tools
 - Mobile application development
 - API ecosystem expansion
+
+## Cloud Deployment
+
+This project is designed to be deployed on AWS using a comprehensive infrastructure-as-code approach with CloudFormation templates.
+
+### Deployment Architecture
+
+The system is deployed using four main CloudFormation templates:
+
+1. **VPC Infrastructure** (`vpc-template.yaml`)
+   - Networking foundation with public and private subnets
+   - NAT Gateways for private subnet internet access
+   - Appropriate security groups and routing tables
+
+2. **Backend Infrastructure** (`backend-template.yaml`)
+   - Auto Scaling Group of EC2 instances
+   - Application Load Balancer
+   - Security groups with appropriate ingress/egress rules
+   - IAM roles with least privilege access
+
+3. **Frontend Infrastructure** (`frontend-template.yaml`)
+   - S3 bucket for static website hosting
+   - CloudFront distribution for content delivery
+   - Appropriate bucket policies and access controls
+
+4. **CI/CD Pipeline** (`cicd-template.yaml`)
+   - CodePipeline for orchestrating the deployment workflow
+   - CodeBuild projects for building and testing
+   - GitHub integration for automatic deployments
+   - IAM roles with appropriate permissions
+
+### Deployment Steps
+
+See the dedicated README files for detailed deployment instructions:
+- VPC setup: [vpc-setup-readme.md](vpc-setup-readme.md)
+- Backend setup: [backend-setup-readme.md](backend-setup-readme.md)
+- Frontend setup: [frontend-setup-readme.md](frontend-setup-readme.md)
+- CI/CD setup: [cicd-setup-readme.md](cicd-setup-readme.md)
+
+## Troubleshooting
+
+### Common Issues
+
+- **Missing AWS CLI**: Install AWS CLI using pip: `pip install awscli`
+- **CORS Errors**: Ensure the backend CORS settings match the frontend URL
+- **Elasticsearch Connection Issues**: Check security group rules and network ACLs
+- **CI/CD Pipeline Failures**: Check CodeBuild logs and IAM permissions
+
+### Debugging Tips
+
+- Use CloudWatch Logs to view application logs
+- Check the CloudFormation stack events for deployment issues
+- Use AWS Systems Manager to connect to EC2 instances for debugging

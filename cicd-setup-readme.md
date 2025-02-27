@@ -208,4 +208,140 @@ Then delete the stack:
 python -m awscli cloudformation delete-stack --stack-name financial-news-cicd
 ```
 
-If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above. 
+If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above.
+
+## YAML Syntax Requirements for CodeBuild Buildspecs
+
+The CI/CD pipeline uses AWS CodeBuild buildspecs defined in the CloudFormation template. Pay special attention to the syntax requirements for these buildspecs:
+
+### Common Syntax Issues
+
+1. **Multiline Commands**: When using multiline bash commands, properly quote and escape the strings:
+   ```yaml
+   # CORRECT:
+   - "if [ -f \"package.json\" ]; then echo \"Found package.json\"; npm install; else echo \"No package.json found\"; fi"
+   
+   # INCORRECT:
+   - if [ -f "package.json" ]; then
+       echo "Found package.json"
+       npm install
+     else
+       echo "No package.json found"
+     fi
+   ```
+
+2. **Variable Interpolation**: Use `$(command)` syntax instead of backticks:
+   ```yaml
+   # CORRECT:
+   - "echo \"Build completed on $(date)\""
+   
+   # INCORRECT:
+   - echo "Build completed on `date`"
+   ```
+
+3. **Quoting and Escaping**: Always escape embedded double quotes and properly quote the entire command:
+   ```yaml
+   # CORRECT:
+   - "echo \"Current directory: $(pwd)\""
+   
+   # INCORRECT:
+   - echo "Current directory: $(pwd)"
+   ```
+
+### Validating Buildspec Syntax
+
+To avoid deployment failures, validate your syntax before committing changes:
+
+1. Extract the buildspec to a separate file for testing:
+   ```bash
+   # Extract buildspec from CloudFormation template to test file
+   python -c "import yaml; print(yaml.dump(yaml.safe_load(open('cicd-template.yaml').read())['Resources']['FrontendBuildProject']['Properties']['Source']['BuildSpec']))" > test-buildspec.yml
+   ```
+
+2. Validate the buildspec directly:
+   ```bash
+   cat test-buildspec.yml | python -c "import sys, yaml; yaml.safe_load(sys.stdin)"
+   ```
+
+3. If no errors are displayed, the syntax is valid.
+
+## Common Deployment Issues and Solutions
+
+### Access Denied Errors
+
+If your CodeBuild projects encounter "Access Denied" errors:
+
+1. **IAM Role Permissions**: Ensure the CodeBuildServiceRole has necessary permissions:
+   ```yaml
+   # Add these permissions to CodeBuildServiceRole
+   - Effect: Allow
+     Action:
+       - 'cloudformation:DescribeStacks'
+       - 'cloudformation:ListStackResources'
+     Resource: '*'
+   ```
+
+2. **S3 Bucket Access**: Verify the bucket policy allows access from CodeBuild
+
+3. **CloudFront Access**: Ensure the IAM role has proper CloudFront permissions:
+   ```yaml
+   - Effect: Allow
+     Action:
+       - 'cloudfront:CreateInvalidation'
+       - 'cloudfront:GetInvalidation'
+       - 'cloudfront:ListInvalidations'
+     Resource: '*'
+   ```
+
+### Build Environment Issues
+
+1. **Runtime Version**: Ensure you're using compatible runtime versions:
+   ```yaml
+   runtime-versions:
+     nodejs: 16  # Update as needed
+     python: 3.9 # Update as needed
+   ```
+
+2. **Environment Variables**: Set all required environment variables in the CodeBuild project
+
+3. **Memory/CPU Limits**: If builds fail due to resource constraints, increase the compute type:
+   ```yaml
+   ComputeType: BUILD_GENERAL1_MEDIUM # Increase from SMALL if needed
+   ```
+
+### CI/CD Pipeline Debugging
+
+To debug pipeline issues:
+
+1. Check the individual phases of your CodeBuild projects in the AWS Console
+2. Examine CloudWatch Logs for detailed error messages
+3. Validate IAM permissions for each service
+4. Check that environment variables are correctly passed between stages
+5. Verify source code is correctly pulled from GitHub
+6. Update the GitHub webhook if pipeline isn't triggered by code pushes
+
+## Updating an Existing Pipeline
+
+When updating an existing CI/CD pipeline:
+
+1. Make a backup of your current template:
+   ```bash
+   python -m awscli cloudformation get-template --stack-name financial-news-cicd > cicd-template-backup.json
+   ```
+
+2. Make your changes to the template, ensuring proper YAML syntax
+
+3. Validate the template:
+   ```bash
+   python -m awscli cloudformation validate-template --template-body file://cicd-template.yaml
+   ```
+
+4. Update the stack:
+   ```bash
+   python -m awscli cloudformation update-stack --stack-name financial-news-cicd --template-body file://cicd-template.yaml --capabilities CAPABILITY_IAM
+   ```
+
+5. Monitor the stack update:
+   ```bash
+   python -m awscli cloudformation describe-stack-events --stack-name financial-news-cicd
+   ``` 

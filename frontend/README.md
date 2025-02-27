@@ -78,32 +78,67 @@ When deploying the frontend to AWS, ensure the following steps are completed:
 The frontend needs to connect to your deployed backend API. Update the `.env.production` file with the correct backend URL:
 
 ```
-REACT_APP_API_URL=https://your-actual-api-domain.com
+REACT_APP_API_URL=http://development-backend-alb-1048070002.us-east-1.elb.amazonaws.com
 ```
 
-For AWS deployments, this will typically be:
-- CloudFront distribution domain for your backend API
-- API Gateway endpoint URL
-- Load balancer URL for your backend service
+For AWS deployments, this URL will typically be:
+- The Application Load Balancer DNS name (as shown above)
+- API Gateway endpoint URL (if using API Gateway)
+- CloudFront distribution domain name (if your backend is behind CloudFront)
 
-### CloudFront Configuration
+### AWS CloudFormation Deployment
 
-If you're using CloudFront with S3, ensure the following:
-1. CloudFront distribution has proper origin settings for your S3 bucket
-2. CloudFront behavior settings include proper cache policy and forwarded headers
-3. Error pages are configured to return `index.html` for 403/404 errors (required for SPA routing)
+This project is deployed using AWS CloudFormation templates:
 
-### CORS Configuration
+1. **Frontend Infrastructure** (`frontend-template.yaml`):
+   - Creates S3 bucket for hosting
+   - Sets up CloudFront distribution
+   - Configures appropriate bucket policies
 
-If your frontend and backend are on different domains, ensure:
-1. Backend API has proper CORS headers configured
-2. API Gateway (if used) has CORS enabled for the frontend domain
+2. **CI/CD Pipeline** (`cicd-template.yaml`):
+   - Sets up automatic deployment from GitHub
+   - Handles building, testing, and deploying the application
 
-### Environment Variables
+### Deployment Process
 
-Before building, ensure all required environment variables are set:
-```
+The deployment process happens automatically through the CI/CD pipeline:
+
+1. When code is pushed to the specified GitHub branch, CodePipeline is triggered
+2. CodeBuild runs `npm install` and `npm test` to verify the code
+3. If tests pass, CodeBuild runs `npm run build` to create the production build
+4. The build artifacts are deployed to the S3 bucket
+5. A CloudFront invalidation is created to clear the cache
+
+### YAML Syntax Notes
+
+When making changes to CloudFormation templates:
+- Always quote multiline commands properly
+- Ensure proper YAML indentation
+- Validate templates before pushing changes:
+  ```
+  aws cloudformation validate-template --template-body file://cicd-template.yaml
+  ```
+
+### Troubleshooting Deployment
+
+If deployment fails:
+1. Check CodeBuild logs in AWS Console
+2. Verify IAM permissions for CodeBuild service role
+3. Check for YAML syntax errors in buildspec
+4. Verify environment variables are correctly set
+5. Ensure the S3 bucket exists and is correctly referenced
+
+### Manual Deployment
+
+For manual deployments to S3:
+
+```bash
+# Build the application
 npm run build
-```
 
-This will create production-ready files in the `build/` directory that will be deployed to S3.
+# Sync to S3
+aws s3 sync build/ s3://your-bucket-name/ --delete
+
+# Create CloudFront invalidation
+aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+```
