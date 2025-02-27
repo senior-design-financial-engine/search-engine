@@ -11,39 +11,17 @@ phases:
       - echo "Current directory: $(pwd)"
       - ls -la
       - echo "Checking for frontend/deployspec.yml file"
-      - |
-        if [ -f "frontend/deployspec.yml" ]; then
-          echo "Found frontend/deployspec.yml, noting its existence..."
-          # No longer copying it since we're using this root file directly
-        else
-          echo "WARNING: frontend/deployspec.yml not found, but continuing with root version"
-        fi
+      - if [ -f "frontend/deployspec.yml" ]; then echo "Found frontend/deployspec.yml, noting its existence..."; else echo "WARNING: frontend/deployspec.yml not found, but continuing with root version"; fi
 
   pre_build:
     commands:
       - echo "Pre-build phase in root deployspec.yml"
-      - |
-        if [ -d "frontend" ]; then
-          cd frontend
-          if [ -f "package.json" ]; then
-            echo "Found frontend package.json, installing dependencies..."
-            npm install
-          fi
-          cd ..
-        fi
+      - if [ -d "frontend" ]; then cd frontend; if [ -f "package.json" ]; then echo "Found frontend package.json, installing dependencies..."; npm install; fi; cd ..; fi
 
   build:
     commands:
       - echo "Build phase in root deployspec.yml"
-      - |
-        if [ -d "frontend" ]; then
-          cd frontend
-          if [ -f "package.json" ]; then
-            echo "Building frontend..."
-            npm run build
-          fi
-          cd ..
-        fi
+      - if [ -d "frontend" ]; then cd frontend; if [ -f "package.json" ]; then echo "Building frontend..."; npm run build; fi; cd ..; fi
 
   post_build:
     commands:
