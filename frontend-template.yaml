@@ -81,12 +81,9 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: cloudfront.amazonaws.com
+              AWS: !Sub "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}"
             Action: 's3:GetObject'
             Resource: !Sub "${FrontendBucket.Arn}/*"
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
   # CloudFront Origin Access Identity
   CloudFrontOAI:
