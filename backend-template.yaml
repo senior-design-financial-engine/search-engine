@@ -11,6 +11,11 @@ Parameters:
       - staging
       - production
   
+  VpcStackName:
+    Description: Name of the VPC CloudFormation stack
+    Type: String
+    Default: financial-news-vpc
+  
   InstanceType:
     Description: EC2 instance type for the backend servers
     Type: String
@@ -129,7 +134,7 @@ Resources:
     Properties:
       GroupDescription: Security group for backend servers
       VpcId: 
-        Fn::ImportValue: !Sub "financial-news-vpc-VPCID"
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -151,7 +156,7 @@ Resources:
     Properties:
       GroupDescription: Security group for Application Load Balancer
       VpcId:
-        Fn::ImportValue: !Sub "financial-news-vpc-VPCID"
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -359,8 +364,8 @@ Resources:
       MaxSize: !Ref MaxSize
       DesiredCapacity: !Ref DesiredCapacity
       VPCZoneIdentifier:
-        - Fn::ImportValue: !Sub "financial-news-vpc-PrivateSubnet1ID"
-        - Fn::ImportValue: !Sub "financial-news-vpc-PrivateSubnet2ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet2ID"
       TargetGroupARNs:
         - !Ref BackendTargetGroup
       HealthCheckType: ELB
@@ -383,8 +388,8 @@ Resources:
         - Key: idle_timeout.timeout_seconds
           Value: '60'
       Subnets:
-        - Fn::ImportValue: !Sub "financial-news-vpc-PublicSubnet1ID"
-        - Fn::ImportValue: !Sub "financial-news-vpc-PublicSubnet2ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       Tags:
@@ -401,7 +406,7 @@ Resources:
       Port: 5000
       Protocol: HTTP
       VpcId:
-        Fn::ImportValue: !Sub "financial-news-vpc-VPCID"
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
       HealthCheckIntervalSeconds: 30
       HealthCheckPath: /health
       HealthCheckProtocol: HTTP

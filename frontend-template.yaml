@@ -33,6 +33,11 @@ Parameters:
     Description: Name of the backend CloudFormation stack
     Type: String
     Default: financial-news-backend
+  
+  CloudFrontHostedZoneId:
+    Description: CloudFront hosted zone ID
+    Type: String
+    Default: Z2FDTNDATAQYW2
 
 Conditions:
   HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
@@ -175,7 +180,7 @@ Resources:
       Type: A
       AliasTarget:
         DNSName: !GetAtt CloudFrontDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (this is fixed)
+        HostedZoneId: !Ref CloudFrontHostedZoneId  # CloudFront hosted zone ID
         EvaluateTargetHealth: false
 
   WwwDomainRecordSet:
@@ -187,7 +192,7 @@ Resources:
       Type: A
       AliasTarget:
         DNSName: !GetAtt CloudFrontDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (this is fixed)
+        HostedZoneId: !Ref CloudFrontHostedZoneId  # CloudFront hosted zone ID
         EvaluateTargetHealth: false
 
   # IAM User for CI/CD deployment

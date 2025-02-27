@@ -38,6 +38,11 @@ Parameters:
     Description: Name of the backend CloudFormation stack
     Type: String
     Default: financial-news-backend
+  
+  VpcStackName:
+    Description: Name of the VPC CloudFormation stack
+    Type: String
+    Default: financial-news-vpc
 
 Resources:
   # S3 bucket for storing pipeline artifacts
