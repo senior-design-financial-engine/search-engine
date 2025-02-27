@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { searchArticles } from '../services/api';
 import { Container, Row, Col, Card, Button, Badge, Spinner, Form } from 'react-bootstrap';
-import AnalyticsSideMenu from './AnalyticsSideMenu';
 import '../styles/Results.css';
 
 function Results() {
@@ -28,14 +27,7 @@ function Results() {
   });
   // Add sorting state
   const [sortBy, setSortBy] = useState('relevance');
-  // Add side menu state
-  const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const navigate = useNavigate();
-
-  // Toggle side menu function
-  const toggleSideMenu = () => {
-    setIsSideMenuOpen(!isSideMenuOpen);
-  };
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -200,13 +192,6 @@ function Results() {
 
   return (
     <Container className="py-4">
-      {/* Analytics Side Menu */}
-      <AnalyticsSideMenu 
-        isOpen={isSideMenuOpen} 
-        toggleMenu={toggleSideMenu} 
-        results={results}
-      />
-      
       <Button 
         variant="outline-secondary" 
         onClick={handleBack} 
