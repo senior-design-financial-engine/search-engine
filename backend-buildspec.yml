@@ -1,0 +1,92 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo Installing deployment tools...
+      - pip install --upgrade awscli
+      - pip install boto3
+  
+  pre_build:
+    commands:
+      - echo Preparing for deployment...
+      - cd backend
+      - mkdir -p scripts
+      - echo "Creating deployment script"
+      - echo '#!/bin/bash' > scripts/deploy.sh
+      - echo '# Stop the current service if it exists' >> scripts/deploy.sh
+      - echo 'if systemctl is-active --quiet financial-news.service; then' >> scripts/deploy.sh
+      - echo '  systemctl stop financial-news.service' >> scripts/deploy.sh
+      - echo 'fi' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '# Extract the deployment package' >> scripts/deploy.sh
+      - echo 'cd /opt/financial-news-engine' >> scripts/deploy.sh
+      - echo 'unzip -o /tmp/backend.zip -d .' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '# Install dependencies' >> scripts/deploy.sh
+      - echo 'pip3 install -r requirements.txt' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '# Restart the service' >> scripts/deploy.sh
+      - echo 'systemctl daemon-reload' >> scripts/deploy.sh
+      - echo 'systemctl start financial-news.service' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '# Check status' >> scripts/deploy.sh
+      - echo 'systemctl status financial-news.service' >> scripts/deploy.sh
+      - chmod +x scripts/deploy.sh
+      - echo "Creating appspec.yml"
+      - echo 'version: 0.0' > appspec.yml
+      - echo 'os: linux' >> appspec.yml
+      - echo 'files:' >> appspec.yml
+      - echo '  - source: dist/backend.zip' >> appspec.yml
+      - echo '    destination: /tmp/' >> appspec.yml
+      - echo 'hooks:' >> appspec.yml
+      - echo '  BeforeInstall:' >> appspec.yml
+      - echo '    - location: scripts/before_install.sh' >> appspec.yml
+      - echo '      timeout: 300' >> appspec.yml
+      - echo '      runas: root' >> appspec.yml
+      - echo '  AfterInstall:' >> appspec.yml
+      - echo '    - location: scripts/deploy.sh' >> appspec.yml
+      - echo '      timeout: 300' >> appspec.yml
+      - echo '      runas: root' >> appspec.yml
+      - echo "Creating before_install script"
+      - echo '#!/bin/bash' > scripts/before_install.sh
+      - echo '' >> scripts/before_install.sh
+      - echo '# Create app directory if it doesn'\''t exist' >> scripts/before_install.sh
+      - echo 'mkdir -p /opt/financial-news-engine' >> scripts/before_install.sh
+      - echo '' >> scripts/before_install.sh
+      - echo '# Backup existing application' >> scripts/before_install.sh
+      - echo 'if [ -d "/opt/financial-news-engine/backup" ]; then' >> scripts/before_install.sh
+      - echo '  rm -rf /opt/financial-news-engine/backup' >> scripts/before_install.sh
+      - echo 'fi' >> scripts/before_install.sh
+      - echo '' >> scripts/before_install.sh
+      - echo 'if [ -f "/opt/financial-news-engine/app.py" ]; then' >> scripts/before_install.sh
+      - echo '  mkdir -p /opt/financial-news-engine/backup' >> scripts/before_install.sh
+      - echo '  cp -r /opt/financial-news-engine/* /opt/financial-news-engine/backup/' >> scripts/before_install.sh
+      - echo 'fi' >> scripts/before_install.sh
+      - chmod +x scripts/before_install.sh
+  
+  build:
+    commands:
+      - echo Getting backend auto scaling group...
+      - "export ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue\" --output text)"
+      - echo "Auto Scaling Group $ASG_NAME"
+      - "export INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query \"AutoScalingGroups[0].Instances[].InstanceId\" --output text)"
+      - echo "Instances to deploy to $INSTANCE_IDS"
+      - echo Deployment ready
+  
+  post_build:
+    commands:
+      - echo Starting deployment to instances...
+      - echo Backend deployment completed
+
+artifacts:
+  files:
+    - backend/appspec.yml
+    - backend/scripts/**/*
+    - backend/dist/backend.zip
+  discard-paths: no
+
+cache:
+  paths:
+    - '/root/.cache/pip' 
