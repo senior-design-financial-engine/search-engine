@@ -108,6 +108,9 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   // Calculate total for percentages
   const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
 
+  // Extract time analysis data from results
+  const timeAnalysis = results && results.aggregations ? results.aggregations.time_analysis : null;
+
   return (
     <>
       <Button 
@@ -269,28 +272,71 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
             <Card className="analytics-card shadow-sm">
               <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-calendar-date me-2 text-primary"></i>
-                  Publication Timeline
+                  <i className="bi bi-clock-history me-2 text-primary"></i>
+                  Time Distribution
                 </h5>
               </Card.Header>
               <Card.Body>
-                <div className="mb-3">
-                  {Object.entries(timeDistribution)
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([month, count], index) => (
-                      <div key={index} className="mb-2">
-                        <div className="d-flex justify-content-between mb-1">
-                          <span>{month}</span>
-                          <span>{count} articles</span>
-                        </div>
-                        <ProgressBar 
-                          variant="secondary" 
-                          now={(count / results.length) * 100} 
-                          className="mb-2"
-                        />
-                      </div>
-                    ))
-                  }
+                <div className="time-stats">
+                  <div className="time-stat-item">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <span>Last 24 Hours</span>
+                      <span className="badge bg-primary rounded-pill">{timeAnalysis?.last_24_hours}</span>
+                    </div>
+                    <div className="progress" style={{ height: '8px' }}>
+                      <div 
+                        className="progress-bar bg-primary" 
+                        role="progressbar" 
+                        style={{ width: `${timeAnalysis?.last_24_hours_pct}%` }}
+                        aria-valuenow={timeAnalysis?.last_24_hours_pct} 
+                        aria-valuemin="0" 
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="time-stat-item mt-2">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <span>Last Week</span>
+                      <span className="badge bg-info rounded-pill">{timeAnalysis?.last_week}</span>
+                    </div>
+                    <div className="progress" style={{ height: '8px' }}>
+                      <div 
+                        className="progress-bar bg-info" 
+                        role="progressbar" 
+                        style={{ width: `${timeAnalysis?.last_week_pct}%` }}
+                        aria-valuenow={timeAnalysis?.last_week_pct} 
+                        aria-valuemin="0" 
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="time-stat-item mt-2">
+                    <div className="d-flex justify-content-between align-items-center mb-1">
+                      <span>Last Month</span>
+                      <span className="badge bg-secondary rounded-pill">{timeAnalysis?.last_month}</span>
+                    </div>
+                    <div className="progress" style={{ height: '8px' }}>
+                      <div 
+                        className="progress-bar bg-secondary" 
+                        role="progressbar" 
+                        style={{ width: `${timeAnalysis?.last_month_pct}%` }}
+                        aria-valuenow={timeAnalysis?.last_month_pct} 
+                        aria-valuemin="0" 
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="daily-average mt-3 text-center">
+                  <div className="daily-average-value">
+                    <span className="h3 text-primary">{timeAnalysis?.daily_average}</span>
+                  </div>
+                  <div className="daily-average-label text-muted">
+                    Average articles per day
+                  </div>
                 </div>
               </Card.Body>
             </Card>

@@ -46,33 +46,19 @@ function Results() {
         if (query) {
           const searchResults = await searchArticles(query, source, timeRange, sentiment);
           
-          // Transform results to ensure consistent structure
-          const normalizedResults = searchResults.map(article => {
-            // Handle both direct properties and Elasticsearch-like _source structure
-            if (article._source) {
-              return { 
-                ...article._source, 
-                id: article._id,
-                // Ensure sentiment_score is properly extracted
-                sentiment_score: article._source.sentiment_score
-              };
-            }
-            return article;
-          });
-          
-          // Log the normalized results for debugging
-          console.log('Normalized search results:', normalizedResults);
-          
-          setResults(normalizedResults);
+          // Store the full response including hits and aggregations
+          setResults(searchResults);
+        } else {
+          setResults([]);
         }
       } catch (error) {
-        console.error('Error fetching search results:', error);
-        setError('Failed to fetch search results. Please try again later.');
+        console.error('Error fetching results:', error);
+        setError('Failed to fetch results. Please try again.');
       } finally {
         setLoading(false);
       }
     };
-
+    
     fetchResults();
   }, [query, source, timeRange, sentiment]);
 
@@ -170,38 +156,46 @@ function Results() {
     setSortBy(sortType);
   };
 
+  // Get just the article hits from the results
+  const getArticleHits = () => {
+    if (!results) return [];
+    if (Array.isArray(results)) return results;
+    return results.hits?.hits || [];
+  };
+
   // Get sorted results based on current sort setting
   const getSortedResults = () => {
-    if (!results || results.length === 0) return [];
+    const articleHits = getArticleHits();
+    if (!articleHits || articleHits.length === 0) return [];
     
-    const sortedResults = [...results];
+    const sortedResults = [...articleHits];
     
     switch (sortBy) {
       case 'date':
         return sortedResults.sort((a, b) => {
-          const dateA = new Date(a.published_at || 0);
-          const dateB = new Date(b.published_at || 0);
+          const dateA = new Date(a._source.published_at || 0);
+          const dateB = new Date(b._source.published_at || 0);
           return dateB - dateA; // Most recent first
         });
       case 'sentiment':
         return sortedResults.sort((a, b) => {
           const sentimentOrder = { positive: 3, neutral: 2, negative: 1, undefined: 0 };
-          const sentimentA = sentimentOrder[a.sentiment?.toLowerCase()] || 0;
-          const sentimentB = sentimentOrder[b.sentiment?.toLowerCase()] || 0;
+          const sentimentA = sentimentOrder[a._source.sentiment?.toLowerCase()] || 0;
+          const sentimentB = sentimentOrder[b._source.sentiment?.toLowerCase()] || 0;
           return sentimentB - sentimentA;
         });
       case 'relevance':
       default:
         return sortedResults.sort((a, b) => {
-          const scoreA = parseFloat(a.relevance_score || a.relevance || 0);
-          const scoreB = parseFloat(b.relevance_score || b.relevance || 0);
-          return scoreB - scoreA; // Highest relevance first
+          const relevanceA = a._source.relevance_score || 0;
+          const relevanceB = b._source.relevance_score || 0;
+          return relevanceB - relevanceA; // Highest relevance first
         });
     }
   };
 
-  // Get the sorted results
   const sortedResults = getSortedResults();
+  const articleCount = getArticleHits().length;
 
   return (
     <Container className="py-4">
@@ -373,11 +367,11 @@ function Results() {
       )}
       
       {/* Results stats */}
-      {!loading && !error && results.length > 0 && (
+      {!loading && !error && articleCount > 0 && (
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h4 className="mb-0">
             <i className="bi bi-journal-text me-2 text-primary"></i>
-            Found {results.length} results
+            Found {articleCount} results
           </h4>
           <div>
             <span className="me-2 text-muted">Sort by:</span>
@@ -410,40 +404,40 @@ function Results() {
       )}
       
       {/* Results grid */}
-      {!loading && !error && results.length > 0 && (
+      {!loading && !error && articleCount > 0 && (
         <Row>
           {sortedResults.map((article, index) => (
             <Col md={4} key={index} className="mb-4">
               <Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
                 <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
                   <Badge bg="secondary" pill className="px-3 py-2">
-                    {article.source || 'Unknown Source'}
+                    {article._source.source || 'Unknown Source'}
                   </Badge>
                   <small className="text-muted">
                     <i className="bi bi-calendar-date me-1"></i>
-                    {formatDate(article.published_at)}
+                    {formatDate(article._source.published_at)}
                   </small>
                 </Card.Header>
                 <Card.Body className="p-3">
                   <Card.Title className="mb-3 fs-5 fw-bold">
                     <a 
-                      href={article.url || '#'} 
+                      href={article._source.url || '#'} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-decoration-none text-primary stretched-link"
                     >
-                      {article.headline || 'Untitled Article'}
+                      {article._source.headline || 'Untitled Article'}
                     </a>
                   </Card.Title>
                   <Card.Text className="text-secondary mb-3 small">
-                    {article.summary || article.snippet || (article.content && `${article.content.substring(0, 150)}...`) || 'No summary available'}
+                    {article._source.summary || article._source.snippet || (article._source.content && `${article._source.content.substring(0, 150)}...`) || 'No summary available'}
                   </Card.Text>
                   
                   <div className="mt-auto pt-2">
-                    {getCompanyData(article).length > 0 && (
+                    {getCompanyData(article._source).length > 0 && (
                       <div className="mb-2">
                         <small className="text-muted d-block mb-1">Companies:</small>
-                        {getCompanyData(article).map((company, idx) => (
+                        {getCompanyData(article._source).map((company, idx) => (
                           <Badge 
                             key={idx} 
                             bg="light" 
@@ -456,10 +450,10 @@ function Results() {
                       </div>
                     )}
                     
-                    {getCategories(article).length > 0 && (
+                    {getCategories(article._source).length > 0 && (
                       <div className="mb-2">
                         <small className="text-muted d-block mb-1">Categories:</small>
-                        {getCategories(article).map((category, idx) => (
+                        {getCategories(article._source).map((category, idx) => (
                           <Badge 
                             key={idx} 
                             bg="info" 
@@ -475,32 +469,32 @@ function Results() {
                 <Card.Footer className="bg-white pt-0 pb-3 px-3 border-0">
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <Badge 
-                      bg={getSentimentBadgeVariant(article.sentiment)} 
+                      bg={getSentimentBadgeVariant(article._source.sentiment)} 
                       className="px-3 py-2 rounded-pill"
-                      title={`Sentiment score: ${article.sentiment_score || 'N/A'} (Range: -1.0 to 1.0, where negative values indicate negative sentiment and positive values indicate positive sentiment)`}
+                      title={`Sentiment score: ${article._source.sentiment_score || 'N/A'} (Range: -1.0 to 1.0, where negative values indicate negative sentiment and positive values indicate positive sentiment)`}
                     >
                       <i className={`bi bi-${
-                        article.sentiment === 'positive' ? 'emoji-smile' : 
-                        article.sentiment === 'negative' ? 'emoji-frown' : 
+                        article._source.sentiment === 'positive' ? 'emoji-smile' : 
+                        article._source.sentiment === 'negative' ? 'emoji-frown' : 
                         'emoji-neutral'
                       } me-1`}></i>
-                      {article.sentiment || 'Unknown'}
-                      {formatSentimentScore(article.sentiment_score)}
+                      {article._source.sentiment || 'Unknown'}
+                      {formatSentimentScore(article._source.sentiment_score)}
                     </Badge>
                     <small className="text-muted">
                       <i className="bi bi-graph-up me-1"></i>
-                      Relevance: {formatRelevanceScore(article.relevance_score || article.relevance)}
+                      Relevance: {formatRelevanceScore(article._source.relevance_score || article._source.relevance)}
                     </small>
                   </div>
                   <div className="mt-2">
                     <Button 
                       variant="outline-primary" 
                       size="sm"
-                      href={article.url || '#'}
+                      href={article._source.url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-100 rounded-pill"
-                      disabled={!article.url}
+                      disabled={!article._source.url}
                     >
                       <i className="bi bi-box-arrow-up-right me-1"></i>
                       Read Article
@@ -514,7 +508,7 @@ function Results() {
       )}
       
       {/* No results found */}
-      {!loading && !error && results.length === 0 && (
+      {!loading && !error && articleCount === 0 && (
         <Row>
           <Col>
             <Card className="mb-4 border-0 shadow-sm rounded-3 bg-light">
