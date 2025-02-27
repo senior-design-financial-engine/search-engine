@@ -4,6 +4,7 @@ import Home from './components/Home';
 import Results from './components/Results';
 import { Navbar, Container, Nav, Button } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/App.css';
 
 function App() {
@@ -19,7 +20,6 @@ function App() {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="me-auto">
               <Nav.Link as={NavLink} to="/" end>Home</Nav.Link>
-              <Nav.Link href="https://github.com/yourusername/search-engine" target="_blank">GitHub</Nav.Link>
             </Nav>
             <Nav>
               <Button 

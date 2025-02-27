@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Button, Container, Row, Col, Card, Alert, Badge } from 'react-bootstrap';
+import { Form, Button, Container, Row, Col, Card, Alert, Badge, ListGroup } from 'react-bootstrap';
 
 // Environment settings
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
@@ -55,6 +55,53 @@ const searchExamples = {
 	]
 };
 
+// RecentQueries component to show recent searches
+const RecentQueries = ({ onSelectQuery }) => {
+	const [recentQueries, setRecentQueries] = useState([]);
+
+	useEffect(() => {
+		// Load recent queries from localStorage
+		const savedQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
+		setRecentQueries(savedQueries);
+	}, []);
+
+	const handleQueryClick = (query) => {
+		if (onSelectQuery) {
+			onSelectQuery(query);
+		}
+	};
+
+	const clearRecentQueries = () => {
+		localStorage.removeItem('recentQueries');
+		setRecentQueries([]);
+	};
+
+	if (recentQueries.length === 0) {
+		return null;
+	}
+
+	return (
+		<Card className="mt-3">
+			<Card.Header className="d-flex justify-content-between align-items-center">
+				<span>Recent Searches</span>
+				<Button variant="outline-secondary" size="sm" onClick={clearRecentQueries}>Clear</Button>
+			</Card.Header>
+			<ListGroup variant="flush">
+				{recentQueries.slice(0, 5).map((query, index) => (
+					<ListGroup.Item 
+						key={index} 
+						action 
+						onClick={() => handleQueryClick(query)}
+						className="d-flex align-items-center"
+					>
+						<i className="bi bi-clock-history me-2"></i> {query}
+					</ListGroup.Item>
+				))}
+			</ListGroup>
+		</Card>
+	);
+};
+
 function Home() {
 	const [query, setQuery] = useState('');
 	const [showAdvanced, setShowAdvanced] = useState(false);
@@ -65,9 +112,33 @@ function Home() {
 	});
 	const navigate = useNavigate();
 
+	const saveRecentQuery = (searchQuery) => {
+		// Get existing recent queries
+		const recentQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
+		
+		// Add new query if it doesn't exist already
+		if (!recentQueries.includes(searchQuery)) {
+			// Add new query at the beginning
+			const updatedQueries = [searchQuery, ...recentQueries.slice(0, 9)];
+			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
+		} else {
+			// If query exists, move it to the top
+			const updatedQueries = [
+				searchQuery,
+				...recentQueries.filter(q => q !== searchQuery)
+			].slice(0, 10);
+			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
+		}
+	};
+
 	const handleSearch = (e) => {
 		e.preventDefault();
 		const searchParams = new URLSearchParams({ query });
+
+		// Save the query to recent searches
+		if (query.trim()) {
+			saveRecentQuery(query.trim());
+		}
 
 		// Add advanced queries to search params
 		for (const [key, value] of Object.entries(advancedQueries)) {
@@ -85,6 +156,9 @@ function Home() {
 
 	const handleExampleSearch = (searchQuery) => {
 		setQuery(searchQuery);
+		// Save the example query to recent searches
+		saveRecentQuery(searchQuery);
+		
 		// Auto-submit after a short delay
 		setTimeout(() => {
 			const searchParams = new URLSearchParams({ query: searchQuery });
@@ -95,6 +169,9 @@ function Home() {
 	const handleExampleWithFilters = (searchQuery, filters) => {
 		setQuery(searchQuery);
 		setAdvancedQueries({...advancedQueries, ...filters});
+		
+		// Save the example query to recent searches
+		saveRecentQuery(searchQuery);
 		
 		// Auto-submit after a short delay
 		setTimeout(() => {
@@ -149,6 +226,16 @@ function Home() {
 										</Button>
 									</Col>
 								</Row>
+								
+								{/* Recent Queries Component */}
+								<RecentQueries onSelectQuery={(q) => {
+									setQuery(q);
+									// Automatically submit the form after selecting a recent query
+									setTimeout(() => {
+										const searchParams = new URLSearchParams({ query: q });
+										navigate(`/results?${searchParams.toString()}`);
+									}, 300);
+								}} />
 								
 								<div className="d-flex justify-content-end mb-3">
 									<Button 
