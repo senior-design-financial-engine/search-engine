@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Button, Container, Row, Col, Card, Alert, Badge, ListGroup, Spinner } from 'react-bootstrap';
-import { getTrendingArticles } from '../services/api';
-import '../styles/Home.css';
+import { Form, Button, Container, Row, Col, Card, Alert, Badge, ListGroup } from 'react-bootstrap';
 
 // Environment settings
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
@@ -191,140 +189,6 @@ const RecentQueries = ({ onSelectQuery }) => {
 				))}
 			</ListGroup>
 		</Card>
-	);
-};
-
-// TrendingArticles component to display trending news
-const TrendingArticles = () => {
-	const [articles, setArticles] = useState([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState(null);
-	const navigate = useNavigate();
-
-	useEffect(() => {
-		const fetchTrendingArticles = async () => {
-			try {
-				setLoading(true);
-				const data = await getTrendingArticles(5);
-				setArticles(data);
-				setError(null);
-			} catch (err) {
-				console.error('Error fetching trending articles:', err);
-				setError('Failed to load trending articles');
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchTrendingArticles();
-	}, []);
-
-	const handleArticleClick = (article) => {
-		// Open the article in a new tab
-		window.open(article.url, '_blank', 'noopener,noreferrer');
-	};
-
-	// Format the published date to show how long ago
-	const formatTimeAgo = (dateString) => {
-		const now = new Date();
-		const publishedDate = new Date(dateString);
-		const diffMs = now - publishedDate;
-		const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
-		
-		if (diffHrs < 1) {
-			const diffMins = Math.floor(diffMs / (1000 * 60));
-			return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-		} else if (diffHrs < 24) {
-			return `${diffHrs} hour${diffHrs !== 1 ? 's' : ''} ago`;
-		} else {
-			const diffDays = Math.floor(diffHrs / 24);
-			return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-		}
-	};
-
-	if (loading) {
-		return (
-			<div className="trending-articles-container text-center py-4">
-				<h3 className="mb-4">
-					<i className="bi bi-lightning-charge-fill text-warning me-2"></i>
-					Trending News
-				</h3>
-				<Spinner animation="border" variant="primary" />
-			</div>
-		);
-	}
-
-	if (error) {
-		return (
-			<div className="trending-articles-container py-4">
-				<h3 className="mb-4">
-					<i className="bi bi-lightning-charge-fill text-warning me-2"></i>
-					Trending News
-				</h3>
-				<Alert variant="danger">{error}</Alert>
-			</div>
-		);
-	}
-
-	if (articles.length === 0) {
-		return null;
-	}
-
-	return (
-		<div className="trending-articles-container py-4">
-			<h3 className="mb-4">
-				<i className="bi bi-lightning-charge-fill text-warning me-2"></i>
-				Trending News
-			</h3>
-			<Row>
-				{articles.map((article, index) => (
-					<Col md={index === 0 ? 12 : 6} lg={index === 0 ? 12 : 6} key={article._id} className="mb-4">
-						<Card 
-							className={`trending-article-card h-100 shadow-sm border-0 ${index === 0 ? 'featured-article' : ''}`}
-							onClick={() => handleArticleClick(article._source)}
-						>
-							<Card.Body>
-								{index === 0 && (
-									<span className="featured-badge">
-										<i className="bi bi-star-fill me-1"></i> Featured
-									</span>
-								)}
-								<div className="d-flex justify-content-between mb-2">
-									<span className="trending-badge">
-										<i className="bi bi-lightning-charge-fill me-1"></i> Trending
-									</span>
-									<small className="text-muted">
-										{formatTimeAgo(article._source.published_at)}
-									</small>
-								</div>
-								<Card.Title className={`${index === 0 ? 'h4' : 'h5'} mb-3`}>
-									{article._source.headline}
-								</Card.Title>
-								{index === 0 && (
-									<Card.Text className="mb-3">
-										{article._source.snippet}
-									</Card.Text>
-								)}
-								<div className="d-flex justify-content-between align-items-center mt-auto">
-									<span className="source-badge">
-										{article._source.source}
-									</span>
-									<div>
-										{article._source.companies && article._source.companies.map((company, idx) => (
-											company.is_primary && (
-												<span key={idx} className="company-badge me-2">
-													{company.name}
-												</span>
-											)
-										))}
-									</div>
-								</div>
-							</Card.Body>
-						</Card>
-					</Col>
-				))}
-			</Row>
-		</div>
 	);
 };
 
@@ -809,9 +673,6 @@ function Home() {
 					</Card>
 				</Col>
 			</Row>
-
-			{/* Add the TrendingArticles component */}
-			<TrendingArticles />
 		</Container>
 	);
 }

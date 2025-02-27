@@ -57,7 +57,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				sentiment
 			}
 		});
-		return response.data.hits.hits;
+		return response.data;
 	} catch (error) {
 		console.error('Error searching articles:', error);
 		
@@ -65,31 +65,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		if (IS_PRODUCTION && error.message === 'Network Error') {
 			console.warn('API network error, using mock data fallback');
 			return mockApi.searchArticles(query, source, time_range, sentiment);
-		}
-		
-		throw error;
-	}
-};
-
-export const getTrendingArticles = async (count = 5) => {
-	// If mock API is enabled, use it instead of the real API
-	if (USE_MOCK_API) {
-		return mockApi.getTrendingArticles(count);
-	}
-	
-	// Otherwise use the real API
-	try {
-		const response = await apiClient.get('/trending', {
-			params: { count }
-		});
-		return response.data.trending_articles;
-	} catch (error) {
-		console.error('Error fetching trending articles:', error);
-		
-		// In production, if API fails, fall back to mock data
-		if (IS_PRODUCTION && error.message === 'Network Error') {
-			console.warn('API network error, using mock data fallback for trending articles');
-			return mockApi.getTrendingArticles(count);
 		}
 		
 		throw error;

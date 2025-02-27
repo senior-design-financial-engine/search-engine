@@ -48,17 +48,9 @@ class BackEnd:
         try:
             results = self.engine.search_news(query_text, filters, time_range)
             # return self.indexer.score_and_rank(results)
-            return results
+            return results['hits']['hits']
         except Exception as e:
             logger.error(f"Error processing search query: {str(e)}")
-            raise
-
-    def get_trending_articles(self, count: int = 5) -> Dict:
-        """Get trending articles from the last 24 hours."""
-        try:
-            return self.engine.get_trending_articles(count)
-        except Exception as e:
-            logger.error(f"Error getting trending articles: {str(e)}")
             raise
 
     def update_index(self):
@@ -108,16 +100,6 @@ def query():
         return jsonify(results)
     except Exception as e:
         logger.error(f"Query endpoint error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/trending', methods=['GET'])
-def trending():
-    try:
-        count = request.args.get('count', 5, type=int)
-        trending_articles = backend.get_trending_articles(count)
-        return jsonify(trending_articles)
-    except Exception as e:
-        logger.error(f"Trending endpoint error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.errorhandler(404)
