@@ -63,26 +63,26 @@ function Results() {
     
     navigate(`/results?${newParams.toString()}`);
   };
-
-  // Helper function to format date
+  
   const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      });
-    } catch (e) {
-      return dateString;
-    }
-  };
-
-  // Helper function to determine badge color based on sentiment
-  const getSentimentBadgeVariant = (sentiment) => {
-    if (!sentiment) return 'secondary';
+    if (!dateString) return 'Unknown Date';
     
-    switch(sentiment.toLowerCase()) {
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+  
+  const getSentimentBadgeVariant = (sentiment) => {
+    switch (sentiment && sentiment.toLowerCase()) {
       case 'positive':
         return 'success';
       case 'negative':
@@ -94,201 +94,229 @@ function Results() {
     }
   };
   
-  // Format relevance score as percentage
   const formatRelevanceScore = (score) => {
-    if (!score && score !== 0) return '';
-    return `${Math.round(score * 100)}%`;
+    if (!score && score !== 0) return 'N/A';
+    
+    // Convert to percentage with one decimal place
+    const percentage = (score * 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   return (
-    <Container className="mt-5">
-      <Button variant="secondary" onClick={handleBack} className="mt-3 mb-4">
-        Back
-      </Button>
-
-      <Card className="mb-4 shadow-sm">
-        <Card.Body>
-          <h2>Results for: <span className="fw-bold fst-italic text-primary">"{query}"</span></h2>
+    <Container className="py-4">
+      <Row className="mb-4">
+        <Col>
+          <Button 
+            variant="outline-secondary" 
+            onClick={handleBack} 
+            className="mb-3 rounded-pill"
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            Back to Search
+          </Button>
           
-          <Row className="mt-4">
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label><strong>Source</strong></Form.Label>
-                <Form.Select 
-                  value={source || ''}
-                  onChange={(e) => handleFilterChange('source', e.target.value)}
+          <div className="d-flex flex-wrap align-items-center">
+            <h1 className="me-3 mb-0 fw-bold">
+              <i className="bi bi-search text-primary me-2"></i>
+              Results for "{query}"
+            </h1>
+            
+            {/* Display filters as badges if present */}
+            <div className="d-flex flex-wrap mt-2">
+              {source && (
+                <Badge bg="info" className="me-2 mb-2 rounded-pill py-2 px-3">
+                  <i className="bi bi-newspaper me-1"></i>
+                  Source: {source}
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="text-white p-0 ms-2" 
+                    onClick={() => handleFilterChange('source', null)}
+                  >
+                    <i className="bi bi-x-circle"></i>
+                  </Button>
+                </Badge>
+              )}
+              
+              {timeRange && timeRange !== 'all' && (
+                <Badge bg="secondary" className="me-2 mb-2 rounded-pill py-2 px-3">
+                  <i className="bi bi-calendar me-1"></i>
+                  Time: {timeRange === 'day' ? 'Last 24h' : 
+                         timeRange === 'week' ? 'Last Week' : 
+                         timeRange === 'month' ? 'Last Month' : 
+                         timeRange === 'year' ? 'Last Year' : timeRange}
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="text-white p-0 ms-2" 
+                    onClick={() => handleFilterChange('time_range', null)}
+                  >
+                    <i className="bi bi-x-circle"></i>
+                  </Button>
+                </Badge>
+              )}
+              
+              {sentiment && sentiment !== 'all' && (
+                <Badge 
+                  bg={getSentimentBadgeVariant(sentiment)} 
+                  className="me-2 mb-2 rounded-pill py-2 px-3"
                 >
-                  <option value="">All Sources</option>
-                  <option value="Bloomberg">Bloomberg</option>
-                  <option value="Reuters">Reuters</option>
-                  <option value="CNBC">CNBC</option>
-                  <option value="Financial Times">Financial Times</option>
-                  <option value="Wall Street Journal">Wall Street Journal</option>
-                  <option value="MarketWatch">MarketWatch</option>
-                  <option value="Barron's">Barron's</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label><strong>Time Range</strong></Form.Label>
-                <Form.Select 
-                  value={timeRange || 'all'}
-                  onChange={(e) => handleFilterChange('time_range', e.target.value)}
-                >
-                  <option value="all">All Time</option>
-                  <option value="day">Last 24 Hours</option>
-                  <option value="week">Last Week</option>
-                  <option value="month">Last Month</option>
-                  <option value="year">Last Year</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={4}>
-              <Form.Group className="mb-3">
-                <Form.Label><strong>Sentiment</strong></Form.Label>
-                <Form.Select 
-                  value={sentiment || 'all'}
-                  onChange={(e) => handleFilterChange('sentiment', e.target.value)}
-                >
-                  <option value="all">All Sentiments</option>
-                  <option value="positive">Positive</option>
-                  <option value="negative">Negative</option>
-                  <option value="neutral">Neutral</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-          
-          {/* Active filters */}
-          <div className="mt-2">
-            {source && (
-              <Badge bg="primary" className="me-2 p-2">
-                Source: {source} <span className="ms-1 cursor-pointer" onClick={() => handleFilterChange('source', '')}>&times;</span>
-              </Badge>
-            )}
-            {timeRange && timeRange !== 'all' && (
-              <Badge bg="info" className="me-2 p-2">
-                Time: {timeRange === 'day' ? 'Last 24h' : 
-                       timeRange === 'week' ? 'Last Week' : 
-                       timeRange === 'month' ? 'Last Month' : 'Last Year'} 
-                <span className="ms-1 cursor-pointer" onClick={() => handleFilterChange('time_range', 'all')}>&times;</span>
-              </Badge>
-            )}
-            {sentiment && sentiment !== 'all' && (
-              <Badge bg={getSentimentBadgeVariant(sentiment)} className="me-2 p-2">
-                Sentiment: {sentiment} <span className="ms-1 cursor-pointer" onClick={() => handleFilterChange('sentiment', 'all')}>&times;</span>
-              </Badge>
-            )}
-          </div>
-        </Card.Body>
-      </Card>
-
-      {loading ? (
-        <div className="text-center my-5">
-          <Spinner animation="border" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </Spinner>
-          <p className="mt-2">Fetching search results...</p>
-        </div>
-      ) : error ? (
-        <div className="alert alert-danger mt-4">{error}</div>
-      ) : results.length === 0 ? (
-        <div className="alert alert-info mt-4">No results found for your search.</div>
-      ) : (
-        <>
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h4>Found {results.length} results</h4>
-            <div>
-              <span className="me-2">Sort by:</span>
-              <Button variant="outline-secondary" size="sm" className="me-2">Relevance</Button>
-              <Button variant="outline-secondary" size="sm" className="me-2">Date</Button>
-              <Button variant="outline-secondary" size="sm">Sentiment</Button>
+                  <i className="bi bi-emoji-smile me-1"></i>
+                  Sentiment: {sentiment}
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="text-white p-0 ms-2" 
+                    onClick={() => handleFilterChange('sentiment', null)}
+                  >
+                    <i className="bi bi-x-circle"></i>
+                  </Button>
+                </Badge>
+              )}
             </div>
           </div>
-          <Row>
-            {results.map((result, index) => (
-              <Col md={4} key={index} className="mb-4">
-                <Card className="h-100 shadow-sm">
-                  <Card.Header className="bg-white border-bottom-0 pb-0">
-                    <div className="d-flex align-items-center justify-content-between">
-                      <small className="text-muted">{result._source.source}</small>
-                      <small className="text-muted">{formatDate(result._source.published_at)}</small>
-                    </div>
-                  </Card.Header>
-                  <Card.Body>
-                    <Card.Title className="mb-3 fw-bold">
-                      {result._source.headline}
-                    </Card.Title>
-                    <Card.Text>
-                      {result._source.snippet || result._source.content?.substring(0, 150) + '...'}
-                    </Card.Text>
-                    
-                    <div className="mt-auto pt-2">
-                      {result._source.companies && result._source.companies.length > 0 && (
-                        <div className="mb-2">
-                          <small className="text-muted d-block mb-1">Companies:</small>
-                          {result._source.companies.map((company, idx) => (
-                            <Badge 
-                              key={idx} 
-                              bg="light" 
-                              text="dark" 
-                              className="me-1 border"
-                            >
-                              {company.name} ({company.ticker})
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+          
+          <p className="text-muted mt-2">
+            Found {results.length} results
+          </p>
+        </Col>
+      </Row>
+      
+      {/* Error message */}
+      {error && (
+        <Row>
+          <Col>
+            <Card className="mb-4 border-0 shadow-sm rounded-3 bg-light">
+              <Card.Body className="text-center py-5">
+                <i className="bi bi-exclamation-triangle-fill text-warning display-1 mb-3"></i>
+                <h3 className="text-danger">{error}</h3>
+                <p>Please try again or modify your search query.</p>
+                <Button 
+                  variant="primary" 
+                  onClick={handleBack}
+                  className="mt-3 rounded-pill"
+                >
+                  <i className="bi bi-arrow-left me-2"></i>
+                  Return to Search
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
+      
+      {/* Loading spinner */}
+      {loading && (
+        <Row>
+          <Col className="text-center py-5">
+            <Spinner animation="border" role="status" variant="primary">
+              <span className="visually-hidden">Loading...</span>
+            </Spinner>
+            <p className="mt-3">Searching for results...</p>
+          </Col>
+        </Row>
+      )}
+      
+      {/* Results list */}
+      {!loading && !error && results.length > 0 && (
+        <Row>
+          <Col md={12}>
+            {results.map((article, index) => (
+              <Card key={index} className="mb-4 border-0 shadow-sm rounded-3 hover-lift">
+                <Card.Body className="p-4">
+                  <Row>
+                    <Col xs={12} md={9}>
+                      <h3 className="mb-2 fw-bold">
+                        <a 
+                          href={article.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary text-decoration-none"
+                        >
+                          {article.headline}
+                        </a>
+                      </h3>
                       
-                      {result._source.categories && result._source.categories.length > 0 && (
-                        <div className="mb-2">
-                          <small className="text-muted d-block mb-1">Categories:</small>
-                          {result._source.categories.map((category, idx) => (
-                            <Badge 
-                              key={idx} 
-                              bg="secondary" 
-                              className="me-1"
-                            >
-                              {category}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </Card.Body>
-                  <Card.Footer className="bg-white">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <Badge bg={getSentimentBadgeVariant(result._source.sentiment)} className="px-3 py-2">
-                        {result._source.sentiment || 'Unknown'} 
-                        {result._source.sentiment_score !== undefined && (
-                          <small> ({(result._source.sentiment_score > 0 ? '+' : '') + result._source.sentiment_score.toFixed(2)})</small>
+                      <p className="text-secondary mb-3">
+                        {article.summary || article.snippet}
+                      </p>
+                      
+                      <div className="mb-2">
+                        <Badge 
+                          bg={getSentimentBadgeVariant(article.sentiment)} 
+                          className="me-2 rounded-pill"
+                        >
+                          {article.sentiment || 'Unknown Sentiment'}
+                        </Badge>
+                        
+                        {article.source && (
+                          <Badge bg="secondary" className="me-2 rounded-pill">
+                            {article.source}
+                          </Badge>
                         )}
-                      </Badge>
-                      {result._source.relevance_score && (
-                        <small className="text-muted">
-                          Relevance: {formatRelevanceScore(result._source.relevance_score)}
-                        </small>
-                      )}
-                    </div>
-                    <div className="mt-2">
-                      <Button 
-                        variant="outline-primary" 
-                        size="sm" 
-                        href={result._source.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-100"
-                      >
-                        Read Article
-                      </Button>
-                    </div>
-                  </Card.Footer>
-                </Card>
-              </Col>
+                        
+                        {article.category && (
+                          <Badge bg="info" className="me-2 rounded-pill">
+                            {article.category}
+                          </Badge>
+                        )}
+                      </div>
+                    </Col>
+                    
+                    <Col xs={12} md={3} className="text-md-end mt-3 mt-md-0">
+                      <div className="d-flex flex-column align-items-md-end">
+                        <div className="text-muted mb-2 small">
+                          <i className="bi bi-calendar-date me-1"></i>
+                          {formatDate(article.published_at)}
+                        </div>
+                        
+                        <div className="text-muted mb-3 small">
+                          <i className="bi bi-graph-up me-1"></i>
+                          Relevance: {formatRelevanceScore(article.relevance)}
+                        </div>
+                        
+                        <Button 
+                          variant="outline-primary" 
+                          size="sm"
+                          href={article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-pill px-3"
+                        >
+                          <i className="bi bi-box-arrow-up-right me-1"></i>
+                          Read Article
+                        </Button>
+                      </div>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
             ))}
-          </Row>
-        </>
+          </Col>
+        </Row>
+      )}
+      
+      {/* No results found */}
+      {!loading && !error && results.length === 0 && (
+        <Row>
+          <Col>
+            <Card className="mb-4 border-0 shadow-sm rounded-3 bg-light">
+              <Card.Body className="text-center py-5">
+                <i className="bi bi-search display-1 text-secondary mb-3"></i>
+                <h3>No results found for "{query}"</h3>
+                <p className="text-muted">Try modifying your search terms or filters.</p>
+                <Button 
+                  variant="primary" 
+                  onClick={handleBack}
+                  className="mt-3 rounded-pill"
+                >
+                  <i className="bi bi-arrow-left me-2"></i>
+                  Back to Search
+                </Button>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
       )}
     </Container>
   );

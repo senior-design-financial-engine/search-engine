@@ -65,9 +65,9 @@ const RecentQueries = ({ onSelectQuery }) => {
 		setRecentQueries(savedQueries);
 	}, []);
 
-	const handleQueryClick = (query) => {
+	const handleQueryClick = (queryData) => {
 		if (onSelectQuery) {
-			onSelectQuery(query);
+			onSelectQuery(queryData);
 		}
 	};
 
@@ -80,21 +80,75 @@ const RecentQueries = ({ onSelectQuery }) => {
 		return null;
 	}
 
+	// Function to render filter badges
+	const renderFilterBadges = (filters) => {
+		if (!filters) return null;
+		
+		const badges = [];
+		
+		if (filters.source) {
+			badges.push(
+				<Badge key="source" bg="info" className="me-1" pill>
+					{filters.source}
+				</Badge>
+			);
+		}
+		
+		if (filters.time_range && filters.time_range !== 'all') {
+			const timeLabel = timeRanges.find(t => t.value === filters.time_range)?.label || filters.time_range;
+			badges.push(
+				<Badge key="time" bg="secondary" className="me-1" pill>
+					{timeLabel}
+				</Badge>
+			);
+		}
+		
+		if (filters.sentiment && filters.sentiment !== 'all') {
+			const sentimentInfo = sentiments.find(s => s.value === filters.sentiment);
+			const label = sentimentInfo?.label || filters.sentiment;
+			const color = sentimentInfo?.color || 'secondary';
+			badges.push(
+				<Badge key="sentiment" bg={color} className="me-1" pill>
+					{label}
+				</Badge>
+			);
+		}
+		
+		return badges.length ? <div className="mt-1">{badges}</div> : null;
+	};
+
 	return (
-		<Card className="mt-3">
-			<Card.Header className="d-flex justify-content-between align-items-center">
-				<span>Recent Searches</span>
-				<Button variant="outline-secondary" size="sm" onClick={clearRecentQueries}>Clear</Button>
+		<Card className="mt-3 shadow-sm border-0 rounded-3">
+			<Card.Header className="d-flex justify-content-between align-items-center bg-white border-bottom py-3">
+				<span className="fw-bold">
+					<i className="bi bi-clock-history me-2 text-primary"></i>
+					Recent Searches
+				</span>
+				<Button 
+					variant="outline-danger" 
+					size="sm" 
+					onClick={clearRecentQueries}
+					className="rounded-pill px-3"
+				>
+					<i className="bi bi-trash me-1"></i>
+					Clear
+				</Button>
 			</Card.Header>
 			<ListGroup variant="flush">
-				{recentQueries.slice(0, 5).map((query, index) => (
+				{recentQueries.slice(0, 5).map((queryData, index) => (
 					<ListGroup.Item 
 						key={index} 
 						action 
-						onClick={() => handleQueryClick(query)}
-						className="d-flex align-items-center"
+						onClick={() => handleQueryClick(queryData)}
+						className="d-flex flex-column align-items-start py-3 transition-bg"
 					>
-						<i className="bi bi-clock-history me-2"></i> {query}
+						<div className="d-flex align-items-center w-100">
+							<div className="search-query-text fw-medium">{typeof queryData === 'string' ? queryData : queryData.query}</div>
+							<div className="ms-auto">
+								<i className="bi bi-search text-muted"></i>
+							</div>
+						</div>
+						{typeof queryData !== 'string' && renderFilterBadges(queryData.filters)}
 					</ListGroup.Item>
 				))}
 			</ListGroup>
@@ -113,19 +167,54 @@ function Home() {
 	const navigate = useNavigate();
 
 	const saveRecentQuery = (searchQuery) => {
+		// Create query object with filters
+		const queryData = {
+			query: searchQuery,
+			filters: {}
+		};
+		
+		// Add filters that have non-default values
+		if (advancedQueries.source) {
+			queryData.filters.source = advancedQueries.source;
+		}
+		
+		if (advancedQueries.time_range !== 'all') {
+			queryData.filters.time_range = advancedQueries.time_range;
+		}
+		
+		if (advancedQueries.sentiment !== 'all') {
+			queryData.filters.sentiment = advancedQueries.sentiment;
+		}
+		
 		// Get existing recent queries
 		const recentQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
 		
-		// Add new query if it doesn't exist already
-		if (!recentQueries.includes(searchQuery)) {
+		// Check if query exists (compare both query text and filters)
+		const queryExists = recentQueries.some(existingQuery => {
+			if (typeof existingQuery === 'string') {
+				return existingQuery === searchQuery && Object.keys(queryData.filters).length === 0;
+			}
+			
+			return existingQuery.query === searchQuery && 
+				JSON.stringify(existingQuery.filters) === JSON.stringify(queryData.filters);
+		});
+		
+		if (!queryExists) {
 			// Add new query at the beginning
-			const updatedQueries = [searchQuery, ...recentQueries.slice(0, 9)];
+			const updatedQueries = [queryData, ...recentQueries.slice(0, 9)];
 			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
 		} else {
 			// If query exists, move it to the top
 			const updatedQueries = [
-				searchQuery,
-				...recentQueries.filter(q => q !== searchQuery)
+				queryData,
+				...recentQueries.filter(existingQuery => {
+					if (typeof existingQuery === 'string') {
+						return !(existingQuery === searchQuery && Object.keys(queryData.filters).length === 0);
+					}
+					
+					return !(existingQuery.query === searchQuery && 
+						JSON.stringify(existingQuery.filters) === JSON.stringify(queryData.filters));
+				})
 			].slice(0, 10);
 			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
 		}
@@ -156,6 +245,13 @@ function Home() {
 
 	const handleExampleSearch = (searchQuery) => {
 		setQuery(searchQuery);
+		// Reset advanced filters
+		setAdvancedQueries({
+			source: '',
+			time_range: 'all',
+			sentiment: 'all'
+		});
+		
 		// Save the example query to recent searches
 		saveRecentQuery(searchQuery);
 		
@@ -188,12 +284,54 @@ function Home() {
 		}, 300);
 	};
 
+	const handleRecentQuerySelect = (queryData) => {
+		if (typeof queryData === 'string') {
+			setQuery(queryData);
+			setAdvancedQueries({
+				source: '',
+				time_range: 'all',
+				sentiment: 'all'
+			});
+			
+			// Automatically submit the form after selecting a recent query
+			setTimeout(() => {
+				const searchParams = new URLSearchParams({ query: queryData });
+				navigate(`/results?${searchParams.toString()}`);
+			}, 300);
+		} else {
+			setQuery(queryData.query);
+			
+			// Set filters from saved query
+			const newAdvancedQueries = {
+				source: '',
+				time_range: 'all',
+				sentiment: 'all',
+				...queryData.filters
+			};
+			setAdvancedQueries(newAdvancedQueries);
+			
+			// Automatically submit the form after selecting a recent query
+			setTimeout(() => {
+				const searchParams = new URLSearchParams({ query: queryData.query });
+				
+				// Add the filters to the search params
+				for (const [key, value] of Object.entries(queryData.filters)) {
+					if (value && value !== 'all') {
+						searchParams.append(key, value);
+					}
+				}
+				
+				navigate(`/results?${searchParams.toString()}`);
+			}, 300);
+		}
+	};
+
 	return (
 		<Container className="pt-5">
 			<Row className="justify-content-center mb-5">
 				<Col md={8} className="text-center">
-					<h1 className="display-4 mb-3">Financial Search Engine</h1>
-					<p className="lead text-muted">
+					<h1 className="display-4 mb-3 fw-bold">Financial Search Engine</h1>
+					<p className="lead text-secondary">
 						Search for financial news across multiple sources with advanced filtering
 					</p>
 					{IS_PRODUCTION && USE_MOCK_API && (
@@ -206,36 +344,32 @@ function Home() {
 			
 			<Row className="justify-content-center">
 				<Col md={10}>
-					<Card className="shadow">
-						<Card.Body>
+					<Card className="shadow-lg border-0 rounded-4">
+						<Card.Body className="p-4">
 							<Form onSubmit={handleSearch}>
 								<Row className="align-items-center mb-3">
 									<Col>
-										<Form.Control
-											type="text"
-											placeholder="Enter your search query (e.g. 'Apple' or 'AI')"
-											value={query}
-											onChange={(e) => setQuery(e.target.value)}
-											className="form-control-lg"
-											required
-										/>
+										<div className="search-input-wrapper position-relative">
+											<i className="bi bi-search position-absolute start-0 top-50 translate-middle-y ms-3 text-secondary"></i>
+											<Form.Control
+												type="text"
+												placeholder="Enter your search query (e.g. 'Apple' or 'AI')"
+												value={query}
+												onChange={(e) => setQuery(e.target.value)}
+												className="form-control-lg rounded-pill ps-5"
+												required
+											/>
+										</div>
 									</Col>
 									<Col xs="auto">
-										<Button type="submit" variant="primary" size="lg">
-											Search
+										<Button type="submit" variant="primary" size="lg" className="rounded-pill px-4">
+											<i className="bi bi-search me-1"></i> Search
 										</Button>
 									</Col>
 								</Row>
 								
 								{/* Recent Queries Component */}
-								<RecentQueries onSelectQuery={(q) => {
-									setQuery(q);
-									// Automatically submit the form after selecting a recent query
-									setTimeout(() => {
-										const searchParams = new URLSearchParams({ query: q });
-										navigate(`/results?${searchParams.toString()}`);
-									}, 300);
-								}} />
+								<RecentQueries onSelectQuery={handleRecentQuerySelect} />
 								
 								<div className="d-flex justify-content-end mb-3">
 									<Button 
@@ -243,12 +377,13 @@ function Home() {
 										onClick={() => setShowAdvanced(!showAdvanced)}
 										className="text-decoration-none"
 									>
+										<i className={`bi bi-sliders me-1 ${showAdvanced ? 'text-primary' : ''}`}></i>
 										{showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options'}
 									</Button>
 								</div>
 
 								{showAdvanced && (
-									<Card className="bg-light mb-3">
+									<Card className="bg-light mb-3 border-0 rounded-3">
 										<Card.Body>
 											<Row>
 												<Col md={4}>
@@ -257,6 +392,7 @@ function Home() {
 														<Form.Select
 															value={advancedQueries.source}
 															onChange={(e) => handleAdvancedChange('source', e.target.value)}
+															className="rounded-3"
 														>
 															<option value="">All Sources</option>
 															{availableSources.map(source => (
@@ -271,6 +407,7 @@ function Home() {
 														<Form.Select
 															value={advancedQueries.time_range}
 															onChange={(e) => handleAdvancedChange('time_range', e.target.value)}
+															className="rounded-3"
 														>
 															{timeRanges.map(range => (
 																<option key={range.value} value={range.value}>{range.label}</option>
@@ -284,6 +421,7 @@ function Home() {
 														<Form.Select
 															value={advancedQueries.sentiment}
 															onChange={(e) => handleAdvancedChange('sentiment', e.target.value)}
+															className="rounded-3"
 														>
 															{sentiments.map(sentiment => (
 																<option key={sentiment.value} value={sentiment.value}>{sentiment.label}</option>
@@ -303,13 +441,16 @@ function Home() {
 
 			<Row className="mt-5">
 				<Col>
-					<h3 className="text-center mb-4">Quick Search Examples</h3>
+					<h3 className="text-center mb-4 fw-bold">
+						<i className="bi bi-lightning-charge text-primary me-2"></i>
+						Quick Search Examples
+					</h3>
 					<div className="d-flex justify-content-center flex-wrap">
 						{['Apple', 'Tesla', 'AI', 'Market', 'Earnings'].map((term) => (
 							<Button 
 								key={term}
 								variant="outline-primary" 
-								className="m-1"
+								className="m-1 rounded-pill px-4"
 								onClick={() => handleExampleSearch(term)}
 							>
 								{term}
@@ -321,11 +462,15 @@ function Home() {
 			
 			<Row className="mt-5">
 				<Col>
-					<h3 className="text-center mb-4">Advanced Search & Filter Demos</h3>
+					<h3 className="text-center mb-4 fw-bold">
+						<i className="bi bi-filter text-primary me-2"></i>
+						Advanced Search & Filter Demos
+					</h3>
 					<Row>
 						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm">
-								<Card.Header className="bg-primary text-white">
+							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+								<Card.Header className="bg-primary text-white border-0 rounded-top-3">
+									<i className="bi bi-newspaper me-2"></i>
 									Source Filtering
 								</Card.Header>
 								<Card.Body>
@@ -334,7 +479,7 @@ function Home() {
 										<Button 
 											variant="outline-secondary" 
 											size="sm"
-											className="m-1"
+											className="m-1 rounded-pill"
 											onClick={() => handleExampleWithFilters('Tesla', {source: 'Bloomberg'})}
 										>
 											Tesla in Bloomberg
@@ -342,7 +487,7 @@ function Home() {
 										<Button 
 											variant="outline-secondary" 
 											size="sm"
-											className="m-1"
+											className="m-1 rounded-pill"
 											onClick={() => handleExampleWithFilters('Tesla', {source: 'Reuters'})}
 										>
 											Tesla in Reuters
@@ -353,8 +498,9 @@ function Home() {
 						</Col>
 						
 						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm">
-								<Card.Header className="bg-success text-white">
+							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+								<Card.Header className="bg-success text-white border-0 rounded-top-3">
+									<i className="bi bi-emoji-smile me-2"></i>
 									Sentiment Analysis
 								</Card.Header>
 								<Card.Body>
@@ -365,7 +511,7 @@ function Home() {
 												key={sentiment.value}
 												variant={`outline-${sentiment.color}`}
 												size="sm"
-												className="m-1"
+												className="m-1 rounded-pill"
 												onClick={() => handleExampleWithFilters('Apple', {sentiment: sentiment.value})}
 											>
 												Apple ({sentiment.label})
@@ -377,8 +523,9 @@ function Home() {
 						</Col>
 						
 						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm">
-								<Card.Header className="bg-info text-white">
+							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+								<Card.Header className="bg-info text-white border-0 rounded-top-3">
+									<i className="bi bi-calendar-event me-2"></i>
 									Time Range Filtering
 								</Card.Header>
 								<Card.Body>
@@ -387,7 +534,7 @@ function Home() {
 										<Button 
 											variant="outline-secondary" 
 											size="sm"
-											className="m-1"
+											className="m-1 rounded-pill"
 											onClick={() => handleExampleWithFilters('Market', {time_range: 'day'})}
 										>
 											Market (24h)
@@ -395,7 +542,7 @@ function Home() {
 										<Button 
 											variant="outline-secondary" 
 											size="sm"
-											className="m-1"
+											className="m-1 rounded-pill"
 											onClick={() => handleExampleWithFilters('Market', {time_range: 'week'})}
 										>
 											Market (Week)
@@ -406,8 +553,9 @@ function Home() {
 						</Col>
 						
 						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm">
-								<Card.Header className="bg-warning text-dark">
+							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+								<Card.Header className="bg-warning text-dark border-0 rounded-top-3">
+									<i className="bi bi-layers me-2"></i>
 									Combined Filters
 								</Card.Header>
 								<Card.Body>
@@ -416,7 +564,7 @@ function Home() {
 										<Button 
 											variant="outline-secondary" 
 											size="sm"
-											className="m-1"
+											className="m-1 rounded-pill"
 											onClick={() => handleExampleWithFilters('Earnings', {
 												source: 'Financial Times',
 												sentiment: 'positive'
@@ -427,7 +575,7 @@ function Home() {
 										<Button 
 											variant="outline-secondary" 
 											size="sm"
-											className="m-1"
+											className="m-1 rounded-pill"
 											onClick={() => handleExampleWithFilters('AI', {
 												time_range: 'month',
 												sentiment: 'neutral'
@@ -445,24 +593,28 @@ function Home() {
 			
 			<Row className="mt-4 mb-5">
 				<Col>
-					<h4 className="text-center mb-4">Search Suggestions by Category</h4>
-					<Card>
-						<Card.Body>
+					<h4 className="text-center mb-4 fw-bold">
+						<i className="bi bi-collection text-primary me-2"></i>
+						Search Suggestions by Category
+					</h4>
+					<Card className="shadow-sm border-0 rounded-3">
+						<Card.Body className="p-4">
 							<Row>
 								{Object.entries(searchExamples).map(([category, examples]) => (
 									<Col md={6} lg={3} key={category} className="mb-3">
-										<h5>{category}</h5>
+										<h5 className="fw-bold">{category}</h5>
 										<ul className="list-unstyled">
 											{examples.map((example, idx) => (
 												<li key={idx} className="mb-2">
 													<Button
 														variant="link"
-														className="text-decoration-none p-0"
+														className="text-decoration-none p-0 text-primary"
 														onClick={() => handleExampleSearch(example.query)}
 													>
+														<i className="bi bi-arrow-right-circle me-1"></i>
 														{example.query}
 													</Button>
-													<small className="text-muted d-block">{example.description}</small>
+													<small className="text-muted d-block ms-4">{example.description}</small>
 												</li>
 											))}
 										</ul>
