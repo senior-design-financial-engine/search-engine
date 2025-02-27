@@ -35,7 +35,17 @@ function Results() {
       try {
         if (query) {
           const searchResults = await searchArticles(query, source, timeRange, sentiment);
-          setResults(searchResults);
+          
+          // Transform results to ensure consistent structure
+          const normalizedResults = searchResults.map(article => {
+            // Handle both direct properties and Elasticsearch-like _source structure
+            if (article._source) {
+              return { ...article._source, id: article._id };
+            }
+            return article;
+          });
+          
+          setResults(normalizedResults);
         }
       } catch (error) {
         console.error('Error fetching search results:', error);
@@ -80,7 +90,9 @@ function Results() {
   };
   
   const getSentimentBadgeVariant = (sentiment) => {
-    switch (sentiment && sentiment.toLowerCase()) {
+    if (!sentiment) return 'secondary';
+    
+    switch (sentiment.toLowerCase()) {
       case 'positive':
         return 'success';
       case 'negative':
@@ -93,11 +105,37 @@ function Results() {
   };
   
   const formatRelevanceScore = (score) => {
-    if (!score && score !== 0) return 'N/A';
+    if (score === undefined || score === null) return 'N/A';
     
     // Convert to percentage with one decimal place
-    const percentage = (score * 100).toFixed(1);
-    return `${percentage}%`;
+    const percentage = (parseFloat(score) * 100).toFixed(1);
+    return isNaN(percentage) ? 'N/A' : `${percentage}%`;
+  };
+
+  // Helper function to safely get company data
+  const getCompanyData = (article) => {
+    if (!article) return [];
+    if (Array.isArray(article.companies)) return article.companies;
+    
+    // If we have a single company object, wrap it in an array
+    if (article.companies && typeof article.companies === 'object') {
+      return [article.companies];
+    }
+    
+    return [];
+  };
+
+  // Helper function to safely get categories
+  const getCategories = (article) => {
+    if (!article) return [];
+    if (Array.isArray(article.categories)) return article.categories;
+    
+    // If we have a string, split it by commas
+    if (typeof article.categories === 'string') {
+      return article.categories.split(',').map(c => c.trim());
+    }
+    
+    return [];
   };
 
   return (
@@ -302,39 +340,39 @@ function Results() {
                 <Card.Body className="p-3">
                   <Card.Title className="mb-3 fs-5 fw-bold">
                     <a 
-                      href={article.url} 
+                      href={article.url || '#'} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-decoration-none text-primary stretched-link"
                     >
-                      {article.headline}
+                      {article.headline || 'Untitled Article'}
                     </a>
                   </Card.Title>
                   <Card.Text className="text-secondary mb-3 small">
-                    {article.summary || article.snippet || (article.content && `${article.content.substring(0, 150)}...`)}
+                    {article.summary || article.snippet || (article.content && `${article.content.substring(0, 150)}...`) || 'No summary available'}
                   </Card.Text>
                   
                   <div className="mt-auto pt-2">
-                    {article.companies && article.companies.length > 0 && (
+                    {getCompanyData(article).length > 0 && (
                       <div className="mb-2">
                         <small className="text-muted d-block mb-1">Companies:</small>
-                        {article.companies.map((company, idx) => (
+                        {getCompanyData(article).map((company, idx) => (
                           <Badge 
                             key={idx} 
                             bg="light" 
                             text="dark" 
                             className="me-1 mb-1 border rounded-pill"
                           >
-                            {company.name} {company.ticker && `(${company.ticker})`}
+                            {company.name || company} {company.ticker && `(${company.ticker})`}
                           </Badge>
                         ))}
                       </div>
                     )}
                     
-                    {article.categories && article.categories.length > 0 && (
+                    {getCategories(article).length > 0 && (
                       <div className="mb-2">
                         <small className="text-muted d-block mb-1">Categories:</small>
-                        {article.categories.map((category, idx) => (
+                        {getCategories(article).map((category, idx) => (
                           <Badge 
                             key={idx} 
                             bg="info" 
@@ -362,17 +400,18 @@ function Results() {
                     </Badge>
                     <small className="text-muted">
                       <i className="bi bi-graph-up me-1"></i>
-                      Relevance: {formatRelevanceScore(article.relevance)}
+                      Relevance: {formatRelevanceScore(article.relevance_score || article.relevance)}
                     </small>
                   </div>
                   <div className="mt-2">
                     <Button 
                       variant="outline-primary" 
                       size="sm"
-                      href={article.url}
+                      href={article.url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-100 rounded-pill"
+                      disabled={!article.url}
                     >
                       <i className="bi bi-box-arrow-up-right me-1"></i>
                       Read Article
