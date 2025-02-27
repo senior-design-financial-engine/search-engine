@@ -526,11 +526,9 @@ Resources:
             build:
               commands:
                 - echo Getting backend auto scaling group...
-                - |
-                  export ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+                - "export ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue\" --output text)"
                 - echo Auto Scaling Group: $ASG_NAME
-                - |
-                  export INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[].InstanceId" --output text)
+                - "export INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query \"AutoScalingGroups[0].Instances[].InstanceId\" --output text)"
                 - echo Instances to deploy to: $INSTANCE_IDS
                 - echo Deployment ready
             
