@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 import logging
 import os
 from flask_cors import CORS
+import threading
+import time
+import schedule
+from update_database import main as update_db
 
 # Load environment variables
 load_dotenv()
@@ -13,9 +17,12 @@ load_dotenv()
 # Check if we should use mock data
 USE_MOCK_DATA = os.getenv('USE_MOCK_DATA', 'false').lower() == 'true'
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 cors = CORS(app)
-logger = logging.getLogger(__name__)
 
 class BackEnd:
     def __init__(self, embedding_model_path: str, num_dim: int):
@@ -54,8 +61,14 @@ class BackEnd:
             raise
 
     def update_index(self):
-        # Update the index with new data
-        pass
+        """Update the index with new data"""
+        try:
+            logger.info("Starting scheduled database update")
+            # Run the update_database script
+            update_db(skip_scrape=False)
+            logger.info("Scheduled database update completed successfully")
+        except Exception as e:
+            logger.error(f"Error updating index: {str(e)}")
     
     def dummy_search(
         self,
@@ -78,10 +91,38 @@ class BackEnd:
                 ]
             return dummy_results
 
+def run_scheduler():
+    """Run the scheduler in a separate thread"""
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
 # Initialize the backend
 embedding_model_path = 'models/embedding_model.pth'
 num_dim = 300  # Example dimension size
 backend = BackEnd(embedding_model_path, num_dim)
+
+# Set up scheduled tasks
+UPDATE_INTERVAL = os.getenv('UPDATE_INTERVAL_HOURS', '4')
+try:
+    update_interval = int(UPDATE_INTERVAL)
+except ValueError:
+    update_interval = 4  # Default to 4 hours if invalid config
+
+# Schedule regular database updates
+schedule.every(update_interval).hours.do(backend.update_index)
+logger.info(f"Scheduled database updates every {update_interval} hours")
+
+# Run an initial update if configured
+INITIAL_UPDATE = os.getenv('INITIAL_UPDATE', 'false').lower() == 'true'
+if INITIAL_UPDATE:
+    logger.info("Running initial database update")
+    threading.Thread(target=backend.update_index).start()
+
+# Start the scheduler in a separate thread
+scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+scheduler_thread.start()
+logger.info("Scheduler thread started")
 
 @app.route('/query', methods=['GET'])
 def query():
@@ -100,6 +141,16 @@ def query():
         return jsonify(results)
     except Exception as e:
         logger.error(f"Query endpoint error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/update', methods=['POST'])
+def update():
+    """Endpoint to manually trigger database update"""
+    try:
+        threading.Thread(target=backend.update_index).start()
+        return jsonify({"status": "update started"}), 202
+    except Exception as e:
+        logger.error(f"Update endpoint error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.errorhandler(404)

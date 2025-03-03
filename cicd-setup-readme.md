@@ -16,6 +16,7 @@ The pipeline is designed to handle both frontend and backend deployments:
 
 - **Frontend Pipeline**: Builds, tests, and deploys the React application to S3 and invalidates CloudFront
 - **Backend Pipeline**: Builds, tests, and deploys the Flask application to EC2 instances via SSM Run Command
+- **Lambda Pipeline**: Packages and deploys the Reddit scraper Lambda function to AWS Lambda
 
 ## Prerequisites
 

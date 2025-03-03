@@ -283,6 +283,14 @@ Resources:
           FromPort: 443
           ToPort: 443
           SourceSecurityGroupId: !Ref AppServerSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.2.0/24  # PrivateSubnet1 CIDR
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 10.0.3.0/24  # PrivateSubnet2 CIDR
       Tags:
         - Key: Name
           Value: !Sub ${VPCName}-ES-Endpoint-SG

@@ -65,6 +65,9 @@ phases:
       - echo '  cp -r /opt/financial-news-engine/* /opt/financial-news-engine/backup/' >> scripts/before_install.sh
       - echo 'fi' >> scripts/before_install.sh
       - chmod +x scripts/before_install.sh
+      - cd ..
+      - echo "Preparing Lambda package for Reddit scraper"
+      - mkdir -p lambda-build
   
   build:
     commands:
@@ -73,11 +76,38 @@ phases:
       - echo "Auto Scaling Group $ASG_NAME"
       - "export INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query \"AutoScalingGroups[0].Instances[].InstanceId\" --output text)"
       - echo "Instances to deploy to $INSTANCE_IDS"
+      - echo "Building Lambda package for Reddit scraper"
+      - echo "Installing dependencies for Lambda package..."
+      - pip install -r backend/requirements.txt --target lambda-build/
+      - echo "Copying necessary files to Lambda build directory..."
+      - cp backend/lambda_handler.py lambda-build/
+      - cp -r backend/scraper lambda-build/
+      - cp -r backend/es_database lambda-build/
+      - cp backend/update_database.py lambda-build/
+      - echo "Creating Lambda deployment package..."
+      - cd lambda-build
+      - zip -r ../scraper-package.zip .
+      - cd ..
+      - echo "Getting Lambda bucket name from backend stack..."
+      - "export LAMBDA_BUCKET=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?ExportName=='$BACKEND_STACK_NAME-LambdaCodeBucket'].OutputValue\" --output text)"
+      - echo "Lambda bucket: $LAMBDA_BUCKET"
       - echo Deployment ready
   
   post_build:
     commands:
       - echo Starting deployment to instances...
+      - if [ ! -z "$LAMBDA_BUCKET" ]; then
+      - echo "Uploading Lambda package to S3 bucket"
+      - aws s3 cp scraper-package.zip "s3://$LAMBDA_BUCKET/"
+      - echo "Updating Lambda function with new package..."
+      - "export FUNCTION_NAME=\"${ENVIRONMENT_NAME}-financial-news-scraper\""
+      - "aws lambda update-function-code --function-name $FUNCTION_NAME --s3-bucket $LAMBDA_BUCKET --s3-key scraper-package.zip"
+      - else
+      - echo "Lambda bucket not found. Skipping Lambda deployment."
+      - fi
+      - echo "Cleaning up Lambda build artifacts..."
+      - rm -rf lambda-build
+      - rm -f scraper-package.zip
       - echo Backend deployment completed
 
 artifacts:
@@ -89,4 +119,4 @@ artifacts:
 
 cache:
   paths:
-    - '/root/.cache/pip' 
+    - '/root/.cache/pip'

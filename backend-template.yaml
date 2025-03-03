@@ -11,6 +11,11 @@ Parameters:
       - staging
       - production
   
+  ResourceNameSuffix:
+    Description: A suffix to append to resource names to avoid naming conflicts
+    Type: String
+    Default: v1
+  
   VpcStackName:
     Description: Name of the VPC CloudFormation stack
     Type: String
@@ -40,6 +45,31 @@ Parameters:
     Description: Endpoint URL for Elasticsearch
     Type: String
     Default: https://your-elasticsearch-endpoint.es.amazonaws.com
+  
+  ElasticsearchIndex:
+    Description: Elasticsearch index name
+    Type: String
+    Default: financial_news
+  
+  ApifyApiKey:
+    Description: API key for Apify Reddit scraper
+    Type: String
+    NoEcho: true
+
+  UpdateIntervalHours:
+    Description: How often to update the database (in hours)
+    Type: Number
+    Default: 4
+    MinValue: 1
+    MaxValue: 24
+  
+  InitialUpdate:
+    Description: Whether to run an initial update when the service starts
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
   
   MinSize:
     Description: Minimum number of EC2 instances in the Auto Scaling Group
@@ -85,6 +115,7 @@ Resources:
   BackendInstanceRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub ${EnvironmentName}-backend-role-${ResourceNameSuffix}
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -103,58 +134,92 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  - 'es:ESHttp*'
                   - 'es:ESHttpGet'
-                  - 'es:ESHttpPost'
                   - 'es:ESHttpPut'
+                  - 'es:ESHttpPost'
                   - 'es:ESHttpDelete'
                 Resource: '*'
-        - PolicyName: S3AccessPolicy
+  
+  # IAM Role for Lambda scraper function
+  ScraperLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${EnvironmentName}-scraper-role-${ResourceNameSuffix}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Path: /
+      Policies:
+        - PolicyName: ESScraperAccessPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - 's3:GetObject'
-                  - 's3:ListBucket'
-                Resource: 
-                  - 'arn:aws:s3:::financial-news-assets/*'
-                  - 'arn:aws:s3:::financial-news-assets'
-
-  # Instance Profile for EC2 instances
+                  - 'es:ESHttp*'
+                  - 'es:ESHttpGet'
+                  - 'es:ESHttpPut'
+                  - 'es:ESHttpPost'
+                  - 'es:ESHttpDelete'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource: '*'
+  
+  # EC2 Instance Profile
   BackendInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Path: /
       Roles:
         - !Ref BackendInstanceRole
-
-  # Security Group for Backend EC2 instances
+  
+  # Security Group for Backend Servers
   BackendSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub ${EnvironmentName}-backend-sg-${ResourceNameSuffix}
       GroupDescription: Security group for backend servers
-      VpcId: 
+      VpcId:
         Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
       SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: !Ref SSHLocation
-        - IpProtocol: tcp
-          FromPort: 5000  # Flask default port
-          ToPort: 5000
-          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-sg
-        - Key: Environment
-          Value: !Ref EnvironmentName
-
-  # Security Group for Application Load Balancer
+          Value: !Sub ${EnvironmentName}-backend-sg-${ResourceNameSuffix}
+  
+  # Security Group for ELB
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Application Load Balancer
+      GroupName: !Sub ${EnvironmentName}-lb-sg-${ResourceNameSuffix}
+      GroupDescription: Security group for load balancer
       VpcId:
         Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
       SecurityGroupIngress:
@@ -168,15 +233,112 @@ Resources:
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-alb-sg
-        - Key: Environment
-          Value: !Ref EnvironmentName
-
-  # Launch Template for Auto Scaling Group
+          Value: !Sub ${EnvironmentName}-lb-sg-${ResourceNameSuffix}
+  
+  # Security group for Lambda functions
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-lambda-sg-${ResourceNameSuffix}
+      GroupDescription: Security group for Lambda functions
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-lambda-sg-${ResourceNameSuffix}
+  
+  # Lambda Function for Reddit scraper
+  ScraperLambdaFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: LambdaCodeBucket
+    Properties:
+      FunctionName: !Sub ${EnvironmentName}-financial-news-scraper-${ResourceNameSuffix}
+      Description: Lambda function to scrape Reddit and other news sources for financial news
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt ScraperLambdaRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import os
+          
+          def handler(event, context):
+              print("Financial news scraper placeholder function")
+              print("Event:", json.dumps(event))
+              
+              # Return a placeholder response
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Placeholder Lambda - Replace with actual scraper code')
+              }
+      Timeout: 300
+      MemorySize: 512
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt LambdaSecurityGroup.GroupId
+        SubnetIds:
+          - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet1ID"
+          - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet2ID"
+      Environment:
+        Variables:
+          ELASTICSEARCH_URL: !Ref ElasticsearchEndpoint
+          ELASTICSEARCH_INDEX: !Ref ElasticsearchIndex
+          EMBEDDING_DIMENSIONS: '768'
+          UPDATE_INTERVAL_HOURS: !Ref UpdateIntervalHours
+          INITIAL_UPDATE: !Ref InitialUpdate
+          USE_MOCK_DATA: 'false'
+          APIFY_API_KEY: !Ref ApifyApiKey
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-scraper-${ResourceNameSuffix}
+  
+  # Lambda Code Bucket
+  LambdaCodeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::AccountId}-${EnvironmentName}-lambda-code-${ResourceNameSuffix}
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-lambda-code-bucket-${ResourceNameSuffix}
+  
+  # CloudWatch Event Rule to trigger the scraper
+  ScraperScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${EnvironmentName}-scraper-schedule-${ResourceNameSuffix}
+      ScheduleExpression: !Sub rate(${UpdateIntervalHours} hours)
+      State: ENABLED
+      Targets:
+        - Id: ScraperTarget
+          Arn: !GetAtt ScraperLambdaFunction.Arn
+  
+  # Permission for EventBridge to invoke Lambda
+  ScraperSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt ScraperLambdaFunction.Arn
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ScraperScheduleRule.Arn
+  
+  # Launch Template for backend servers
   BackendLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
+    DependsOn: [BackendSecurityGroup, BackendInstanceProfile]
     Properties:
-      LaunchTemplateName: !Sub ${EnvironmentName}-backend-lt
+      LaunchTemplateName: !Sub ${EnvironmentName}-backend-lt-${ResourceNameSuffix}
       VersionDescription: Initial version
       LaunchTemplateData:
         ImageId: !Ref AMIId
@@ -190,251 +352,163 @@ Resources:
           Fn::Base64: !Sub |
             #!/bin/bash -xe
             
-            # Update system packages
+            # Update system
             yum update -y
             
-            # Install Python and development tools
-            yum install -y python3 python3-pip python3-devel gcc git
+            # Install dependencies
+            yum install -y python3 python3-pip git
             
             # Install CloudWatch agent
             yum install -y amazon-cloudwatch-agent
             
-            # Create app directory
-            mkdir -p /opt/financial-news-engine
-            cd /opt/financial-news-engine
+            # Clone repository
+            REPO_DIR=/opt/financial-news
+            mkdir -p $REPO_DIR
+            cd $REPO_DIR
+            git clone https://github.com/yourusername/financial-news-engine.git .
             
-            # Clone application code (replace with your Git repository URL)
-            # git clone https://github.com/yourusername/financial-news-engine.git .
+            # Set up Python environment
+            pip3 install -r backend/requirements.txt
             
-            # For demo purposes, create a simple Flask app
-            cat > app.py << 'EOL'
-            from flask import Flask, jsonify
-            import os
-            import logging
-            from elasticsearch import Elasticsearch
-            from flask_cors import CORS
-            
-            app = Flask(__name__)
-            
-            # Configure CORS
-            cors_origins = [
-                "http://localhost:3000",                                     # Local development
-                "https://financial-news-frontend-*.s3.amazonaws.com",        # S3 bucket
-                "https://*.cloudfront.net",                                  # CloudFront distribution
-                "https://*.amazonaws.com"                                    # Any AWS domain
-            ]
-            CORS(app, resources={r"/*": {"origins": cors_origins}})
-            
-            # Configure logging
-            logging.basicConfig(
-                level=logging.INFO,
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-            logger = logging.getLogger(__name__)
-            
-            # Connect to Elasticsearch
-            es_endpoint = os.environ.get('ES_ENDPOINT', '${ElasticsearchEndpoint}')
-            try:
-                es = Elasticsearch([es_endpoint])
-                logger.info(f"Connected to Elasticsearch at {es_endpoint}")
-            except Exception as e:
-                logger.error(f"Failed to connect to Elasticsearch: {str(e)}")
-                es = None
-            
-            @app.route('/health', methods=['GET'])
-            def health_check():
-                return jsonify({"status": "healthy"})
-            
-            @app.route('/search', methods=['GET'])
-            def search():
-                if es is None:
-                    return jsonify({"error": "Elasticsearch connection not available"}), 503
-                
-                try:
-                    # Simple search to test ES connection
-                    result = es.info()
-                    return jsonify({
-                        "message": "Elasticsearch connection successful",
-                        "es_info": result
-                    })
-                except Exception as e:
-                    logger.error(f"Search error: {str(e)}")
-                    return jsonify({"error": str(e)}), 500
-            
-            if __name__ == '__main__':
-                app.run(host='0.0.0.0', port=5000)
+            # Add environment variables
+            cat > /etc/environment << EOL
+            ELASTICSEARCH_URL=${ElasticsearchEndpoint}
+            ELASTICSEARCH_INDEX=${ElasticsearchIndex}
+            EMBEDDING_DIMENSIONS=768
+            UPDATE_INTERVAL_HOURS=${UpdateIntervalHours}
+            INITIAL_UPDATE=${InitialUpdate}
+            USE_MOCK_DATA=false
+            APIFY_API_KEY=${ApifyApiKey}
             EOL
             
-            # Create requirements.txt
-            cat > requirements.txt << 'EOL'
-            flask==2.3.3
-            flask-cors==4.0.0
-            elasticsearch==8.9.0
-            requests==2.31.0
-            python-dotenv==1.0.0
-            gunicorn==21.2.0
-            EOL
+            # Set up application
+            mkdir -p /opt/financial-news/logs
+            cd /opt/financial-news
             
-            # Install dependencies
-            pip3 install -r requirements.txt
-            
-            # Create systemd service
-            cat > /etc/systemd/system/financial-news.service << 'EOL'
+            # Create systemd service for backend
+            cat > /etc/systemd/system/financial-news-backend.service << EOL
             [Unit]
-            Description=Financial News Engine Flask App
+            Description=Financial News Backend Service
             After=network.target
             
             [Service]
-            User=root
-            WorkingDirectory=/opt/financial-news-engine
-            ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
+            User=ec2-user
+            WorkingDirectory=/opt/financial-news/backend
+            ExecStart=/usr/bin/python3 backend.py
             Restart=always
-            Environment=ES_ENDPOINT=${ElasticsearchEndpoint}
+            RestartSec=10
+            StandardOutput=syslog
+            StandardError=syslog
+            SyslogIdentifier=financial-news-backend
+            Environment=PYTHONPATH=/opt/financial-news
+            EnvironmentFile=/etc/environment
             
             [Install]
             WantedBy=multi-user.target
             EOL
             
-            # Enable and start service
-            systemctl enable financial-news.service
-            systemctl start financial-news.service
-            
-            # Configure CloudWatch agent
-            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOL'
-            {
-              "agent": {
-                "metrics_collection_interval": 60,
-                "run_as_user": "root"
-              },
-              "logs": {
-                "logs_collected": {
-                  "files": {
-                    "collect_list": [
-                      {
-                        "file_path": "/var/log/messages",
-                        "log_group_name": "/financial-news/system",
-                        "log_stream_name": "{instance_id}"
-                      },
-                      {
-                        "file_path": "/var/log/financial-news.log",
-                        "log_group_name": "/financial-news/application",
-                        "log_stream_name": "{instance_id}"
-                      }
-                    ]
-                  }
-                }
-              },
-              "metrics": {
-                "metrics_collected": {
-                  "disk": {
-                    "measurement": [
-                      "used_percent"
-                    ],
-                    "resources": [
-                      "/"
-                    ]
-                  },
-                  "mem": {
-                    "measurement": [
-                      "mem_used_percent"
-                    ]
-                  }
-                }
-              }
-            }
-            EOL
-            
-            # Start CloudWatch agent
+            # Start CloudWatch agent with default config
             systemctl enable amazon-cloudwatch-agent
             systemctl start amazon-cloudwatch-agent
             
-            # Signal completion
-            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource BackendAutoScalingGroup --region ${AWS::Region}
-
-  # Auto Scaling Group for Backend Servers
+            # Start application
+            systemctl enable financial-news-backend
+            systemctl start financial-news-backend
+        
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 20
+              VolumeType: gp3
+              DeleteOnTermination: true
+        
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 1
+        
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}-backend-server-${ResourceNameSuffix}
+          - ResourceType: volume
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}-backend-volume-${ResourceNameSuffix}
+  
+  # Auto Scaling Group
   BackendAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
-    DependsOn: LoadBalancerListener
     Properties:
-      AutoScalingGroupName: !Sub ${EnvironmentName}-backend-asg
+      AutoScalingGroupName: !Sub ${EnvironmentName}-backend-asg-${ResourceNameSuffix}
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet2ID"
       LaunchTemplate:
         LaunchTemplateId: !Ref BackendLaunchTemplate
         Version: !GetAtt BackendLaunchTemplate.LatestVersionNumber
       MinSize: !Ref MinSize
       MaxSize: !Ref MaxSize
       DesiredCapacity: !Ref DesiredCapacity
-      VPCZoneIdentifier:
-        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet1ID"
-        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet2ID"
       TargetGroupARNs:
         - !Ref BackendTargetGroup
-      HealthCheckType: ELB
-      HealthCheckGracePeriod: 300
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-instance
+          Value: !Sub ${EnvironmentName}-backend-instance-${ResourceNameSuffix}
           PropagateAtLaunch: true
-        - Key: Environment
-          Value: !Ref EnvironmentName
-          PropagateAtLaunch: true
-
-  # Application Load Balancer
-  ApplicationLoadBalancer:
+  
+  # Load Balancer
+  BackendLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn: [LoadBalancerSecurityGroup]
     Properties:
-      Name: !Sub ${EnvironmentName}-backend-alb
+      Name: !Sub ${EnvironmentName}-backend-lb-${ResourceNameSuffix}
       Scheme: internet-facing
-      LoadBalancerAttributes:
-        - Key: idle_timeout.timeout_seconds
-          Value: '60'
+      Type: application
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
       Subnets:
         - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
         - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
-      SecurityGroups:
-        - !Ref LoadBalancerSecurityGroup
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-alb
-        - Key: Environment
-          Value: !Ref EnvironmentName
-
-  # Target Group for Backend Servers
+          Value: !Sub ${EnvironmentName}-backend-lb-${ResourceNameSuffix}
+  
+  # Target Group
   BackendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub ${EnvironmentName}-backend-tg
-      Port: 5000
+      Name: !Sub ${EnvironmentName}-backend-tg-${ResourceNameSuffix}
+      Port: 80
       Protocol: HTTP
       VpcId:
         Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
-      HealthCheckIntervalSeconds: 30
-      HealthCheckPath: /health
+      HealthCheckPath: /query
       HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
       TargetGroupAttributes:
         - Key: deregistration_delay.timeout_seconds
-          Value: '20'
+          Value: 30
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-tg
-        - Key: Environment
-          Value: !Ref EnvironmentName
-
-  # Listener for Application Load Balancer (HTTP)
-  LoadBalancerListener:
+          Value: !Sub ${EnvironmentName}-backend-tg-${ResourceNameSuffix}
+  
+  # Listener
+  BackendListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref BackendTargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      LoadBalancerArn: !Ref BackendLoadBalancer
       Port: 80
       Protocol: HTTP
-
-  # Auto Scaling Policies
-  ScaleUpPolicy:
+  
+  # Auto Scaling Policy
+  BackendScaleUpPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
       AutoScalingGroupName: !Ref BackendAutoScalingGroup
@@ -443,65 +517,59 @@ Resources:
         PredefinedMetricSpecification:
           PredefinedMetricType: ASGAverageCPUUtilization
         TargetValue: 70.0
-
+  
   # CloudWatch Alarms
   HighCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmDescription: Alarm if CPU too high for more than 5 minutes
+      AlarmDescription: Alarm if CPU too high or metric disappears
       MetricName: CPUUtilization
       Namespace: AWS/EC2
       Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 85
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 90
       AlarmActions:
-        - !Ref BackendSNSTopic
+        - !Ref AlarmTopic
       Dimensions:
         - Name: AutoScalingGroupName
           Value: !Ref BackendAutoScalingGroup
       ComparisonOperator: GreaterThanThreshold
-
+  
   # SNS Topic for Alarms
-  BackendSNSTopic:
+  AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:
-      DisplayName: !Sub ${EnvironmentName}-backend-alerts
-      TopicName: !Sub ${EnvironmentName}-backend-alerts
+      DisplayName: !Sub ${EnvironmentName}-backend-alarms-${ResourceNameSuffix}
+      TopicName: !Sub ${EnvironmentName}-backend-alarms-${ResourceNameSuffix}
 
 Outputs:
-  BackendALBDNSName:
-    Description: DNS Name of the Application Load Balancer
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  BackendURL:
+    Description: URL of the backend service
+    Value: !Sub http://${BackendLoadBalancer.DNSName}
     Export:
-      Name: !Sub "${AWS::StackName}-BackendALBDNSName"
-  
-  BackendALBFullQualifiedDNSName:
-    Description: Full DNS Name of the Application Load Balancer
-    Value: !Sub https://${ApplicationLoadBalancer.DNSName}
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendALBURL"
-  
-  BackendAutoScalingGroupName:
-    Description: Auto Scaling Group Name
-    Value: !Ref BackendAutoScalingGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendASGName"
-  
-  BackendSecurityGroupId:
-    Description: Security Group ID for Backend Servers
-    Value: !Ref BackendSecurityGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendSGID"
-  
-  BackendSNSTopicArn:
-    Description: ARN of the SNS Topic for Backend Alerts
-    Value: !Ref BackendSNSTopic
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendSNSTopicARN"
+      Name: !Sub ${AWS::StackName}-BackendURL
   
   ApiGatewayUrl:
-    Description: "URL of the Backend API endpoint"
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: URL of the backend service (for compatibility)
+    Value: !Sub ${BackendLoadBalancer.DNSName}
     Export:
-      Name: !Sub "${AWS::StackName}-ApiGatewayUrl" 
+      Name: !Sub ${AWS::StackName}-ApiGatewayUrl
+  
+  ScraperLambdaFunction:
+    Description: ARN of the scraper Lambda function
+    Value: !GetAtt ScraperLambdaFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ScraperLambdaFunction
+  
+  LambdaCodeBucket:
+    Description: S3 bucket for Lambda code storage
+    Value: !Ref LambdaCodeBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-LambdaCodeBucket
+  
+  LambdaSecurityGroup:
+    Description: Security Group for Lambda functions
+    Value: !Ref LambdaSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-AppLambdaSG 

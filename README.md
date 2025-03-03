@@ -10,6 +10,7 @@ Currently in active development by Team 14 at Boston University's Electrical & C
 
 ### Real-Time News Aggregation
 - Multi-source web crawling (BBC, NPR, AP News)
+- Reddit financial communities scraping
 - Real-time indexing with updates within 3 minutes of publication
 - Support for multiple news categories and regions
 
@@ -55,6 +56,7 @@ Currently in active development by Team 14 at Boston University's Electrical & C
 1. **Web Crawler**
    - RSS feed processing
    - Multi-source support (BBC, NPR, AP News)
+   - Reddit scraper for financial subreddits
    - Content validation
    - URL deduplication
 
@@ -87,6 +89,7 @@ Currently in active development by Team 14 at Boston University's Electrical & C
   - requests
   - flask-cors
   - python-dotenv
+  - apify-client (for Reddit scraping)
 
 ### Development Setup
 - Node.js environment for frontend
@@ -171,6 +174,7 @@ See the dedicated README files for detailed deployment instructions:
 - Backend setup: [backend-setup-readme.md](backend-setup-readme.md)
 - Frontend setup: [frontend-setup-readme.md](frontend-setup-readme.md)
 - CI/CD setup: [cicd-setup-readme.md](cicd-setup-readme.md)
+- Reddit scraper: [backend-setup-readme.md](backend-setup-readme.md#reddit-scraper)
 
 ## Deployment Quick Start
 
@@ -205,6 +209,7 @@ For detailed setup instructions, refer to the dedicated README files:
 - [Backend Setup](backend-setup-readme.md)
 - [Frontend Setup](frontend-setup-readme.md)
 - [CI/CD Pipeline Setup](cicd-setup-readme.md)
+- [Template Validation Guide](validate_template_readme.md)
 
 ## Development Environment
 
@@ -249,6 +254,8 @@ The project uses a complete infrastructure-as-code approach with AWS CloudFormat
 
 - **VPC Setup** (`vpc-template.yaml`): Creates a custom VPC with public and private subnets, NAT Gateway, and security groups.
 - **Backend Setup** (`backend-template.yaml`): Deploys EC2 instances with Auto Scaling and an Application Load Balancer.
+  - Includes serverless Reddit scraper Lambda integrated with VPC for secure data processing
+  - Reddit scraper Lambda accesses Elasticsearch within VPC using private networking
 - **Frontend Setup** (`frontend-template.yaml`): Configures S3 bucket and CloudFront distribution for the static web frontend.
 - **CI/CD Pipeline** (`cicd-template.yaml`): Sets up AWS CodePipeline with GitHub integration for continuous delivery.
 
@@ -265,3 +272,55 @@ For detailed deployment instructions, see:
 - [Backend Setup Guide](backend-setup-readme.md)
 - [Frontend Setup Guide](frontend-setup-readme.md)
 - [CI/CD Setup Guide](cicd-setup-readme.md)
+- [Template Validation Guide](validate_template_readme.md)
+
+## Recent Improvements
+
+### Enhanced VPC Integration
+
+The Reddit scraper Lambda function now runs within the VPC for improved security:
+
+- **Security**: Lambda functions operate within private subnets with restricted egress
+- **Resource Access**: Direct, secure access to Elasticsearch without traversing public networks
+- **Permissions**: Properly configured IAM roles with least-privilege access
+
+### CloudFormation Template Enhancements
+
+Recent template improvements include:
+
+- **VPC Reference Fixes**: Corrected import syntax to match exact export names from VPC stack (`VPCID` vs `VpcId`)
+- **CloudWatch Configuration**: Simplified CloudWatch agent setup to avoid validation errors
+- **IAM Role Updates**: Added proper VPC access permissions for Lambda functions
+- **Template Validation**: Added custom validation script (`validate_yaml.py`) to detect common CloudFormation issues
+
+### Comprehensive Documentation
+
+- **Improved Troubleshooting Guides**: Added detailed sections on resolving common CloudFormation validation issues
+- **Enhanced Configuration References**: Detailed VPC integration documentation with performance considerations
+- **AWS Best Practices**: Added links to AWS documentation for Lambda VPC integration and security best practices
+
+For a comprehensive list of changes, please refer to the [Backend Setup Guide](backend-setup-readme.md) troubleshooting section.
+
+## Additional Tools
+
+### CloudFormation Template Validator (`validate_yaml.py`)
+
+The project includes a custom validation script that helps identify common issues in CloudFormation templates:
+
+```bash
+python validate_yaml.py [template_file]
+```
+
+This tool provides additional validation beyond what the AWS CloudFormation validator checks:
+
+- Identifies problematic AWS intrinsic references like `${aws:InstanceId}`
+- Detects patterns that may pass basic validation but cause deployment failures
+- Provides clear error messages and suggested fixes
+
+For detailed usage instructions, see the [Template Validation Guide](validate_template_readme.md).
+
+### Other Development Utilities
+
+- **Mock Data Generator**: For frontend development without Elasticsearch
+- **Local Dev Environment**: Docker Compose setup for local testing
+- **Test Harness**: Automated tests for backend REST API endpoints

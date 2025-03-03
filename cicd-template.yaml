@@ -210,9 +210,9 @@ Resources:
         EnvironmentVariables:
           - Name: REACT_APP_API_URL
             Value: !Sub 
-              - "https://${ApiDomainName}"
-              - ApiDomainName: 
-                  Fn::ImportValue: !Sub "${BackendStackName}-ApiGatewayUrl"
+              - "${ApiURL}"
+              - ApiURL: 
+                  Fn::ImportValue: !Sub "${BackendStackName}-BackendURL"
           - Name: ENVIRONMENT
             Value: !Ref EnvironmentName
       Source:
