@@ -192,6 +192,14 @@ Resources:
                   - 'cloudformation:DescribeStacks'
                   - 'cloudformation:ListStackResources'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'lambda:UpdateFunctionCode'
+                  - 'lambda:GetFunction'
+                  - 'lambda:PublishVersion'
+                  - 'lambda:UpdateFunctionConfiguration'
+                Resource: 
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
 
   # Frontend CodeBuild Project
   FrontendBuildProject:
@@ -279,6 +287,9 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
         PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: BACKEND_STACK_NAME
+            Value: !Ref BackendStackName
       Source:
         Type: CODEPIPELINE
         BuildSpec: |
@@ -293,6 +304,7 @@ Resources:
                 - "python -m pip install --upgrade pip"
                 - "pip install pytest pytest-cov flake8"
                 - "pip install -r requirements.txt"
+                - "pip install boto3 zipfile36"
             
             pre_build:
               commands:
@@ -305,6 +317,78 @@ Resources:
                 - "echo \"Building the backend deployment package...\""
                 - "mkdir -p dist"
                 - "zip -r dist/backend.zip ."
+                
+                - "echo \"Building Lambda deployment package...\""
+                - "mkdir -p lambda_dist"
+                
+                # Create Lambda package inline without external script
+                - |
+                  python -c "
+                  import os, sys, shutil, zipfile, tempfile
+                  from pathlib import Path
+
+                  # Define output path
+                  output_path = 'lambda_dist/lambda-package.zip'
+                  backend_dir = os.getcwd()
+                  requirements_file = os.path.join(backend_dir, 'requirements.txt')
+                  
+                  # Files to include in the Lambda package
+                  files_to_copy = ['lambda_handler.py', 'update_database.py', '__init__.py']
+                  dirs_to_copy = ['scraper', 'es_database']
+                  
+                  # Create temp directory and package Lambda code
+                  with tempfile.TemporaryDirectory() as tmp_dir:
+                      print(f'Creating temporary directory: {tmp_dir}')
+                      
+                      # Copy individual files
+                      for f in files_to_copy:
+                          src = os.path.join(backend_dir, f)
+                          if os.path.exists(src):
+                              shutil.copy(src, tmp_dir)
+                              print(f'Copied {f}')
+                      
+                      # Copy directories
+                      for d in dirs_to_copy:
+                          src_dir = os.path.join(backend_dir, d)
+                          if os.path.exists(src_dir):
+                              dst_dir = os.path.join(tmp_dir, d)
+                              shutil.copytree(src_dir, dst_dir)
+                              print(f'Copied directory {d}')
+                      
+                      # Install dependencies to the package
+                      if os.path.exists(requirements_file):
+                          print(f'Installing dependencies from {requirements_file}')
+                          os.system(f'{sys.executable} -m pip install --target {tmp_dir} -r {requirements_file}')
+                      
+                      # Create the zip file
+                      os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                      with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                          # Add all files from the temp directory to the zip
+                          for root, _, files in os.walk(tmp_dir):
+                              for file in files:
+                                  file_path = os.path.join(root, file)
+                                  # Create relative path for the file in the zip
+                                  rel_path = os.path.relpath(file_path, tmp_dir)
+                                  zipf.write(file_path, rel_path)
+                      
+                      print(f'Created Lambda package: {output_path}')
+                  "
+                
+                - "echo \"Getting S3 bucket name for Lambda code...\""
+                - "export LAMBDA_BUCKET=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='LambdaCodeBucket'].OutputValue\" --output text || echo '')"
+                - "if [ -z \"$LAMBDA_BUCKET\" ]; then echo \"Lambda bucket not found, skipping upload\"; else echo \"Found Lambda bucket: $LAMBDA_BUCKET\"; fi"
+                - "if [ -n \"$LAMBDA_BUCKET\" ]; then aws s3 cp lambda_dist/lambda-package.zip s3://$LAMBDA_BUCKET/lambda-package.zip; fi"
+                
+                - "echo \"Getting Lambda function name...\""
+                - "export LAMBDA_FUNCTION=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='ScraperLambdaFunction'].OutputValue\" --output text || echo '')"
+                - "if [ -z \"$LAMBDA_FUNCTION\" ]; then echo \"Lambda function not found, skipping update\"; else echo \"Found Lambda function: $LAMBDA_FUNCTION\"; fi"
+                - "if [ -n \"$LAMBDA_FUNCTION\" ] && [ -n \"$LAMBDA_BUCKET\" ]; then"
+                - "  echo \"Updating Lambda function code from S3...\""
+                - "  aws lambda update-function-code --function-name $LAMBDA_FUNCTION --s3-bucket $LAMBDA_BUCKET --s3-key lambda-package.zip --publish"
+                - "  echo \"Updating Lambda function handler to match actual implementation...\""
+                - "  aws lambda update-function-configuration --function-name $LAMBDA_FUNCTION --handler lambda_handler.lambda_handler"
+                - "fi"
+                
                 - "echo \"Build completed on $(date)\""
             
             post_build:
@@ -314,6 +398,7 @@ Resources:
           artifacts:
             files:
               - "backend/dist/backend.zip"
+              - "backend/lambda_dist/lambda-package.zip"
               - "appspec.yml"
               - "backend/scripts/**/*"
             discard-paths: no

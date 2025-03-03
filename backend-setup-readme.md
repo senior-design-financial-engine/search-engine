@@ -367,7 +367,16 @@ The Reddit scraper is fully integrated into the CI/CD pipeline:
    - Upload it to the S3 bucket
    - Update the Lambda function with the new code
 
-You don't need to run any manual deployment scripts, as this is all handled by the CI/CD pipeline.
+The packaging and deployment process is implemented directly in the CI/CD pipeline's buildspec configuration (in the `cicd-template.yaml` file), eliminating the need for any external deployment scripts. The process:
+
+1. Creates a temporary directory for packaging
+2. Copies the required files and directories
+3. Installs dependencies
+4. Creates a ZIP archive
+5. Uploads the package to the Lambda code S3 bucket
+6. Updates the Lambda function with the new code
+
+This streamlined approach ensures consistent deployments and removes any manual steps that might lead to errors or inconsistencies.
 
 ### Testing the Deployment
 

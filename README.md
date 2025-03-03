@@ -324,3 +324,37 @@ For detailed usage instructions, see the [Template Validation Guide](validate_te
 - **Mock Data Generator**: For frontend development without Elasticsearch
 - **Local Dev Environment**: Docker Compose setup for local testing
 - **Test Harness**: Automated tests for backend REST API endpoints
+
+## AWS Infrastructure
+
+### AWS Architecture
+
+Our AWS infrastructure includes:
+
+- Multi-AZ VPC with public and private subnets
+- Load-balanced EC2 instances for backend services
+- S3 and CloudFront for frontend hosting
+- Elasticsearch for vector search
+- Includes serverless Reddit scraper Lambda integrated with VPC for secure data processing
+- Reddit scraper Lambda accesses Elasticsearch within VPC using private networking
+- CI/CD pipeline with GitHub integration for automated deployments
+
+## Recent Updates
+
+### Lambda Deployment Process Improvements
+
+The Lambda function deployment process has been fully integrated into the CI/CD pipeline:
+
+- **Streamlined Deployment**: Lambda packaging and deployment happens directly in the CI/CD pipeline
+- **No External Scripts**: Eliminated external deployment scripts for better maintainability
+- **Automated Updates**: When code is pushed, the Lambda function is automatically updated
+- **Consistent Deployments**: The standardized CI/CD process ensures consistent deployments
+- **Simplified Workflow**: Developers only need to push code to trigger deployments
+
+The packaging process:
+1. Identifies necessary code files and dependencies
+2. Creates a deployment package
+3. Uploads to the designated S3 bucket
+4. Updates the Lambda function with the new code
+
+See the `LAMBDA_DEPLOYMENT_GUIDE.md` for detailed information.

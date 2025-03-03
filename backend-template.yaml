@@ -264,17 +264,11 @@ Resources:
       Role: !GetAtt ScraperLambdaRole.Arn
       Code:
         ZipFile: |
-          import json
-          import os
-          
           def handler(event, context):
-              print("Financial news scraper placeholder function")
-              print("Event:", json.dumps(event))
-              
-              # Return a placeholder response
+              print('Initial deployment placeholder Lambda')
               return {
                   'statusCode': 200,
-                  'body': json.dumps('Placeholder Lambda - Replace with actual scraper code')
+                  'body': 'Initial deployment completed. Replace with actual code via CI/CD.'
               }
       Timeout: 300
       MemorySize: 512
