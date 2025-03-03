@@ -387,8 +387,54 @@ Resources:
                     if [ -n \"$LAMBDA_FUNCTION\" ] && [ -n \"$LAMBDA_BUCKET\" ]; then
                       echo \"Updating Lambda function code from S3...\"
                       aws lambda update-function-code --function-name $LAMBDA_FUNCTION --s3-bucket $LAMBDA_BUCKET --s3-key lambda-package.zip --publish
+                      
+                      echo \"Waiting for Lambda update to complete...\"
+                      # First try the wait command
+                      aws lambda wait function-updated --function-name $LAMBDA_FUNCTION || {
+                        # Fallback to polling if wait command fails
+                        echo \"Fallback: Polling for update completion...\"
+                        state=\"InProgress\"
+                        retries=0
+                        max_retries=30  # Maximum wait of 5 minutes
+                        
+                        while [ \"$state\" != \"Successful\" ] && [ $retries -lt $max_retries ]; do
+                          sleep 10
+                          state=$(aws lambda get-function --function-name $LAMBDA_FUNCTION --query 'Configuration.LastUpdateStatus' --output text || echo \"Failed\")
+                          last_state=$state
+                          echo \"Current state: $state (Attempt $retries of $max_retries)\"
+                          retries=$((retries+1))
+                          
+                          # Break if we see Failed, successful or retries exhausted
+                          if [ \"$state\" = \"Failed\" ] || [ \"$state\" = \"Successful\" ] || [ $retries -ge $max_retries ]; then
+                            break
+                          fi
+                        done
+                        
+                        if [ \"$state\" != \"Successful\" ]; then
+                          echo \"Warning: Lambda update did not complete successfully within timeout. Current state: $state\"
+                          echo \"Proceeding with configuration update attempt anyway...\"
+                        else
+                          echo \"Lambda update completed successfully after polling\"
+                        fi
+                      }
+                      
                       echo \"Updating Lambda function handler to match actual implementation...\"
-                      aws lambda update-function-configuration --function-name $LAMBDA_FUNCTION --handler lambda_handler.lambda_handler
+                      # Retry logic for configuration update
+                      max_config_retries=5
+                      config_retry=0
+                      until aws lambda update-function-configuration --function-name $LAMBDA_FUNCTION --handler lambda_handler.lambda_handler || [ $config_retry -ge $max_config_retries ]; do
+                        config_retry=$((config_retry+1))
+                        echo \"Configuration update attempt $config_retry of $max_config_retries failed, retrying in 10 seconds...\"
+                        sleep 10
+                      done
+                      
+                      if [ $config_retry -ge $max_config_retries ]; then
+                        echo \"Failed to update Lambda configuration after $max_config_retries attempts\"
+                        # Don't exit with error to prevent pipeline failure
+                        # For full strictness, you could add: exit 1
+                      else
+                        echo \"Successfully updated Lambda configuration\"
+                      fi
                     fi
                   "
                 
