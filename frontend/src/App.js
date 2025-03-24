@@ -1,55 +1,29 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Link, NavLink } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Header from './components/Header';
+import Footer from './components/Footer';
 import Home from './components/Home';
 import Results from './components/Results';
-import { Navbar, Container, Nav, Button } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap-icons/font/bootstrap-icons.css';
-import './styles/App.css';
+import Article from './components/Article';
+import DiagnosticTool from './components/DiagnosticTool';
+import './App.css';
 
 function App() {
   return (
     <Router>
-      <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm">
-        <Container>
-          <Navbar.Brand as={Link} to="/">
-            <i className="bi bi-search me-2"></i>
-            Financial Search Engine
-          </Navbar.Brand>
-          <Navbar.Toggle aria-controls="basic-navbar-nav" />
-          <Navbar.Collapse id="basic-navbar-nav">
-            <Nav className="me-auto">
-              <Nav.Link as={NavLink} to="/" end>Home</Nav.Link>
-            </Nav>
-            <Nav>
-              <Button 
-                variant="outline-light" 
-                size="sm" 
-                as={Link} 
-                to="/" 
-                className="me-2"
-              >
-                New Search
-              </Button>
-            </Nav>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
-      
-      <div className="app-content">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/results" element={<Results />} />
-        </Routes>
+      <div className="d-flex flex-column min-vh-100">
+        <Header />
+        <main className="flex-grow-1">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/results" element={<Results />} />
+            <Route path="/article/:id" element={<Article />} />
+            <Route path="/diagnostics" element={<DiagnosticTool />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+        <Footer />
       </div>
-      
-      <footer className="bg-light py-3 mt-5">
-        <Container className="text-center">
-          <small className="text-muted">
-            Financial Search Engine Demo - Enhanced with advanced filtering and search capabilities
-          </small>
-        </Container>
-      </footer>
     </Router>
   );
 }
