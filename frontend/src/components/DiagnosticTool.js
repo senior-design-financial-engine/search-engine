@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Accordion, Badge, Table, Alert, Form } from 'react-bootstrap';
-import { checkApiHealth, getApiErrorLogs, clearApiErrorLogs } from '../services/api';
+import { Container, Row, Col, Card, Button, Accordion, Badge, Table, Alert, Form, Tabs, Tab, Spinner } from 'react-bootstrap';
+import { 
+  checkApiHealth, 
+  getApiErrorLogs, 
+  clearApiErrorLogs,
+  getFullDiagnosticReport,
+  getDiagnosticNetworkInfo,
+  getDiagnosticSystemInfo,
+  getDiagnosticElasticsearchInfo,
+  getDiagnosticErrorLogs
+} from '../services/api';
 
 const DiagnosticTool = () => {
   const [healthStatus, setHealthStatus] = useState(null);
@@ -8,6 +17,11 @@ const DiagnosticTool = () => {
   const [loading, setLoading] = useState(true);
   const [envInfo, setEnvInfo] = useState({});
   const [connectionTest, setConnectionTest] = useState(null);
+  const [networkDiagnostics, setNetworkDiagnostics] = useState(null);
+  const [systemDiagnostics, setSystemDiagnostics] = useState(null);
+  const [esDiagnostics, setEsDiagnostics] = useState(null);
+  const [diagnosticReport, setDiagnosticReport] = useState(null);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
   const [networkInfo, setNetworkInfo] = useState({
     online: navigator.onLine,
     userAgent: navigator.userAgent,
@@ -19,6 +33,7 @@ const DiagnosticTool = () => {
     } : null
   });
   const [showCopyableFormat, setShowCopyableFormat] = useState(false);
+  const [selectedDiagnosticTab, setSelectedDiagnosticTab] = useState('basic');
 
   useEffect(() => {
     // Get environment info
@@ -123,6 +138,41 @@ const DiagnosticTool = () => {
     }
   };
 
+  // Make API call to the new diagnostic endpoints
+  const fetchAdvancedDiagnostics = async (type) => {
+    setLoadingDiagnostics(true);
+    try {
+      let data;
+      
+      switch(type) {
+        case 'network':
+          data = await getDiagnosticNetworkInfo();
+          setNetworkDiagnostics(data);
+          break;
+        case 'system':
+          data = await getDiagnosticSystemInfo();
+          setSystemDiagnostics(data);
+          break;
+        case 'elasticsearch':
+          data = await getDiagnosticElasticsearchInfo();
+          setEsDiagnostics(data);
+          break;
+        case 'report':
+          data = await getFullDiagnosticReport();
+          setDiagnosticReport(data);
+          break;
+        default:
+          // For health, we already have that data
+          break;
+      }
+    } catch (error) {
+      console.error(`Failed to fetch ${type} diagnostics:`, error);
+      // Set error state for the appropriate diagnostic type
+    } finally {
+      setLoadingDiagnostics(false);
+    }
+  };
+
   // Create the copyable diagnostic report in a compact, structured format for LLMs
   const generateLLMReport = () => {
     const timestamp = new Date().toISOString();
@@ -176,6 +226,38 @@ const DiagnosticTool = () => {
       });
     }
     
+    // Add advanced diagnostics if available
+    if (diagnosticReport) {
+      report += '\n#### Advanced Diagnostics\n';
+      
+      // System info
+      if (diagnosticReport.system) {
+        report += `Hostname: ${diagnosticReport.system.hostname}\n`;
+        report += `Platform: ${diagnosticReport.system.platform} ${diagnosticReport.system.platform_version}\n`;
+        
+        if (diagnosticReport.system.cpu) {
+          report += `CPU Usage: ${diagnosticReport.system.cpu.percent}%\n`;
+        }
+        
+        if (diagnosticReport.system.memory) {
+          report += `Memory Usage: ${diagnosticReport.system.memory.percent_used}%\n`;
+        }
+      }
+      
+      // Elasticsearch status
+      if (diagnosticReport.elasticsearch) {
+        report += `Elasticsearch Connected: ${diagnosticReport.elasticsearch.success ? 'Yes' : 'No'}\n`;
+        if (!diagnosticReport.elasticsearch.success && diagnosticReport.elasticsearch.error) {
+          report += `Elasticsearch Error: ${diagnosticReport.elasticsearch.error}\n`;
+        }
+      }
+      
+      // Recent errors from backend
+      if (diagnosticReport.recent_errors && diagnosticReport.recent_errors.length > 0) {
+        report += `\nBackend Errors: ${diagnosticReport.recent_errors.length} recent errors\n`;
+      }
+    }
+    
     return report;
   };
 
@@ -189,6 +271,231 @@ const DiagnosticTool = () => {
         console.error('Failed to copy report:', err);
         alert('Failed to copy report. Please try manually selecting and copying the text.');
       });
+  };
+
+  // Run a full diagnostic report that collects data from all diagnostic endpoints
+  const runFullDiagnostics = async () => {
+    setLoadingDiagnostics(true);
+    try {
+      await fetchAdvancedDiagnostics('report');
+      setSelectedDiagnosticTab('advanced');
+    } catch (error) {
+      console.error('Failed to run full diagnostics:', error);
+    } finally {
+      setLoadingDiagnostics(false);
+    }
+  };
+
+  // Render the advanced diagnostics panel
+  const renderAdvancedDiagnostics = () => {
+    if (loadingDiagnostics) {
+      return (
+        <div className="text-center p-5">
+          <Spinner animation="border" role="status">
+            <span className="visually-hidden">Loading diagnostics...</span>
+          </Spinner>
+          <p className="mt-2">Loading detailed diagnostics...</p>
+        </div>
+      );
+    }
+
+    if (diagnosticReport) {
+      return (
+        <div>
+          <Alert variant="info" className="mb-3">
+            <Alert.Heading>Comprehensive Diagnostic Report</Alert.Heading>
+            <p>
+              This is a detailed diagnostic report that includes system, network, and service information
+              from both the frontend and backend.
+            </p>
+          </Alert>
+          
+          <Accordion defaultActiveKey="0" className="mb-3">
+            <Accordion.Item eventKey="0">
+              <Accordion.Header>System Information</Accordion.Header>
+              <Accordion.Body>
+                {diagnosticReport.system && (
+                  <Table striped bordered>
+                    <tbody>
+                      <tr>
+                        <th>Hostname</th>
+                        <td>{diagnosticReport.system.hostname}</td>
+                      </tr>
+                      <tr>
+                        <th>Platform</th>
+                        <td>{diagnosticReport.system.platform} {diagnosticReport.system.platform_version}</td>
+                      </tr>
+                      <tr>
+                        <th>CPU Usage</th>
+                        <td>{diagnosticReport.system.cpu?.percent}%</td>
+                      </tr>
+                      <tr>
+                        <th>Memory Usage</th>
+                        <td>{diagnosticReport.system.memory?.percent_used}%</td>
+                      </tr>
+                      <tr>
+                        <th>Disk Usage</th>
+                        <td>{diagnosticReport.system.disk?.percent_used}%</td>
+                      </tr>
+                      <tr>
+                        <th>Process Uptime</th>
+                        <td>{Math.floor(diagnosticReport.system.uptime?.process / 60)} minutes</td>
+                      </tr>
+                    </tbody>
+                  </Table>
+                )}
+              </Accordion.Body>
+            </Accordion.Item>
+            
+            <Accordion.Item eventKey="1">
+              <Accordion.Header>Elasticsearch Status</Accordion.Header>
+              <Accordion.Body>
+                {diagnosticReport.elasticsearch && (
+                  <div>
+                    <Alert variant={diagnosticReport.elasticsearch.success ? 'success' : 'danger'}>
+                      <Alert.Heading>
+                        {diagnosticReport.elasticsearch.success ? 'Connected' : 'Connection Failed'}
+                      </Alert.Heading>
+                      {!diagnosticReport.elasticsearch.success && diagnosticReport.elasticsearch.error && (
+                        <p className="mb-0"><strong>Error:</strong> {diagnosticReport.elasticsearch.error}</p>
+                      )}
+                    </Alert>
+                    
+                    {diagnosticReport.elasticsearch.ping && (
+                      <div className="mt-3">
+                        <h5>Network Ping</h5>
+                        <Table striped bordered>
+                          <tbody>
+                            <tr>
+                              <th>Success</th>
+                              <td>{diagnosticReport.elasticsearch.ping.success ? 'Yes' : 'No'}</td>
+                            </tr>
+                            <tr>
+                              <th>Packet Loss</th>
+                              <td>{diagnosticReport.elasticsearch.ping.packet_loss_percent}%</td>
+                            </tr>
+                            {diagnosticReport.elasticsearch.ping.avg_latency_ms && (
+                              <tr>
+                                <th>Average Latency</th>
+                                <td>{diagnosticReport.elasticsearch.ping.avg_latency_ms} ms</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </Table>
+                      </div>
+                    )}
+                    
+                    {diagnosticReport.elasticsearch.connection && (
+                      <div className="mt-3">
+                        <h5>HTTP Connection</h5>
+                        <Table striped bordered>
+                          <tbody>
+                            <tr>
+                              <th>Status Code</th>
+                              <td>{diagnosticReport.elasticsearch.connection.status_code || 'N/A'}</td>
+                            </tr>
+                            <tr>
+                              <th>Response Time</th>
+                              <td>{diagnosticReport.elasticsearch.connection.total_latency_ms?.toFixed(2) || 'N/A'} ms</td>
+                            </tr>
+                            <tr>
+                              <th>DNS Resolution</th>
+                              <td>{diagnosticReport.elasticsearch.connection.dns_resolved ? 'Success' : 'Failed'}</td>
+                            </tr>
+                          </tbody>
+                        </Table>
+                      </div>
+                    )}
+                    
+                    {diagnosticReport.elasticsearch.query && (
+                      <div className="mt-3">
+                        <h5>Query Test</h5>
+                        <Table striped bordered>
+                          <tbody>
+                            <tr>
+                              <th>Success</th>
+                              <td>{diagnosticReport.elasticsearch.query.success ? 'Yes' : 'No'}</td>
+                            </tr>
+                            {diagnosticReport.elasticsearch.query.hit_count !== undefined && (
+                              <tr>
+                                <th>Documents Found</th>
+                                <td>{diagnosticReport.elasticsearch.query.hit_count}</td>
+                              </tr>
+                            )}
+                            {diagnosticReport.elasticsearch.query.status_code && (
+                              <tr>
+                                <th>Status Code</th>
+                                <td>{diagnosticReport.elasticsearch.query.status_code}</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Accordion.Body>
+            </Accordion.Item>
+            
+            <Accordion.Item eventKey="2">
+              <Accordion.Header>Backend Errors</Accordion.Header>
+              <Accordion.Body>
+                {diagnosticReport.recent_errors && diagnosticReport.recent_errors.length > 0 ? (
+                  <div>
+                    <Alert variant="warning">
+                      <Alert.Heading>Recent Backend Errors</Alert.Heading>
+                      <p>These are the most recent errors logged by the backend service.</p>
+                    </Alert>
+                    
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {diagnosticReport.recent_errors.map((error, index) => (
+                        <Alert key={index} variant="danger" className="mb-2">
+                          {error.timestamp && <div><small>{new Date(error.timestamp).toLocaleString()}</small></div>}
+                          {error.level && <Badge bg="warning">{error.level}</Badge>}
+                          <div className="mt-1">{error.message || error.raw || 'Unknown error'}</div>
+                          {error.exception && (
+                            <div className="mt-1">
+                              <small className="text-muted">{error.exception.type}: {error.exception.value}</small>
+                            </div>
+                          )}
+                        </Alert>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Alert variant="success">
+                    <Alert.Heading>No Recent Errors</Alert.Heading>
+                    <p>No backend errors have been recorded recently.</p>
+                  </Alert>
+                )}
+              </Accordion.Body>
+            </Accordion.Item>
+          </Accordion>
+          
+          <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+            <Button 
+              variant="primary" 
+              onClick={runFullDiagnostics}
+            >
+              <i className="bi bi-arrow-repeat me-1"></i> Refresh Diagnostics
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-center p-4">
+        <p>Run a comprehensive diagnostic to see detailed information about the system and services.</p>
+        <Button 
+          variant="primary" 
+          onClick={runFullDiagnostics}
+          disabled={loadingDiagnostics}
+        >
+          <i className="bi bi-stethoscope me-1"></i> Run Full Diagnostics
+        </Button>
+      </div>
+    );
   };
 
   return (
@@ -232,6 +539,13 @@ const DiagnosticTool = () => {
                 >
                   <i className="bi bi-arrow-clockwise me-1"></i> Refresh Data
                 </Button>
+                <Button 
+                  variant="outline-primary" 
+                  onClick={runFullDiagnostics}
+                  disabled={loadingDiagnostics}
+                >
+                  <i className="bi bi-stethoscope me-1"></i> Run Full Diagnostics
+                </Button>
               </div>
             </Alert>
             
@@ -243,202 +557,181 @@ const DiagnosticTool = () => {
           </Card.Body>
         ) : (
           <Card.Body>
-            <Row>
-              <Col md={6}>
-                <h5>API Status</h5>
-                {loading ? (
-                  <p>Loading health information...</p>
-                ) : (
-                  <Alert variant={
-                    healthStatus?.status === 'ok' ? 'success' :
-                    healthStatus?.status === 'degraded' ? 'warning' : 'danger'
-                  }>
-                    <Alert.Heading>
-                      {healthStatus?.status === 'ok' ? 'API is healthy' :
-                       healthStatus?.status === 'degraded' ? 'API is degraded' : 'API is down'}
-                    </Alert.Heading>
-                    {healthStatus?.details && (
-                      <pre className="mt-2 mb-0 small">
-                        {JSON.stringify(healthStatus.details, null, 2)}
-                      </pre>
+            <Tabs
+              activeKey={selectedDiagnosticTab}
+              onSelect={(k) => setSelectedDiagnosticTab(k)}
+              className="mb-3"
+            >
+              <Tab eventKey="basic" title="Basic Diagnostics">
+                <Row>
+                  <Col md={6}>
+                    <h5>API Status</h5>
+                    {loading ? (
+                      <p>Loading health information...</p>
+                    ) : (
+                      <Alert variant={
+                        healthStatus?.status === 'ok' ? 'success' :
+                        healthStatus?.status === 'degraded' ? 'warning' : 'danger'
+                      }>
+                        <Alert.Heading>
+                          {healthStatus?.status === 'ok' ? 'API is healthy' :
+                           healthStatus?.status === 'degraded' ? 'API is degraded' : 'API is down'}
+                        </Alert.Heading>
+                        {healthStatus?.details && (
+                          <pre className="mt-2 mb-0 small">
+                            {JSON.stringify(healthStatus.details, null, 2)}
+                          </pre>
+                        )}
+                        {healthStatus?.error && (
+                          <div className="mt-2">
+                            <strong>Error:</strong> {healthStatus.error}
+                          </div>
+                        )}
+                      </Alert>
                     )}
-                    {healthStatus?.error && (
-                      <div className="mt-2">
-                        <strong>Error:</strong> {healthStatus.error}
-                      </div>
+                    
+                    <div className="d-flex mt-3 mb-4">
+                      <Button 
+                        variant="primary" 
+                        onClick={checkHealth} 
+                        className="me-2"
+                      >
+                        <i className="bi bi-arrow-clockwise me-1"></i>
+                        Refresh Status
+                      </Button>
+                      <Button 
+                        variant="outline-secondary" 
+                        onClick={testConnection}
+                      >
+                        <i className="bi bi-link me-1"></i>
+                        Test Connection
+                      </Button>
+                    </div>
+                    
+                    {connectionTest && (
+                      <Alert variant={
+                        connectionTest.status === 'success' ? 'success' :
+                        connectionTest.status === 'warning' ? 'warning' :
+                        connectionTest.status === 'pending' ? 'info' : 'danger'
+                      }>
+                        <Alert.Heading>Connection Test</Alert.Heading>
+                        <p>{connectionTest.message}</p>
+                        {connectionTest.error && (
+                          <div>
+                            <strong>Error:</strong> {connectionTest.error}
+                          </div>
+                        )}
+                        {connectionTest.details && (
+                          <Accordion className="mt-2">
+                            <Accordion.Item eventKey="0">
+                              <Accordion.Header>Connection Details</Accordion.Header>
+                              <Accordion.Body>
+                                <pre className="mb-0 small">
+                                  {JSON.stringify(connectionTest.details, null, 2)}
+                                </pre>
+                              </Accordion.Body>
+                            </Accordion.Item>
+                          </Accordion>
+                        )}
+                      </Alert>
                     )}
-                  </Alert>
-                )}
-                
-                <div className="d-flex mt-3 mb-4">
-                  <Button 
-                    variant="primary" 
-                    onClick={checkHealth} 
-                    className="me-2"
-                  >
-                    <i className="bi bi-arrow-clockwise me-1"></i>
-                    Refresh Status
-                  </Button>
-                  <Button 
-                    variant="outline-secondary" 
-                    onClick={testConnection}
-                  >
-                    <i className="bi bi-link me-1"></i>
-                    Test Connection
-                  </Button>
-                </div>
-                
-                {connectionTest && (
-                  <Alert variant={
-                    connectionTest.status === 'success' ? 'success' :
-                    connectionTest.status === 'warning' ? 'warning' : 
-                    connectionTest.status === 'pending' ? 'info' : 'danger'
-                  } className="mb-4">
-                    <p className="mb-1">{connectionTest.message}</p>
-                    {connectionTest.error && <p className="mb-0 small">Error: {connectionTest.error}</p>}
-                    {connectionTest.details && (
-                      <Accordion className="mt-2">
-                        <Accordion.Item eventKey="0">
-                          <Accordion.Header>Connection Details</Accordion.Header>
-                          <Accordion.Body>
-                            <pre className="mb-0 small">
-                              {JSON.stringify(connectionTest.details, null, 2)}
-                            </pre>
-                          </Accordion.Body>
-                        </Accordion.Item>
-                      </Accordion>
-                    )}
-                  </Alert>
-                )}
-              </Col>
-              
-              <Col md={6}>
-                <h5>Network Information</h5>
-                <Table striped bordered hover size="sm" className="mb-4">
-                  <tbody>
-                    <tr>
-                      <td>Status</td>
-                      <td>
-                        <Badge bg={networkInfo.online ? 'success' : 'danger'}>
-                          {networkInfo.online ? 'Online' : 'Offline'}
-                        </Badge>
-                      </td>
-                    </tr>
-                    {networkInfo.connection && (
-                      <>
-                        <tr>
-                          <td>Connection Type</td>
-                          <td>{networkInfo.connection.type || 'Unknown'}</td>
-                        </tr>
-                        <tr>
-                          <td>Effective Type</td>
-                          <td>{networkInfo.connection.effectiveType || 'Unknown'}</td>
-                        </tr>
-                        <tr>
-                          <td>Downlink</td>
-                          <td>{networkInfo.connection.downlink ? `${networkInfo.connection.downlink} Mbps` : 'Unknown'}</td>
-                        </tr>
-                        <tr>
-                          <td>RTT</td>
-                          <td>{networkInfo.connection.rtt ? `${networkInfo.connection.rtt} ms` : 'Unknown'}</td>
-                        </tr>
-                      </>
-                    )}
-                  </tbody>
-                </Table>
-                
-                <h5>Environment</h5>
-                <Table striped bordered hover size="sm" className="mb-4">
-                  <tbody>
-                    <tr>
-                      <td>API Endpoint</td>
-                      <td>{envInfo.apiUrl}</td>
-                    </tr>
-                    <tr>
-                      <td>Environment</td>
-                      <td>{envInfo.environment}</td>
-                    </tr>
-                    <tr>
-                      <td>Browser</td>
-                      <td className="small">{navigator.userAgent}</td>
-                    </tr>
-                  </tbody>
-                </Table>
-              </Col>
-            </Row>
-          </Card.Body>
-        )}
-      </Card>
-      
-      <Card className="shadow-sm">
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="m-0">API Error Logs</h5>
-          <Button 
-            variant="outline-danger" 
-            size="sm" 
-            onClick={handleClearLogs}
-            disabled={errorLogs.length === 0}
-          >
-            <i className="bi bi-trash me-1"></i>
-            Clear Logs
-          </Button>
-        </Card.Header>
-        <Card.Body>
-          {errorLogs.length === 0 ? (
-            <Alert variant="info">No error logs found.</Alert>
-          ) : (
-            <Accordion>
-              {errorLogs.map((log, index) => (
-                <Accordion.Item eventKey={index.toString()} key={index}>
-                  <Accordion.Header>
-                    <span className="me-2">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </span>
-                    <Badge bg="danger" className="me-2">
-                      {log.error?.status || 'Error'}
-                    </Badge>
-                    {log.message}
-                  </Accordion.Header>
-                  <Accordion.Body>
-                    <h6>Error Details</h6>
-                    <Table striped bordered hover size="sm">
+                  </Col>
+                  
+                  <Col md={6}>
+                    <h5>Environment</h5>
+                    <Table striped bordered>
                       <tbody>
                         <tr>
-                          <td>Message</td>
-                          <td>{log.error?.message || 'N/A'}</td>
+                          <th>API URL</th>
+                          <td>{envInfo.apiUrl}</td>
                         </tr>
                         <tr>
-                          <td>Status</td>
-                          <td>{log.error?.status || 'N/A'}</td>
+                          <th>Environment</th>
+                          <td>
+                            <Badge bg={envInfo.environment === 'production' ? 'danger' : 'info'}>
+                              {envInfo.environment}
+                            </Badge>
+                          </td>
                         </tr>
                         <tr>
-                          <td>URL</td>
-                          <td>{log.error?.url || 'N/A'}</td>
+                          <th>Network Status</th>
+                          <td>
+                            <Badge bg={networkInfo.online ? 'success' : 'danger'}>
+                              {networkInfo.online ? 'Online' : 'Offline'}
+                            </Badge>
+                          </td>
                         </tr>
-                        <tr>
-                          <td>Method</td>
-                          <td>{log.error?.method || 'N/A'}</td>
-                        </tr>
+                        {networkInfo.connection && (
+                          <>
+                            <tr>
+                              <th>Connection Type</th>
+                              <td>{networkInfo.connection.effectiveType}</td>
+                            </tr>
+                            <tr>
+                              <th>Downlink Speed</th>
+                              <td>{networkInfo.connection.downlink} Mbps</td>
+                            </tr>
+                            <tr>
+                              <th>Latency (RTT)</th>
+                              <td>{networkInfo.connection.rtt} ms</td>
+                            </tr>
+                          </>
+                        )}
                       </tbody>
                     </Table>
                     
-                    {log.error?.data && (
+                    <h5 className="mt-4">Error Log ({errorLogs.length})</h5>
+                    {errorLogs.length === 0 ? (
+                      <Alert variant="success">
+                        <p className="mb-0">No errors logged</p>
+                      </Alert>
+                    ) : (
                       <>
-                        <h6 className="mt-3">Response Data</h6>
-                        <pre className="border rounded p-2 bg-light small">
-                          {typeof log.error.data === 'string' 
-                            ? log.error.data 
-                            : JSON.stringify(log.error.data, null, 2)
-                          }
-                        </pre>
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                          {errorLogs.slice(-5).map((log, index) => (
+                            <Alert key={index} variant="danger" className="mb-2">
+                              <small>{new Date(log.timestamp).toLocaleString()}</small>
+                              <div><strong>{log.message}</strong></div>
+                              {log.error?.message && (
+                                <div className="small">{log.error.message}</div>
+                              )}
+                              {log.error?.url && (
+                                <div className="small text-muted">URL: {log.error.url}</div>
+                              )}
+                            </Alert>
+                          ))}
+                        </div>
+                        <Button 
+                          variant="outline-danger" 
+                          size="sm" 
+                          onClick={handleClearLogs}
+                          className="mt-2"
+                        >
+                          <i className="bi bi-trash me-1"></i>
+                          Clear Error Logs
+                        </Button>
                       </>
                     )}
-                  </Accordion.Body>
-                </Accordion.Item>
-              ))}
-            </Accordion>
-          )}
-        </Card.Body>
+                  </Col>
+                </Row>
+                
+                <div className="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                  <Button 
+                    variant="outline-primary" 
+                    onClick={runFullDiagnostics}
+                    disabled={loadingDiagnostics}
+                  >
+                    <i className="bi bi-stethoscope me-1"></i> Run Advanced Diagnostics
+                  </Button>
+                </div>
+              </Tab>
+              
+              <Tab eventKey="advanced" title="Advanced Diagnostics">
+                {renderAdvancedDiagnostics()}
+              </Tab>
+            </Tabs>
+          </Card.Body>
+        )}
       </Card>
     </Container>
   );

@@ -164,11 +164,22 @@ const retryRequest = async (fn, maxRetries = MAX_RETRIES, delay = RETRY_DELAY) =
 export const checkApiHealth = async () => {
 	try {
 		apiLogger.log('Checking API health');
-		const response = await apiClient.get('/health');
-		return {
-			status: response.data.status || 'ok',
-			details: response.data
-		};
+		// First try the enhanced diagnostic endpoint
+		try {
+			const response = await apiClient.get('/diagnostic/health');
+			return {
+				status: response.data.status || 'ok',
+				details: response.data
+			};
+		} catch (error) {
+			// Fall back to the basic health endpoint if diagnostic endpoints aren't available
+			apiLogger.log('Advanced health check failed, trying basic endpoint');
+			const response = await apiClient.get('/health');
+			return {
+				status: response.data.status || 'ok',
+				details: response.data
+			};
+		}
 	} catch (error) {
 		apiLogger.error('Health check failed:', error);
 		return {
@@ -241,5 +252,71 @@ export const clearApiErrorLogs = () => {
 		apiLogger.log('API error logs cleared');
 	} catch (e) {
 		console.error('Failed to clear error logs:', e);
+	}
+};
+
+// New diagnostic API functions
+export const getDiagnosticNetworkInfo = async () => {
+	try {
+		apiLogger.log('Fetching diagnostic network information');
+		const response = await retryRequest(async () => {
+			return await apiClient.get('/diagnostic/network');
+		});
+		return response.data;
+	} catch (error) {
+		apiLogger.error('Error fetching diagnostic network info:', error);
+		throw error;
+	}
+};
+
+export const getDiagnosticSystemInfo = async () => {
+	try {
+		apiLogger.log('Fetching diagnostic system information');
+		const response = await retryRequest(async () => {
+			return await apiClient.get('/diagnostic/system');
+		});
+		return response.data;
+	} catch (error) {
+		apiLogger.error('Error fetching diagnostic system info:', error);
+		throw error;
+	}
+};
+
+export const getDiagnosticElasticsearchInfo = async () => {
+	try {
+		apiLogger.log('Fetching diagnostic Elasticsearch information');
+		const response = await retryRequest(async () => {
+			return await apiClient.get('/diagnostic/elasticsearch');
+		});
+		return response.data;
+	} catch (error) {
+		apiLogger.error('Error fetching diagnostic Elasticsearch info:', error);
+		throw error;
+	}
+};
+
+export const getDiagnosticErrorLogs = async () => {
+	try {
+		apiLogger.log('Fetching diagnostic error logs');
+		const response = await retryRequest(async () => {
+			return await apiClient.get('/diagnostic/errors');
+		});
+		return response.data;
+	} catch (error) {
+		apiLogger.error('Error fetching diagnostic error logs:', error);
+		throw error;
+	}
+};
+
+export const getFullDiagnosticReport = async () => {
+	try {
+		apiLogger.log('Fetching full diagnostic report');
+		const response = await retryRequest(async () => {
+			return await apiClient.get('/diagnostic/report');
+		});
+		return response.data;
+	} catch (error) {
+		apiLogger.error('Error fetching full diagnostic report:', error);
+		throw error;
 	}
 };

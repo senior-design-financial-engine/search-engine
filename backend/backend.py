@@ -12,33 +12,37 @@ import requests
 import time
 from datetime import datetime
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("backend_debug.log"),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
-# Create a specific logger for the application
-logger = logging.getLogger('search_engine_backend')
-logger.setLevel(logging.DEBUG)
-
-# Load environment variables
+# Load environment variables first
 load_dotenv()
 
-app = Flask(__name__)
-cors = CORS(app)
+# Import our custom utilities
+from utils.logger import get_logger, setup_request_logging, setup_debug_endpoints, performance_monitor
+from utils.diagnostics import register_diagnostic_endpoints
+from utils.network import test_es_connection, network_diagnostics
 
-# Log startup information
+# Create Flask app
+app = Flask(__name__)
+
+# Initialize logger
+logger = get_logger()
 logger.info("="*50)
 logger.info("BACKEND STARTING")
 logger.info(f"Environment: {os.getenv('FLASK_ENV', 'development')}")
 logger.info(f"Elasticsearch URL: {os.getenv('ELASTICSEARCH_URL', 'Not configured')}")
 logger.info(f"Elasticsearch Index: {os.getenv('ELASTICSEARCH_INDEX', 'Not configured')}")
 logger.info("="*50)
+
+# Setup CORS
+cors_origins = [
+    "http://localhost:3000",                         # Local development
+    "https://financial-news-frontend-*.s3.amazonaws.com",  # S3 bucket
+    "https://*.cloudfront.net",                      # CloudFront distribution
+    "https://*.amazonaws.com"                        # Any AWS domain
+]
+CORS(app, resources={r"/*": {"origins": cors_origins}})
+
+# Setup request logging middleware
+setup_request_logging(app)
 
 class BackEnd:
     def __init__(self):
@@ -60,49 +64,25 @@ class BackEnd:
             logger.info("Backend initialized with Elasticsearch engine")
         except Exception as e:
             error_trace = traceback.format_exc()
-            logger.error(f"Failed to initialize backend: {str(e)}")
-            logger.error(f"Error trace: {error_trace}")
+            logger.error(f"Failed to initialize backend: {str(e)}", extra={
+                'extra': {'traceback': error_trace}
+            })
             raise
 
+    @performance_monitor(name="test_elasticsearch_connection")
     def _test_elasticsearch_connection(self):
         """Test the connection to Elasticsearch and log the results."""
-        es_url = os.getenv('ELASTICSEARCH_URL')
-        es_api_key = os.getenv('ELASTICSEARCH_API_KEY')
+        # Use our advanced ES connection test utility
+        result = test_es_connection()
         
-        if not es_url:
-            logger.error("ELASTICSEARCH_URL environment variable is not set")
-            return
+        if result.get("success", False):
+            logger.info("Elasticsearch connection test successful")
+        else:
+            logger.error(f"Elasticsearch connection test failed: {result.get('error', 'Unknown error')}")
             
-        if not es_api_key:
-            logger.error("ELASTICSEARCH_API_KEY environment variable is not set")
-            return
-            
-        try:
-            logger.info(f"Testing connection to Elasticsearch at {es_url}")
-            headers = {
-                "Authorization": f"ApiKey {es_api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            start_time = time.time()
-            response = requests.get(
-                es_url, 
-                headers=headers,
-                timeout=10
-            )
-            request_time = time.time() - start_time
-            
-            logger.info(f"Elasticsearch response time: {request_time:.2f}s")
-            logger.info(f"Elasticsearch response status: {response.status_code}")
-            
-            if response.status_code >= 400:
-                logger.error(f"Elasticsearch error response: {response.text}")
-            else:
-                logger.info("Elasticsearch connection successful")
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to connect to Elasticsearch: {str(e)}")
+        return result
 
+    @performance_monitor(name="process_search_query")
     def process_search_query(
         self,
         query_text: Optional[str] = None,
@@ -111,9 +91,13 @@ class BackEnd:
     ) -> Dict:
         """Process a search query with optional filters and time range."""
         query_id = f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{hash(query_text or '')}"
-        logger.info(f"[Query:{query_id}] Processing search query: '{query_text}'")
-        logger.info(f"[Query:{query_id}] Filters: {json.dumps(filters)}")
-        logger.info(f"[Query:{query_id}] Time range: {json.dumps(time_range)}")
+        logger.info(f"Processing search query: '{query_text}'", extra={
+            'extra': {
+                'query_id': query_id,
+                'filters': filters,
+                'time_range': time_range
+            }
+        })
         
         start_time = time.time()
         try:
@@ -121,16 +105,28 @@ class BackEnd:
             processing_time = time.time() - start_time
             
             hits_count = len(results['hits']['hits']) if results and 'hits' in results else 0
-            logger.info(f"[Query:{query_id}] Query completed in {processing_time:.2f}s with {hits_count} results")
+            logger.info(f"Query completed with {hits_count} results", extra={
+                'extra': {
+                    'query_id': query_id,
+                    'processing_time_ms': processing_time * 1000,
+                    'hits_count': hits_count
+                }
+            })
             
             return results['hits']['hits']
         except Exception as e:
             processing_time = time.time() - start_time
             error_trace = traceback.format_exc()
-            logger.error(f"[Query:{query_id}] Error processing search query after {processing_time:.2f}s: {str(e)}")
-            logger.error(f"[Query:{query_id}] Error trace: {error_trace}")
+            logger.error(f"Error processing search query: {str(e)}", extra={
+                'extra': {
+                    'query_id': query_id,
+                    'processing_time_ms': processing_time * 1000,
+                    'traceback': error_trace
+                }
+            })
             raise
 
+    @performance_monitor(name="update_index")
     def update_index(self, articles: List[Dict] = None):
         """Update the index with new articles."""
         try:
@@ -145,19 +141,10 @@ class BackEnd:
                 logger.info("No articles provided to update index")
         except Exception as e:
             error_trace = traceback.format_exc()
-            logger.error(f"Error updating index: {str(e)}")
-            logger.error(f"Error trace: {error_trace}")
+            logger.error(f"Error updating index: {str(e)}", extra={
+                'extra': {'traceback': error_trace}
+            })
             raise
-
-# Add request logging middleware
-@app.before_request
-def log_request_info():
-    logger.info(f"Request: {request.method} {request.path} - {dict(request.args)}")
-
-@app.after_request
-def log_response_info(response):
-    logger.info(f"Response: {response.status_code}")
-    return response
 
 # Initialize the backend
 try:
@@ -169,6 +156,7 @@ except Exception as e:
     # Continue with Flask app, but endpoints will return errors
 
 @app.route('/health', methods=['GET'])
+@performance_monitor(name="health_check")
 def health_check():
     """Health check endpoint to verify system status."""
     status = {
@@ -187,9 +175,20 @@ def health_check():
         es_api_key = os.getenv('ELASTICSEARCH_API_KEY')
         
         if es_url and es_api_key:
-            headers = {"Authorization": f"ApiKey {es_api_key}"}
-            response = requests.get(es_url, headers=headers, timeout=5)
-            status["services"]["elasticsearch"] = response.status_code < 400
+            # Use our network diagnostics utility
+            result = network_diagnostics.test_connection(
+                url=es_url,
+                headers={"Authorization": f"ApiKey {es_api_key}"},
+                timeout=5
+            )
+            
+            status["services"]["elasticsearch"] = result["success"]
+            
+            # Include more connection details
+            status["elasticsearch"] = {
+                "connected": result["success"],
+                "latency_ms": result.get("total_latency_ms")
+            }
         
         if not status["services"]["elasticsearch"]:
             status["status"] = "degraded"
@@ -202,6 +201,7 @@ def health_check():
     return jsonify(status)
 
 @app.route('/query', methods=['GET'])
+@performance_monitor(name="query_endpoint")
 def query():
     try:
         query_text = request.args.get('query', None)
@@ -215,19 +215,31 @@ def query():
         if sentiment:
             filters["sentiment"] = sentiment
         
+        logger.info(f"API query request received", extra={
+            'extra': {
+                'query': query_text,
+                'source': source,
+                'time_range': time_range,
+                'sentiment': sentiment
+            }
+        })
+        
         results = backend.process_search_query(query_text, filters, time_range)
         return jsonify(results)
     except Exception as e:
         error_trace = traceback.format_exc()
-        logger.error(f"Query endpoint error: {str(e)}")
-        logger.error(f"Error trace: {error_trace}")
+        logger.error(f"Query endpoint error: {str(e)}", extra={
+            'extra': {'traceback': error_trace}
+        })
         return jsonify({
             'error': str(e),
             'error_type': type(e).__name__,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'request_id': getattr(request, 'request_id', None)
         }), 500
 
 @app.route('/article/<article_id>', methods=['GET'])
+@performance_monitor(name="get_article_endpoint")
 def get_article(article_id):
     try:
         logger.info(f"Retrieving article with ID: {article_id}")
@@ -239,29 +251,51 @@ def get_article(article_id):
             return jsonify({'error': 'Article not found'}), 404
     except Exception as e:
         error_trace = traceback.format_exc()
-        logger.error(f"Get article endpoint error: {str(e)}")
-        logger.error(f"Error trace: {error_trace}")
+        logger.error(f"Get article endpoint error: {str(e)}", extra={
+            'extra': {'traceback': error_trace}
+        })
         return jsonify({
             'error': str(e),
             'error_type': type(e).__name__,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'request_id': getattr(request, 'request_id', None)
         }), 500
 
 @app.errorhandler(404)
 def not_found(error):
-    logger.warning(f"404 error: {request.path}")
-    return jsonify({'error': 'Not found'}), 404
+    logger.warning(f"404 Not Found: {request.path}")
+    return jsonify({
+        'error': 'Not Found',
+        'path': request.path,
+        'timestamp': datetime.now().isoformat()
+    }), 404
 
 @app.errorhandler(500)
-def internal_error(error):
-    error_trace = traceback.format_exc()
-    logger.error(f"500 error: {str(error)}")
-    logger.error(f"Error trace: {error_trace}")
+def server_error(error):
+    logger.error(f"500 Server Error: {str(error)}", extra={
+        'extra': {'traceback': traceback.format_exc()}
+    })
     return jsonify({
-        'error': 'Internal server error',
-        'error_details': str(error),
-        'timestamp': datetime.now().isoformat()
+        'error': 'Internal Server Error',
+        'message': str(error),
+        'timestamp': datetime.now().isoformat(),
+        'request_id': getattr(request, 'request_id', None)
     }), 500
 
+# Register debug endpoints
+logger.info("Setting up debug endpoints...")
+setup_debug_endpoints(app)
+
+# Register diagnostic endpoints
+logger.info("Setting up diagnostic endpoints...")
+register_diagnostic_endpoints(app)
+
+# Success startup message
+logger.info("Backend service fully initialized and ready")
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV', 'development') == 'development'
+    
+    logger.info(f"Starting Flask server on port {port} (debug={debug})")
+    app.run(host='0.0.0.0', port=port, debug=debug)
