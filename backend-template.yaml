@@ -36,6 +36,26 @@ Parameters:
     Type: String
     Default: https://your-elasticsearch-endpoint.es.amazonaws.com
   
+  ElasticsearchApiKey:
+    Description: API Key for Elasticsearch
+    Type: String
+    NoEcho: true
+  
+  ElasticsearchIndex:
+    Description: Elasticsearch index name
+    Type: String
+    Default: financial_news
+  
+  EsNumberOfShards:
+    Description: Number of shards for Elasticsearch index
+    Type: Number
+    Default: 3
+  
+  EsNumberOfReplicas:
+    Description: Number of replicas for Elasticsearch index
+    Type: Number
+    Default: 2
+  
   MinSize:
     Description: Minimum number of EC2 instances in the Auto Scaling Group
     Type: Number
@@ -228,9 +248,12 @@ Resources:
             logger = logging.getLogger(__name__)
             
             # Connect to Elasticsearch
-            es_endpoint = os.environ.get('ES_ENDPOINT', '${ElasticsearchEndpoint}')
+            es_endpoint = os.environ.get('ELASTICSEARCH_URL')
+            es_api_key = os.environ.get('ELASTICSEARCH_API_KEY')
+            es_index = os.environ.get('ELASTICSEARCH_INDEX')
+            
             try:
-                es = Elasticsearch([es_endpoint])
+                es = Elasticsearch([es_endpoint], api_key=es_api_key)
                 logger.info(f"Connected to Elasticsearch at {es_endpoint}")
             except Exception as e:
                 logger.error(f"Failed to connect to Elasticsearch: {str(e)}")
@@ -273,7 +296,7 @@ Resources:
             # Install dependencies
             pip3 install -r requirements.txt
             
-            # Create systemd service
+            # Create systemd service with environment variables
             cat > /etc/systemd/system/financial-news.service << 'EOL'
             [Unit]
             Description=Financial News Engine Flask App
@@ -284,10 +307,23 @@ Resources:
             WorkingDirectory=/opt/financial-news-engine
             ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app
             Restart=always
-            Environment=ES_ENDPOINT=${ElasticsearchEndpoint}
+            Environment=ELASTICSEARCH_URL=${ElasticsearchEndpoint}
+            Environment=ELASTICSEARCH_API_KEY=${ElasticsearchApiKey}
+            Environment=ELASTICSEARCH_INDEX=${ElasticsearchIndex}
+            Environment=ES_NUMBER_OF_SHARDS=${EsNumberOfShards}
+            Environment=ES_NUMBER_OF_REPLICAS=${EsNumberOfReplicas}
             
             [Install]
             WantedBy=multi-user.target
+            EOL
+            
+            # Create .env file for local development and testing
+            cat > /opt/financial-news-engine/.env << 'EOL'
+            ELASTICSEARCH_URL=${ElasticsearchEndpoint}
+            ELASTICSEARCH_API_KEY=${ElasticsearchApiKey}
+            ELASTICSEARCH_INDEX=${ElasticsearchIndex}
+            ES_NUMBER_OF_SHARDS=${EsNumberOfShards}
+            ES_NUMBER_OF_REPLICAS=${EsNumberOfReplicas}
             EOL
             
             # Enable and start service
@@ -499,4 +535,10 @@ Outputs:
     Description: "URL of the Backend API endpoint"
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
-      Name: !Sub "${AWS::StackName}-ApiGatewayUrl" 
+      Name: !Sub "${AWS::StackName}-ApiGatewayUrl"
+  
+  ElasticsearchSettings:
+    Description: "Elasticsearch configuration used"
+    Value: !Sub "URL: ${ElasticsearchEndpoint}, Index: ${ElasticsearchIndex}"
+    Export:
+      Name: !Sub "${AWS::StackName}-ElasticsearchSettings" 

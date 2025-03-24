@@ -1,4 +1,13 @@
 version: 0.2
+
+env:
+  parameter-store:
+    ELASTICSEARCH_API_KEY: "/financial-news/elasticsearch-api-key"
+    ELASTICSEARCH_URL: "/financial-news/elasticsearch-url"
+    ELASTICSEARCH_INDEX: "/financial-news/elasticsearch-index"
+    ES_NUMBER_OF_SHARDS: "/financial-news/es-number-of-shards"
+    ES_NUMBER_OF_REPLICAS: "/financial-news/es-number-of-replicas"
+
 phases:
   install:
     runtime-versions:
@@ -26,6 +35,36 @@ phases:
       - echo '' >> scripts/deploy.sh
       - echo '# Install dependencies' >> scripts/deploy.sh
       - echo 'pip3 install -r requirements.txt' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '# Create .env file with proper environment variables' >> scripts/deploy.sh
+      - echo 'cat > /opt/financial-news-engine/.env << EOF' >> scripts/deploy.sh
+      - echo 'ELASTICSEARCH_URL=$ELASTICSEARCH_URL' >> scripts/deploy.sh
+      - echo 'ELASTICSEARCH_API_KEY=$ELASTICSEARCH_API_KEY' >> scripts/deploy.sh
+      - echo 'ELASTICSEARCH_INDEX=$ELASTICSEARCH_INDEX' >> scripts/deploy.sh
+      - echo 'ES_NUMBER_OF_SHARDS=$ES_NUMBER_OF_SHARDS' >> scripts/deploy.sh
+      - echo 'ES_NUMBER_OF_REPLICAS=$ES_NUMBER_OF_REPLICAS' >> scripts/deploy.sh
+      - echo 'EOF' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '# Update the systemd service file to include environment variables' >> scripts/deploy.sh
+      - echo 'cat > /etc/systemd/system/financial-news.service << EOF' >> scripts/deploy.sh
+      - echo '[Unit]' >> scripts/deploy.sh
+      - echo 'Description=Financial News Engine Flask App' >> scripts/deploy.sh
+      - echo 'After=network.target' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '[Service]' >> scripts/deploy.sh
+      - echo 'User=root' >> scripts/deploy.sh
+      - echo 'WorkingDirectory=/opt/financial-news-engine' >> scripts/deploy.sh
+      - echo 'ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app' >> scripts/deploy.sh
+      - echo 'Restart=always' >> scripts/deploy.sh
+      - echo 'Environment=ELASTICSEARCH_URL=$ELASTICSEARCH_URL' >> scripts/deploy.sh
+      - echo 'Environment=ELASTICSEARCH_API_KEY=$ELASTICSEARCH_API_KEY' >> scripts/deploy.sh
+      - echo 'Environment=ELASTICSEARCH_INDEX=$ELASTICSEARCH_INDEX' >> scripts/deploy.sh
+      - echo 'Environment=ES_NUMBER_OF_SHARDS=$ES_NUMBER_OF_SHARDS' >> scripts/deploy.sh
+      - echo 'Environment=ES_NUMBER_OF_REPLICAS=$ES_NUMBER_OF_REPLICAS' >> scripts/deploy.sh
+      - echo '' >> scripts/deploy.sh
+      - echo '[Install]' >> scripts/deploy.sh
+      - echo 'WantedBy=multi-user.target' >> scripts/deploy.sh
+      - echo 'EOF' >> scripts/deploy.sh
       - echo '' >> scripts/deploy.sh
       - echo '# Restart the service' >> scripts/deploy.sh
       - echo 'systemctl daemon-reload' >> scripts/deploy.sh
@@ -73,6 +112,16 @@ phases:
       - echo "Auto Scaling Group $ASG_NAME"
       - "export INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query \"AutoScalingGroups[0].Instances[].InstanceId\" --output text)"
       - echo "Instances to deploy to $INSTANCE_IDS"
+      - echo "Preparing environment variables for service files..."
+      - echo "Creating environment variables file..."
+      - "cd backend"
+      - "echo \"# Auto-generated environment file\" > .env"
+      - "echo \"ELASTICSEARCH_URL=${ELASTICSEARCH_URL}\" >> .env"
+      - "echo \"ELASTICSEARCH_API_KEY=${ELASTICSEARCH_API_KEY}\" >> .env"
+      - "echo \"ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX}\" >> .env"
+      - "echo \"ES_NUMBER_OF_SHARDS=${ES_NUMBER_OF_SHARDS}\" >> .env"
+      - "echo \"ES_NUMBER_OF_REPLICAS=${ES_NUMBER_OF_REPLICAS}\" >> .env"
+      - "zip -r dist/backend.zip ."
       - echo Deployment ready
   
   post_build:

@@ -29,6 +29,31 @@ Parameters:
     Type: String
     NoEcho: true
   
+  ElasticsearchApiKey:
+    Description: API Key for Elasticsearch
+    Type: String
+    NoEcho: true
+  
+  ElasticsearchUrl:
+    Description: Endpoint URL for Elasticsearch
+    Type: String
+    Default: https://your-elasticsearch-endpoint.es.amazonaws.com
+  
+  ElasticsearchIndex:
+    Description: Elasticsearch index name
+    Type: String
+    Default: financial_news
+  
+  EsNumberOfShards:
+    Description: Number of shards for Elasticsearch index
+    Type: Number
+    Default: 3
+  
+  EsNumberOfReplicas:
+    Description: Number of replicas for Elasticsearch index
+    Type: Number
+    Default: 2
+  
   FrontendStackName:
     Description: Name of the frontend CloudFormation stack
     Type: String
@@ -600,6 +625,52 @@ Resources:
       TargetAction: Source
       TargetPipelineVersion: !GetAtt FinancialNewsPipeline.Version
       RegisterWithThirdParty: true
+
+  # AWS Systems Manager Parameter Store parameters for Elasticsearch
+  ElasticsearchApiKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch-api-key
+      Type: SecureString
+      Value: !Ref ElasticsearchApiKey
+      Description: API Key for Elasticsearch
+      Tier: Standard
+  
+  ElasticsearchUrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch-url
+      Type: String
+      Value: !Ref ElasticsearchUrl
+      Description: Endpoint URL for Elasticsearch
+      Tier: Standard
+  
+  ElasticsearchIndexParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch-index
+      Type: String
+      Value: !Ref ElasticsearchIndex
+      Description: Elasticsearch index name
+      Tier: Standard
+  
+  EsNumberOfShardsParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/es-number-of-shards
+      Type: String
+      Value: !Ref EsNumberOfShards
+      Description: Number of shards for Elasticsearch index
+      Tier: Standard
+  
+  EsNumberOfReplicasParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/es-number-of-replicas
+      Type: String
+      Value: !Ref EsNumberOfReplicas
+      Description: Number of replicas for Elasticsearch index
+      Tier: Standard
 
 Outputs:
   PipelineURL:
