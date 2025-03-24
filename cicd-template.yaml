@@ -631,7 +631,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: /financial-news/elasticsearch-api-key
-      Type: SecureString
+      Type: String
       Value: !Ref ElasticsearchApiKey
       Description: API Key for Elasticsearch
       Tier: Standard
