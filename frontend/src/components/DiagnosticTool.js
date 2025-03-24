@@ -37,8 +37,10 @@ const DiagnosticTool = () => {
 
   useEffect(() => {
     // Get environment info
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
+    
     setEnvInfo({
-      apiUrl: process.env.REACT_APP_API_URL || 'Not configured',
+      apiUrl,
       environment: process.env.REACT_APP_ENV || 'development'
     });
 
@@ -79,7 +81,7 @@ const DiagnosticTool = () => {
       console.error("Failed to check health:", error);
       setHealthStatus({
         status: 'error',
-        error: error.message,
+        error: error.message || 'Connection refused',
         online: navigator.onLine
       });
     }
@@ -96,10 +98,12 @@ const DiagnosticTool = () => {
   };
 
   const testConnection = async () => {
-    setConnectionTest({ status: 'pending', message: 'Testing connection...' });
+    const apiUrl = envInfo.apiUrl;
+    
+    setConnectionTest({ status: 'pending', message: `Testing connection to ${apiUrl}...` });
     try {
       // Try to fetch the API root
-      const response = await fetch(envInfo.apiUrl, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         mode: 'cors',
         cache: 'no-cache',
@@ -133,8 +137,20 @@ const DiagnosticTool = () => {
       setConnectionTest({
         status: 'error',
         message: 'Connection failed',
-        error: error.message
+        error: error.message || 'Unknown error'
       });
+      
+      // Add information about potential fixes
+      if (error.message?.includes('ERR_CONNECTION_REFUSED')) {
+        setConnectionTest(prev => ({
+          ...prev,
+          possibleFixes: [
+            'Check if the backend server is running',
+            'Check if there are firewall or networking issues',
+            'Verify the API URL is correct and accessible from your network'
+          ]
+        }));
+      }
     }
   };
 
@@ -158,8 +174,15 @@ const DiagnosticTool = () => {
           setEsDiagnostics(data);
           break;
         case 'report':
-          data = await getFullDiagnosticReport();
-          setDiagnosticReport(data);
+          try {
+            data = await getFullDiagnosticReport();
+            console.log('Received diagnostic report:', data);
+            setDiagnosticReport(data);
+          } catch (reportError) {
+            console.error('Diagnostic report error:', reportError);
+            // Create a more detailed client-side report with error information
+            generateClientSideDiagnosticReport(reportError);
+          }
           break;
         default:
           // For health, we already have that data
@@ -167,10 +190,52 @@ const DiagnosticTool = () => {
       }
     } catch (error) {
       console.error(`Failed to fetch ${type} diagnostics:`, error);
-      // Set error state for the appropriate diagnostic type
+      if (type === 'report' && !diagnosticReport) {
+        // Generate client-side report only if we haven't already set one in the nested try/catch
+        generateClientSideDiagnosticReport(error);
+      }
     } finally {
       setLoadingDiagnostics(false);
     }
+  };
+
+  // Helper function to generate client-side diagnostic report
+  const generateClientSideDiagnosticReport = (error) => {
+    const errorMessage = error?.message || 'Unknown error occurred';
+    const errorStatus = error?.response?.status;
+    
+    // Generate a client-side only diagnostic report when backend is unreachable
+    const offlineReport = {
+      _generated: 'client-side',
+      timestamp: new Date().toISOString(),
+      status: 'degraded',
+      frontend: {
+        online: navigator.onLine,
+        userAgent: navigator.userAgent,
+        window: {
+          innerHeight: window.innerHeight,
+          innerWidth: window.innerWidth
+        },
+        connection: networkInfo.connection
+      },
+      backend: {
+        status: 'unreachable',
+        error: errorMessage,
+        status_code: errorStatus,
+        last_attempt: new Date().toISOString()
+      },
+      // Create safe empty objects that match the expected structure
+      system: {},
+      elasticsearch: {},
+      recent_errors: errorLogs.slice(-5).map(log => ({
+        timestamp: log.timestamp,
+        level: 'ERROR',
+        message: log.message,
+        error: log.error
+      }))
+    };
+    
+    setDiagnosticReport(offlineReport);
   };
 
   // Create the copyable diagnostic report in a compact, structured format for LLMs
@@ -186,6 +251,12 @@ const DiagnosticTool = () => {
       if (healthStatus.error) report += `Error: ${healthStatus.error}\n`;
       if (connectionTest) report += `Connection test: ${connectionTest.message}\n`;
       if (connectionTest?.error) report += `Connection error: ${connectionTest.error}\n`;
+      if (connectionTest?.possibleFixes) {
+        report += `Possible fixes:\n`;
+        connectionTest.possibleFixes.forEach(fix => {
+          report += `- ${fix}\n`;
+        });
+      }
     } else {
       report += `Status: unknown\n`;
     }
@@ -229,6 +300,11 @@ const DiagnosticTool = () => {
     // Add advanced diagnostics if available
     if (diagnosticReport) {
       report += '\n#### Advanced Diagnostics\n';
+      
+      // Note if this is client-side generated data
+      if (diagnosticReport._generated === 'client-side') {
+        report += `NOTE: This is client-side generated diagnostic data. Backend is unreachable.\n\n`;
+      }
       
       // System info
       if (diagnosticReport.system) {
@@ -300,13 +376,35 @@ const DiagnosticTool = () => {
     }
 
     if (diagnosticReport) {
+      // Handle client-side generated report
+      const isClientGenerated = diagnosticReport._generated === 'client-side';
+      
+      // Safety check for null/undefined properties
+      const safeSystem = diagnosticReport.system || {};
+      const safeElasticsearch = diagnosticReport.elasticsearch || {};
+      const safeErrors = Array.isArray(diagnosticReport.recent_errors) ? diagnosticReport.recent_errors : [];
+      
       return (
         <div>
-          <Alert variant="info" className="mb-3">
-            <Alert.Heading>Comprehensive Diagnostic Report</Alert.Heading>
+          {isClientGenerated && (
+            <Alert variant="warning" className="mb-3">
+              <Alert.Heading>Limited Diagnostics Available</Alert.Heading>
+              <p>
+                Unable to reach the backend server. Showing client-side diagnostics only.
+              </p>
+              <hr />
+              <p className="mb-0">
+                Please check your network connection and verify the backend server is running.
+              </p>
+            </Alert>
+          )}
+          
+          <Alert variant={isClientGenerated ? "warning" : "info"} className="mb-3">
+            <Alert.Heading>Diagnostic Report</Alert.Heading>
             <p>
-              This is a detailed diagnostic report that includes system, network, and service information
-              from both the frontend and backend.
+              {isClientGenerated 
+                ? "This is a limited diagnostic report with client-side information only."
+                : "This is a detailed diagnostic report that includes system, network, and service information from both the frontend and backend."}
             </p>
           </Alert>
           
@@ -314,70 +412,107 @@ const DiagnosticTool = () => {
             <Accordion.Item eventKey="0">
               <Accordion.Header>System Information</Accordion.Header>
               <Accordion.Body>
-                {diagnosticReport.system && (
+                {Object.keys(safeSystem).length > 0 ? (
                   <Table striped bordered>
                     <tbody>
                       <tr>
                         <th>Hostname</th>
-                        <td>{diagnosticReport.system.hostname}</td>
+                        <td>{safeSystem.hostname || 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Platform</th>
-                        <td>{diagnosticReport.system.platform} {diagnosticReport.system.platform_version}</td>
+                        <td>{safeSystem.platform || 'N/A'} {safeSystem.platform_version || ''}</td>
                       </tr>
                       <tr>
                         <th>CPU Usage</th>
-                        <td>{diagnosticReport.system.cpu?.percent}%</td>
+                        <td>{safeSystem.cpu?.percent !== undefined ? `${safeSystem.cpu.percent}%` : 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Memory Usage</th>
-                        <td>{diagnosticReport.system.memory?.percent_used}%</td>
+                        <td>{safeSystem.memory?.percent_used !== undefined ? `${safeSystem.memory.percent_used}%` : 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Disk Usage</th>
-                        <td>{diagnosticReport.system.disk?.percent_used}%</td>
+                        <td>{safeSystem.disk?.percent_used !== undefined ? `${safeSystem.disk.percent_used}%` : 'N/A'}</td>
                       </tr>
                       <tr>
                         <th>Process Uptime</th>
-                        <td>{Math.floor(diagnosticReport.system.uptime?.process / 60)} minutes</td>
+                        <td>{safeSystem.uptime?.process !== undefined ? `${Math.floor((safeSystem.uptime.process) / 60)} minutes` : 'N/A'}</td>
                       </tr>
                     </tbody>
                   </Table>
+                ) : (
+                  <Alert variant="warning">
+                    <p className="mb-0">System information not available. Backend server may be unreachable.</p>
+                  </Alert>
                 )}
+                
+                {/* Always show client-side system info */}
+                <h5 className="mt-3">Client Information</h5>
+                <Table striped bordered>
+                  <tbody>
+                    <tr>
+                      <th>Browser</th>
+                      <td>{navigator.userAgent}</td>
+                    </tr>
+                    <tr>
+                      <th>Window Size</th>
+                      <td>{window.innerWidth}x{window.innerHeight}</td>
+                    </tr>
+                    <tr>
+                      <th>Network Status</th>
+                      <td>{navigator.onLine ? 'Online' : 'Offline'}</td>
+                    </tr>
+                    {networkInfo.connection && (
+                      <>
+                        <tr>
+                          <th>Connection Type</th>
+                          <td>{networkInfo.connection.effectiveType || 'Unknown'}</td>
+                        </tr>
+                        {networkInfo.connection.downlink && (
+                          <tr>
+                            <th>Downlink</th>
+                            <td>{networkInfo.connection.downlink} Mbps</td>
+                          </tr>
+                        )}
+                      </>
+                    )}
+                  </tbody>
+                </Table>
               </Accordion.Body>
             </Accordion.Item>
             
             <Accordion.Item eventKey="1">
               <Accordion.Header>Elasticsearch Status</Accordion.Header>
               <Accordion.Body>
-                {diagnosticReport.elasticsearch && (
+                {Object.keys(safeElasticsearch).length > 0 ? (
                   <div>
-                    <Alert variant={diagnosticReport.elasticsearch.success ? 'success' : 'danger'}>
+                    <Alert variant={safeElasticsearch.success ? 'success' : 'danger'}>
                       <Alert.Heading>
-                        {diagnosticReport.elasticsearch.success ? 'Connected' : 'Connection Failed'}
+                        {safeElasticsearch.success ? 'Connected' : 'Connection Failed'}
                       </Alert.Heading>
-                      {!diagnosticReport.elasticsearch.success && diagnosticReport.elasticsearch.error && (
-                        <p className="mb-0"><strong>Error:</strong> {diagnosticReport.elasticsearch.error}</p>
+                      {!safeElasticsearch.success && safeElasticsearch.error && (
+                        <p className="mb-0"><strong>Error:</strong> {safeElasticsearch.error}</p>
                       )}
                     </Alert>
                     
-                    {diagnosticReport.elasticsearch.ping && (
+                    {safeElasticsearch.ping && (
                       <div className="mt-3">
                         <h5>Network Ping</h5>
                         <Table striped bordered>
                           <tbody>
                             <tr>
                               <th>Success</th>
-                              <td>{diagnosticReport.elasticsearch.ping.success ? 'Yes' : 'No'}</td>
+                              <td>{safeElasticsearch.ping.success ? 'Yes' : 'No'}</td>
                             </tr>
                             <tr>
                               <th>Packet Loss</th>
-                              <td>{diagnosticReport.elasticsearch.ping.packet_loss_percent}%</td>
+                              <td>{safeElasticsearch.ping.packet_loss_percent !== undefined ? `${safeElasticsearch.ping.packet_loss_percent}%` : 'N/A'}</td>
                             </tr>
-                            {diagnosticReport.elasticsearch.ping.avg_latency_ms && (
+                            {safeElasticsearch.ping.avg_latency_ms && (
                               <tr>
                                 <th>Average Latency</th>
-                                <td>{diagnosticReport.elasticsearch.ping.avg_latency_ms} ms</td>
+                                <td>{safeElasticsearch.ping.avg_latency_ms} ms</td>
                               </tr>
                             )}
                           </tbody>
@@ -385,47 +520,47 @@ const DiagnosticTool = () => {
                       </div>
                     )}
                     
-                    {diagnosticReport.elasticsearch.connection && (
+                    {safeElasticsearch.connection && (
                       <div className="mt-3">
                         <h5>HTTP Connection</h5>
                         <Table striped bordered>
                           <tbody>
                             <tr>
                               <th>Status Code</th>
-                              <td>{diagnosticReport.elasticsearch.connection.status_code || 'N/A'}</td>
+                              <td>{safeElasticsearch.connection.status_code || 'N/A'}</td>
                             </tr>
                             <tr>
                               <th>Response Time</th>
-                              <td>{diagnosticReport.elasticsearch.connection.total_latency_ms?.toFixed(2) || 'N/A'} ms</td>
+                              <td>{safeElasticsearch.connection.total_latency_ms !== undefined ? `${safeElasticsearch.connection.total_latency_ms.toFixed(2)} ms` : 'N/A'}</td>
                             </tr>
                             <tr>
                               <th>DNS Resolution</th>
-                              <td>{diagnosticReport.elasticsearch.connection.dns_resolved ? 'Success' : 'Failed'}</td>
+                              <td>{safeElasticsearch.connection.dns_resolved ? 'Success' : 'Failed'}</td>
                             </tr>
                           </tbody>
                         </Table>
                       </div>
                     )}
                     
-                    {diagnosticReport.elasticsearch.query && (
+                    {safeElasticsearch.query && (
                       <div className="mt-3">
                         <h5>Query Test</h5>
                         <Table striped bordered>
                           <tbody>
                             <tr>
                               <th>Success</th>
-                              <td>{diagnosticReport.elasticsearch.query.success ? 'Yes' : 'No'}</td>
+                              <td>{safeElasticsearch.query.success ? 'Yes' : 'No'}</td>
                             </tr>
-                            {diagnosticReport.elasticsearch.query.hit_count !== undefined && (
+                            {safeElasticsearch.query.hit_count !== undefined && (
                               <tr>
                                 <th>Documents Found</th>
-                                <td>{diagnosticReport.elasticsearch.query.hit_count}</td>
+                                <td>{safeElasticsearch.query.hit_count}</td>
                               </tr>
                             )}
-                            {diagnosticReport.elasticsearch.query.status_code && (
+                            {safeElasticsearch.query.status_code && (
                               <tr>
                                 <th>Status Code</th>
-                                <td>{diagnosticReport.elasticsearch.query.status_code}</td>
+                                <td>{safeElasticsearch.query.status_code}</td>
                               </tr>
                             )}
                           </tbody>
@@ -433,14 +568,24 @@ const DiagnosticTool = () => {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <Alert variant="warning">
+                    <Alert.Heading>Elasticsearch Status Unavailable</Alert.Heading>
+                    <p>Unable to retrieve Elasticsearch status. Backend server may be unreachable.</p>
+                  </Alert>
                 )}
               </Accordion.Body>
             </Accordion.Item>
             
             <Accordion.Item eventKey="2">
-              <Accordion.Header>Backend Errors</Accordion.Header>
+              <Accordion.Header>
+                Backend Errors
+                {safeErrors.length > 0 && (
+                  <Badge bg="danger" className="ms-2">{safeErrors.length}</Badge>
+                )}
+              </Accordion.Header>
               <Accordion.Body>
-                {diagnosticReport.recent_errors && diagnosticReport.recent_errors.length > 0 ? (
+                {safeErrors.length > 0 ? (
                   <div>
                     <Alert variant="warning">
                       <Alert.Heading>Recent Backend Errors</Alert.Heading>
@@ -448,14 +593,26 @@ const DiagnosticTool = () => {
                     </Alert>
                     
                     <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                      {diagnosticReport.recent_errors.map((error, index) => (
+                      {safeErrors.map((error, index) => (
                         <Alert key={index} variant="danger" className="mb-2">
-                          {error.timestamp && <div><small>{new Date(error.timestamp).toLocaleString()}</small></div>}
-                          {error.level && <Badge bg="warning">{error.level}</Badge>}
-                          <div className="mt-1">{error.message || error.raw || 'Unknown error'}</div>
+                          {error.timestamp && (
+                            <div>
+                              <small>
+                                {new Date(error.timestamp).toLocaleString()}
+                              </small>
+                            </div>
+                          )}
+                          {error.level && (
+                            <Badge bg="warning" className="me-1">{error.level}</Badge>
+                          )}
+                          <div className="mt-1">
+                            {error.message || error.raw || 'Unknown error'}
+                          </div>
                           {error.exception && (
                             <div className="mt-1">
-                              <small className="text-muted">{error.exception.type}: {error.exception.value}</small>
+                              <small className="text-muted">
+                                {error.exception.type}: {error.exception.value}
+                              </small>
                             </div>
                           )}
                         </Alert>
@@ -463,10 +620,50 @@ const DiagnosticTool = () => {
                     </div>
                   </div>
                 ) : (
-                  <Alert variant="success">
-                    <Alert.Heading>No Recent Errors</Alert.Heading>
-                    <p>No backend errors have been recorded recently.</p>
+                  <Alert variant={isClientGenerated ? "warning" : "success"}>
+                    <Alert.Heading>{isClientGenerated ? "Backend Errors Unavailable" : "No Recent Errors"}</Alert.Heading>
+                    <p>{isClientGenerated 
+                      ? "Unable to retrieve backend errors. Backend server may be unreachable." 
+                      : "No backend errors have been recorded recently."}</p>
                   </Alert>
+                )}
+                
+                {/* Always show frontend errors */}
+                <h5 className="mt-4">
+                  Frontend Errors 
+                  {errorLogs.length > 0 && (
+                    <Badge bg="danger" className="ms-2">{errorLogs.length}</Badge>
+                  )}
+                </h5>
+                {errorLogs.length === 0 ? (
+                  <Alert variant="success">
+                    <p className="mb-0">No frontend errors logged</p>
+                  </Alert>
+                ) : (
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {errorLogs.slice(-5).map((error, index) => (
+                      <Alert key={index} variant="danger" className="mb-2">
+                        {error.timestamp && (
+                          <div>
+                            <small>{new Date(error.timestamp).toLocaleString()}</small>
+                          </div>
+                        )}
+                        <div className="mt-1">
+                          <strong>{error.message || 'Unknown error'}</strong>
+                        </div>
+                        {error.error?.message && (
+                          <div className="mt-1">
+                            <small>{error.error.message}</small>
+                          </div>
+                        )}
+                        {error.error?.url && (
+                          <div className="mt-1">
+                            <small className="text-muted">URL: {error.error.url}</small>
+                          </div>
+                        )}
+                      </Alert>
+                    ))}
+                  </div>
                 )}
               </Accordion.Body>
             </Accordion.Item>
@@ -587,6 +784,18 @@ const DiagnosticTool = () => {
                             <strong>Error:</strong> {healthStatus.error}
                           </div>
                         )}
+                        {/* Show a helpful message for connection refused errors */}
+                        {healthStatus?.error && healthStatus.error.includes('Network Error') && (
+                          <div className="mt-2">
+                            <strong>Possible Causes:</strong>
+                            <ul className="mb-0 mt-1">
+                              <li>Backend server may be down or unreachable</li>
+                              <li>CORS policies may be preventing connections</li>
+                              <li>Network connectivity issues</li>
+                              <li>Incorrect API URL configuration</li>
+                            </ul>
+                          </div>
+                        )}
                       </Alert>
                     )}
                     
@@ -619,6 +828,16 @@ const DiagnosticTool = () => {
                         {connectionTest.error && (
                           <div>
                             <strong>Error:</strong> {connectionTest.error}
+                          </div>
+                        )}
+                        {connectionTest.possibleFixes && (
+                          <div className="mt-2">
+                            <strong>Possible Fixes:</strong>
+                            <ul className="mb-0 mt-1">
+                              {connectionTest.possibleFixes.map((fix, index) => (
+                                <li key={index}>{fix}</li>
+                              ))}
+                            </ul>
                           </div>
                         )}
                         {connectionTest.details && (

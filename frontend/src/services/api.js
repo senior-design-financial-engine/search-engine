@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variables with fallbacks
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // ms
@@ -52,7 +52,7 @@ apiLogger.log('API Configuration:', {
 });
 
 // Configure axios defaults
-axios.defaults.timeout = 15000; // 15 seconds timeout
+axios.defaults.timeout = 30000; // 30 seconds timeout
 
 // Create axios instance with proper configuration for production
 const apiClient = axios.create({
@@ -160,6 +160,26 @@ const retryRequest = async (fn, maxRetries = MAX_RETRIES, delay = RETRY_DELAY) =
 	throw lastError;
 };
 
+// Helper function to validate diagnostic data
+const validateDiagnosticData = (data) => {
+	if (!data || typeof data !== 'object') {
+		return {
+			_generated: 'default',
+			timestamp: new Date().toISOString(),
+			status: 'error',
+			error: 'Invalid or empty diagnostic data received'
+		};
+	}
+	
+	// Ensure the data has the expected structure
+	return {
+		...data,
+		system: data.system || {},
+		elasticsearch: data.elasticsearch || {},
+		recent_errors: Array.isArray(data.recent_errors) ? data.recent_errors : []
+	};
+};
+
 // Health check function
 export const checkApiHealth = async () => {
 	try {
@@ -184,7 +204,7 @@ export const checkApiHealth = async () => {
 		apiLogger.error('Health check failed:', error);
 		return {
 			status: 'error',
-			error: error.message,
+			error: error.message || 'Unknown connection error',
 			online: navigator.onLine
 		};
 	}
@@ -199,8 +219,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			const response = await apiClient.get('/query', {
 				params: {
 					query,
-					source,
 					time_range,
+					source,
 					sentiment
 				}
 			});
@@ -311,134 +331,30 @@ export const getDiagnosticErrorLogs = async () => {
 export const getFullDiagnosticReport = async () => {
 	try {
 		apiLogger.log('Fetching full diagnostic report');
-		try {
-			const response = await retryRequest(async () => {
-				return await apiClient.get('/diagnostic/report');
-			});
-			return response.data;
-		} catch (error) {
-			apiLogger.warn('Real diagnostic endpoint failed, returning mock data for development:', error);
-			
-			// Return mock data for development/testing when the real endpoint fails
-			// This helps with debugging the UI when the backend is not available
-			return {
-				timestamp: new Date().toISOString(),
-				system: {
-					hostname: 'development-host',
-					platform: 'mock-os',
-					platform_version: '1.0',
-					python_version: '3.9.0',
-					cpu: {
-						percent: 45,
-						count: 4
-					},
-					memory: {
-						total: 8000000000,
-						used: 4000000000,
-						percent_used: 50
-					},
-					disk: {
-						total: 100000000000,
-						used: 60000000000,
-						percent_used: 60
-					},
-					uptime: {
-						system: 3600,
-						process: 1800
-					}
-				},
-				elasticsearch: {
-					success: false,
-					error: "Mock error: Could not connect to Elasticsearch",
-					elasticsearch_url: "http://localhost:9200",
-					ping: {
-						success: false,
-						packets_sent: 5,
-						packets_received: 0,
-						packet_loss_percent: 100
-					},
-					connection: {
-						success: false,
-						status_code: null,
-						dns_resolved: true,
-						ip_address: "127.0.0.1",
-						total_latency_ms: null,
-						error: "Connection refused"
-					},
-					query: {
-						success: false,
-						status_code: null,
-						hit_count: null,
-						error: "Could not execute query due to connection failure"
-					}
-				},
-				recent_errors: [
-					{
-						timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-						level: "ERROR",
-						message: "Mock error: Failed to connect to Elasticsearch",
-						exception: {
-							type: "ConnectionError",
-							value: "Connection refused",
-							traceback: [
-								"Traceback (most recent call last):",
-								"  File \"app/backend.py\", line 120, in _test_elasticsearch_connection",
-								"    self.es.ping()",
-								"  File \"elasticsearch/client/utils.py\", line 152, in _wrapped",
-								"    return func(*args, **kwargs)",
-								"  File \"elasticsearch/client/__init__.py\", line 350, in ping",
-								"    return self.transport.perform_request(",
-								"  File \"elasticsearch/transport.py\", line 415, in perform_request",
-								"    raise ConnectionError(\"N/A\", str(e), e)"
-							]
-						}
-					},
-					{
-						timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-						level: "WARNING",
-						message: "Mock warning: High memory usage detected",
-						raw: "Memory usage above 80%"
-					}
-				],
-				network: {
-					tests: {
-						"elasticsearch:9200": {
-							ping: {
-								success: false,
-								packet_loss_percent: 100,
-								error: "Host unreachable"
-							},
-							http: {
-								success: false,
-								status_code: null,
-								total_latency_ms: null,
-								error: "Connection refused"
-							}
-						},
-						"api.example.com": {
-							ping: {
-								success: true,
-								packet_loss_percent: 0,
-								avg_latency_ms: 45.2,
-								min_latency_ms: 42.1,
-								max_latency_ms: 50.3
-							},
-							http: {
-								success: true,
-								status_code: 200,
-								total_latency_ms: 120.5
-							},
-							traceroute: {
-								success: true,
-								reached_destination: true
-							}
-						}
-					}
-				}
-			};
-		}
+		
+		const response = await retryRequest(async () => {
+			return await apiClient.get('/diagnostic/report');
+		});
+		
+		// Validate and normalize the data
+		const validatedData = validateDiagnosticData(response.data);
+		apiLogger.log('Diagnostic report processed successfully');
+		
+		return validatedData;
 	} catch (error) {
 		apiLogger.error('Error fetching full diagnostic report:', error);
+		
+		// Create a fallback report with error information
+		const errorReport = {
+			_generated: 'error',
+			timestamp: new Date().toISOString(),
+			status: 'error',
+			error: error.message || 'Failed to fetch diagnostic data',
+			system: {},
+			elasticsearch: {},
+			recent_errors: []
+		};
+		
 		throw error;
 	}
 };
