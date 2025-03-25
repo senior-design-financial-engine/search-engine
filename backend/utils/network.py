@@ -68,6 +68,11 @@ class NetworkDiagnostics:
         start_time = time.time()
         timeout = timeout or self.timeout
         headers = headers or {}
+        
+        # Add CORS checking headers if not already present
+        if 'Origin' not in headers:
+            headers['Origin'] = 'https://financialnewsengine.com'
+        
         result = {
             "success": False,
             "url": url,
@@ -81,6 +86,7 @@ class NetworkDiagnostics:
             "dns_latency_ms": None,
             "connection_latency_ms": None,
             "total_latency_ms": None,
+            "cors_enabled": False,
             "error": None
         }
         
@@ -116,6 +122,13 @@ class NetworkDiagnostics:
                 result["headers"] = dict(response.headers)
                 result["success"] = 200 <= response.status_code < 400
                 result["content_type"] = response.headers.get("Content-Type")
+                
+                # Check for CORS headers
+                result["cors_enabled"] = 'Access-Control-Allow-Origin' in response.headers
+                if result["cors_enabled"]:
+                    result["cors_allow_origin"] = response.headers.get('Access-Control-Allow-Origin')
+                    result["cors_allow_methods"] = response.headers.get('Access-Control-Allow-Methods')
+                    result["cors_allow_headers"] = response.headers.get('Access-Control-Allow-Headers')
                 
                 # Log sample of the response
                 content_sample = response.text[:500] + '...' if len(response.text) > 500 else response.text

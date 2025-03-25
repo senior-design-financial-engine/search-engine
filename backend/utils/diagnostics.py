@@ -334,6 +334,33 @@ def register_diagnostic_endpoints(app: Flask) -> Blueprint:
         
         return jsonify(report)
     
+    @diagnostics_bp.route('/cors', methods=['GET', 'OPTIONS'])
+    def diagnostic_cors():
+        """Test CORS configuration."""
+        from flask import current_app
+        
+        origin = request.headers.get('Origin', 'Unknown')
+        
+        if request.method == 'OPTIONS':
+            # Handle preflight request
+            response = current_app.make_default_options_response()
+        else:
+            # Handle actual request
+            response = jsonify({
+                "status": "ok",
+                "timestamp": datetime.now().isoformat(),
+                "cors_test": "successful",
+                "request_origin": origin,
+                "allowed_origins": app.config.get('CORS_ORIGINS', [])
+            })
+            
+        # Add CORS headers in response
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        
+        return response
+    
     app.register_blueprint(diagnostics_bp)
     
     # Return the blueprint for testing purposes

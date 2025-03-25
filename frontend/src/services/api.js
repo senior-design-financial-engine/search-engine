@@ -69,7 +69,9 @@ const apiClient = axios.create({
 	baseURL: API_BASE_URL,
 	headers: {
 		'Content-Type': 'application/json'
-	}
+	},
+	withCredentials: false, // Don't send credentials for cross-origin requests
+	timeout: 30000 // 30 seconds timeout
 });
 
 // Response interceptor to handle common errors

@@ -37,12 +37,22 @@ cors_origins = [
     "http://localhost:3000",                         # Local development
     "https://financial-news-frontend-*.s3.amazonaws.com",  # S3 bucket
     "https://*.cloudfront.net",                      # CloudFront distribution
-    "https://*.amazonaws.com"                        # Any AWS domain
+    "https://*.amazonaws.com",                       # Any AWS domain
+    "https://financialnewsengine.com",               # Production domain
+    "https://www.financialnewsengine.com",           # www subdomain
+    "https://development-backend-alb-261878750.us-east-1.elb.amazonaws.com"  # ALB domain
 ]
-CORS(app, resources={r"/*": {"origins": cors_origins}})
+CORS(app, resources={r"/*": {"origins": cors_origins, "supports_credentials": True, "allow_headers": ["Content-Type", "Authorization"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
 # Setup request logging middleware
 setup_request_logging(app)
+
+# Add explicit handling for preflight OPTIONS requests
+@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_preflight(path):
+    response = app.make_default_options_response()
+    return response
 
 class BackEnd:
     def __init__(self):
