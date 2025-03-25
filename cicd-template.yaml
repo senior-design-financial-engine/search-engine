@@ -560,7 +560,8 @@ Resources:
                 - mkdir -p api
                 
                 # Prepare the API code as a deployment package
-                - python -c '
+                - |
+                  python -c '
                   import yaml
                   import os
                   import json

@@ -24,11 +24,6 @@ phases:
       - echo "Building the application"
       - cd frontend
       - echo "Building with environment variables"
-      - |
-        if [ "${USE_MOCK_API}" = "true" ]; then
-          echo "Using mock API for this build"
-          echo "REACT_APP_USE_MOCK_API=true" >> .env.production
-        fi
       - npm run build
       - echo "Build completed"
       - cd ..
@@ -36,7 +31,6 @@ phases:
   post_build:
     commands:
       - echo "Post-build completed"
-      - echo "Checking if mock API is enabled: ${USE_MOCK_API}"
 
 artifacts:
   files:
