@@ -12,7 +12,7 @@ Parameters:
       - production
   
   DomainName:
-    Description: Domain name for the application (optional, leave empty to use CloudFront domain)
+    Description: Domain name for the application (optional, leave empty to use default domain)
     Type: String
     Default: "financialnewsengine.com"
   

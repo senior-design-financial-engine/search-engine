@@ -685,7 +685,7 @@ Resources:
   # Auto Scaling Group for Backend Servers
   BackendAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
-    DependsOn: LoadBalancerListener
+    DependsOn: HTTPSListener
     Properties:
       AutoScalingGroupName: !Sub ${EnvironmentName}-backend-asg
       LaunchTemplate:
