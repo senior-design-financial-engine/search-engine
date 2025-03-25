@@ -559,148 +559,122 @@ Resources:
                 - echo "Extracting API code for direct deployment"
                 - mkdir -p api
                 
-                # Prepare the API code as a deployment package
+                # Create API app.py file directly with shell commands
                 - |
-                  python -c '
-                  import yaml
+                  mkdir -p api/deploy
+                  cat > api/deploy/app.py << 'EOF'
+                  # Default Flask app
+                  from flask import Flask, jsonify, request
+                  from flask_cors import CORS
                   import os
-                  import json
+                  import logging
+                  import sys
                   
-                  # Create deployment files directory
-                  os.makedirs("api/deploy", exist_ok=True)
+                  # Configure logging
+                  log_dir = "logs"
+                  if not os.path.exists(log_dir):
+                      os.makedirs(log_dir)
+                      
+                  logger = logging.getLogger("backend")
+                  logger.setLevel(logging.INFO)
                   
-                  # Read app.py if it exists
-                  app_code = ""
-                  if os.path.exists("app.py"):
-                    with open("app.py", "r") as f:
-                      app_code = f.read()
+                  # Create console handler
+                  ch = logging.StreamHandler(sys.stdout)
+                  ch.setLevel(logging.INFO)
+                  logger.addHandler(ch)
+                  
+                  # Create Flask app
+                  app = Flask(__name__)
+                  
+                  # Setup CORS properly - allow specific domains
+                  cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://financialnewsengine.com")
+                  if cors_origins == "*":
+                      # For wildcard origins, don't use credentials
+                      CORS(app, resources={r"/*": {"origins": "*"}})
+                      logger.info(f"CORS configured with wildcard origin")
                   else:
-                    app_code = """
-                    # Default Flask app
-                    from flask import Flask, jsonify, request
-                    from flask_cors import CORS
-                    import os
-                    import logging
-                    import sys
-                    
-                    # Configure logging
-                    log_dir = "logs"
-                    if not os.path.exists(log_dir):
-                        os.makedirs(log_dir)
-                        
-                    logger = logging.getLogger("backend")
-                    logger.setLevel(logging.INFO)
-                    
-                    # Create console handler
-                    ch = logging.StreamHandler(sys.stdout)
-                    ch.setLevel(logging.INFO)
-                    logger.addHandler(ch)
-                    
-                    # Create Flask app
-                    app = Flask(__name__)
-                    
-                    # Setup CORS properly - allow specific domains
-                    cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://financialnewsengine.com")
-                    if cors_origins == "*":
-                        # For wildcard origins, don't use credentials
-                        CORS(app, resources={r"/*": {"origins": "*"}})
-                        logger.info(f"CORS configured with wildcard origin")
-                    else:
-                        # If specific origins are provided, split the comma-separated list
-                        origins = [origin.strip() for origin in cors_origins.split(",")]
-                        # Enable credentials with specific origins
-                        CORS(app, resources={r"/*": {"origins": origins}}, supports_credentials=True)
-                        logger.info(f"CORS configured with origins: {origins}")
-                    
-                    # Add custom CORS middleware to handle all requests properly
-                    @app.before_request
-                    def handle_preflight():
-                        if request.method == "OPTIONS":
-                            # Create a response with appropriate CORS headers
-                            response = app.make_default_options_response()
-                            if cors_origins == "*":
-                                response.headers["Access-Control-Allow-Origin"] = "*"
-                            else:
-                                # Get the origin from the request
-                                origin = request.headers.get("Origin", "")
-                                # Check if the origin is in the allowed origins
-                                if origin in origins:
-                                    response.headers["Access-Control-Allow-Origin"] = origin
-                                    response.headers["Access-Control-Allow-Credentials"] = "true"
-                            
-                            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-                            response.headers["Access-Control-Max-Age"] = "3600"
-                            return response
-                    
-                    # Ensure CORS headers are added to all responses
-                    @app.after_request
-                    def add_cors_headers(response):
-                        if cors_origins == "*":
-                            response.headers["Access-Control-Allow-Origin"] = "*"
-                        else:
-                            # Get the origin from the request
-                            origin = request.headers.get("Origin", "")
-                            # Check if the origin is in the allowed origins
-                            if origin in origins:
-                                response.headers["Access-Control-Allow-Origin"] = origin
-                                response.headers["Access-Control-Allow-Credentials"] = "true"
-                        
-                        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-                        
-                        if request.method == "OPTIONS":
-                            response.headers["Access-Control-Max-Age"] = "3600"
-                            
-                        return response
-                    
-                    @app.route("/")
-                    def hello():
-                        return jsonify({"status": "ok", "message": "API is running"})
-                    
-                    @app.route("/ping")
-                    def ping():
-                        return jsonify({"status": "ok"})
-                    
-                    @app.route("/health")
-                    def health():
-                        return jsonify({"status": "healthy", "environment": os.environ.get("ENVIRONMENT", "development")})
-                    
-                    @app.route("/diagnostic/health")
-                    def diagnostic_health():
-                        return health()
-                    
-                    if __name__ == "__main__":
-                        logger.info("Starting Flask application")
-                        port = int(os.environ.get("PORT", 5000))
-                        app.run(host="0.0.0.0", port=port)
-                    """
+                      # If specific origins are provided, split the comma-separated list
+                      origins = [origin.strip() for origin in cors_origins.split(",")]
+                      # Enable credentials with specific origins
+                      CORS(app, resources={r"/*": {"origins": origins}}, supports_credentials=True)
+                      logger.info(f"CORS configured with origins: {origins}")
                   
-                  # Read requirements.txt if it exists
-                  requirements = ""
-                  if os.path.exists("requirements.txt"):
-                    with open("requirements.txt", "r") as f:
-                      requirements = f.read()
-                  else:
-                    requirements = """
-                    flask==2.3.3
-                    flask-cors==4.0.0
-                    gunicorn==21.2.0
-                    psutil==5.9.5
-                    """
-                    # Make sure flask-cors is in requirements
-                    if "flask-cors" not in requirements.lower():
-                      requirements += "\nflask-cors==4.0.0"
+                  # Add custom CORS middleware to handle all requests properly
+                  @app.before_request
+                  def handle_preflight():
+                      if request.method == "OPTIONS":
+                          # Create a response with appropriate CORS headers
+                          response = app.make_default_options_response()
+                          if cors_origins == "*":
+                              response.headers["Access-Control-Allow-Origin"] = "*"
+                          else:
+                              # Get the origin from the request
+                              origin = request.headers.get("Origin", "")
+                              # Check if the origin is in the allowed origins
+                              if origin in origins:
+                                  response.headers["Access-Control-Allow-Origin"] = origin
+                                  response.headers["Access-Control-Allow-Credentials"] = "true"
+                          
+                          response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                          response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                          response.headers["Access-Control-Max-Age"] = "3600"
+                          return response
                   
-                  # Write deployment files
-                  with open("api/deploy/app.py", "w") as f:
-                    f.write(app_code)
+                  # Ensure CORS headers are added to all responses
+                  @app.after_request
+                  def add_cors_headers(response):
+                      if cors_origins == "*":
+                          response.headers["Access-Control-Allow-Origin"] = "*"
+                      else:
+                          # Get the origin from the request
+                          origin = request.headers.get("Origin", "")
+                          # Check if the origin is in the allowed origins
+                          if origin in origins:
+                              response.headers["Access-Control-Allow-Origin"] = origin
+                              response.headers["Access-Control-Allow-Credentials"] = "true"
+                      
+                      response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                      response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                      
+                      if request.method == "OPTIONS":
+                          response.headers["Access-Control-Max-Age"] = "3600"
+                          
+                      return response
                   
-                  with open("api/deploy/requirements.txt", "w") as f:
-                    f.write(requirements)
+                  @app.route("/")
+                  def hello():
+                      return jsonify({"status": "ok", "message": "API is running"})
                   
-                  # Create service file
-                  service_file = """
+                  @app.route("/ping")
+                  def ping():
+                      return jsonify({"status": "ok"})
+                  
+                  @app.route("/health")
+                  def health():
+                      return jsonify({"status": "healthy", "environment": os.environ.get("ENVIRONMENT", "development")})
+                  
+                  @app.route("/diagnostic/health")
+                  def diagnostic_health():
+                      return health()
+                  
+                  if __name__ == "__main__":
+                      logger.info("Starting Flask application")
+                      port = int(os.environ.get("PORT", 5000))
+                      app.run(host="0.0.0.0", port=port)
+                  EOF
+
+                # Create requirements.txt file
+                - |
+                  cat > api/deploy/requirements.txt << 'EOF'
+                  flask==2.3.3
+                  flask-cors==4.0.0
+                  gunicorn==21.2.0
+                  psutil==5.9.5
+                  EOF
+
+                # Create systemd service file
+                - |
+                  cat > api/deploy/financial-news.service << 'EOF'
                   [Unit]
                   Description=Financial News Engine Flask App
                   After=network.target
@@ -715,13 +689,12 @@ Resources:
                   
                   [Install]
                   WantedBy=multi-user.target
-                  """
-                  
-                  with open("api/deploy/financial-news.service", "w") as f:
-                    f.write(service_file)
-                  
-                  # Create deployment script
-                  deploy_script = """#!/bin/bash
+                  EOF
+
+                # Create deployment script
+                - |
+                  cat > api/deploy/deploy.sh << 'EOF'
+                  #!/bin/bash
                   set -e
                   
                   # Create directory if it doesn't exist
@@ -746,14 +719,13 @@ Resources:
                   systemctl restart financial-news.service
                   
                   echo "API deployment completed"
-                  """
-                  
-                  with open("api/deploy/deploy.sh", "w") as f:
-                    f.write(deploy_script)
-                    os.chmod("api/deploy/deploy.sh", 0o755)
-                  
-                  # Create verification script
-                  verify_script = """#!/bin/bash
+                  EOF
+                  chmod +x api/deploy/deploy.sh
+
+                # Create verification script
+                - |
+                  cat > api/deploy/verify.sh << 'EOF'
+                  #!/bin/bash
                   set -e
                   
                   echo "Verifying backend service startup..."
@@ -775,12 +747,8 @@ Resources:
                   done
                   
                   echo "Startup verification successful"
-                  """
-                  
-                  with open("api/deploy/verify.sh", "w") as f:
-                    f.write(verify_script)
-                    os.chmod("api/deploy/verify.sh", 0o755)
-                  '
+                  EOF
+                  chmod +x api/deploy/verify.sh
             
             build:
               commands:
@@ -848,8 +816,8 @@ Resources:
                     aws ssm send-command \
                       --instance-ids $INSTANCE_ID \
                       --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cat > /tmp/api-deploy/verify.sh << 'EOL'\n$(cat api/deploy/verify.sh)\nEOL\nchmod +x /tmp/api-deploy/verify.sh"] \
-                      --comment "Upload verification script" \
+                      --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"] \
+                      --comment "Run API deployment" \
                       --output text
                     
                     # Execute deployment
