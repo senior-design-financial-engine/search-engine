@@ -36,6 +36,7 @@ logger.info(f"Elasticsearch Index: {os.getenv('ELASTICSEARCH_INDEX', 'Not config
 logger.info("="*50)
 
 # Setup CORS
+# Define default CORS origins
 cors_origins = [
     "http://localhost:3000",                         # Local development
     "https://financial-news-frontend-*.s3.amazonaws.com",  # S3 bucket
@@ -45,7 +46,19 @@ cors_origins = [
     "https://www.financialnewsengine.com",           # www subdomain
     "https://development-backend-alb-261878750.us-east-1.elb.amazonaws.com"  # ALB domain
 ]
-CORS(app, resources={r"/*": {"origins": cors_origins, "supports_credentials": True, "allow_headers": ["Content-Type", "Authorization"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
+
+# Get CORS allowed origins from environment variable if available
+cors_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if cors_env:
+    # Split by comma and strip whitespace
+    additional_origins = [origin.strip() for origin in cors_env.split(',') if origin.strip()]
+    logger.info(f"Adding {len(additional_origins)} origins from CORS_ALLOWED_ORIGINS env var")
+    cors_origins.extend(additional_origins)
+
+# Log the configured CORS origins
+logger.info(f"Configured CORS origins: {cors_origins}")
+
+CORS(app, resources={r"/*": {"origins": cors_origins, "supports_credentials": True, "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
 # Add after_request handler to ensure CORS headers are set on all responses
 @app.after_request
@@ -53,7 +66,19 @@ def add_cors_headers(response):
     # Get the origin from the request
     origin = request.headers.get('Origin', '')
     
-    # Check if the origin matches any of our allowed patterns
+    # Log all CORS requests for debugging
+    logger.debug(f"CORS request from origin: {origin}")
+    
+    # For production domains, set permissive CORS headers regardless of path
+    if origin and ('financialnewsengine.com' in origin or 'localhost' in origin):
+        logger.debug(f"Setting permissive CORS headers for known domain: {origin}")
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Otherwise check if the origin matches any of our allowed patterns
     # For simplicity in this fix, we'll just check exact matches and wildcards
     origin_allowed = False
     
@@ -77,7 +102,7 @@ def add_cors_headers(response):
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
     elif request.method == 'OPTIONS':
-        # For OPTIONS requests, we'll set permissive headers to allow preflight
+        # For OPTIONS requests, we'll always set permissive headers to allow preflight
         response.headers['Access-Control-Allow-Origin'] = origin or '*'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
@@ -89,6 +114,8 @@ def add_cors_headers(response):
         response.headers['Access-Control-Allow-Origin'] = origin or '*'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        if origin:
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
     
     # Add Cache-Control headers for API responses to prevent caching sensitive data
     if request.path.startswith('/query') or request.path.startswith('/diagnostic'):
@@ -96,7 +123,7 @@ def add_cors_headers(response):
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
     
-    logger.debug(f"CORS headers applied for origin: {origin}, allowed: {origin_allowed}")
+    logger.debug(f"CORS headers applied for origin: {origin}, allowed: {origin_allowed or request.method == 'OPTIONS' or response.status_code >= 400}")
     return response
 
 # Setup request logging middleware
@@ -106,7 +133,20 @@ setup_request_logging(app)
 @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
 @app.route('/<path:path>', methods=['OPTIONS'])
 def handle_preflight(path):
+    logger.debug(f"Handling OPTIONS preflight request for path: {path}")
+    origin = request.headers.get('Origin', '')
+    
     response = app.make_default_options_response()
+    # Set permissive CORS headers for OPTIONS
+    response.headers['Access-Control-Allow-Origin'] = origin or '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    
+    # Allow credentials if origin is provided
+    if origin:
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+    logger.debug(f"Preflight response for {origin}: {dict(response.headers)}")
     return response
 
 # Simple in-memory cache for search results
@@ -643,6 +683,75 @@ def server_error(error):
 # Register debug endpoints
 logger.info("Setting up debug endpoints...")
 setup_debug_endpoints(app)
+
+# Add a CORS test endpoint 
+@app.route('/cors-test', methods=['GET', 'OPTIONS'])
+def cors_test():
+    """Test endpoint that returns detailed info about the request for CORS troubleshooting."""
+    if request.method == 'OPTIONS':
+        return handle_preflight('cors-test')
+        
+    origin = request.headers.get('Origin', 'No origin header')
+    
+    # Log the request details
+    logger.info(f"CORS test endpoint accessed from origin: {origin}")
+    logger.debug(f"Request headers: {dict(request.headers)}")
+    
+    # Return detailed information about the request
+    return jsonify({
+        'cors_test': 'success',
+        'timestamp': datetime.now().isoformat(),
+        'request': {
+            'origin': origin,
+            'method': request.method,
+            'headers': {k: v for k, v in request.headers.items()},
+            'path': request.path,
+            'url': request.url,
+            'remote_addr': request.remote_addr,
+        },
+        'response_headers': {
+            'Access-Control-Allow-Origin': origin or '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+            'Access-Control-Allow-Credentials': 'true' if origin else 'not set',
+        },
+        'message': 'If you can see this response in your browser or application, CORS is working correctly.'
+    })
+
+# Add error handler for CORS issues
+@app.errorhandler(Exception)
+def handle_error(error):
+    """Global error handler to ensure CORS headers are set even for uncaught exceptions."""
+    # First log the error
+    logger.error(f"Uncaught exception: {str(error)}", extra={
+        'extra': {'traceback': traceback.format_exc()}
+    })
+    
+    # Prepare the error response
+    status_code = 500
+    if hasattr(error, 'code'):
+        status_code = error.code
+    
+    response = jsonify({
+        'error': str(error),
+        'error_type': type(error).__name__,
+        'timestamp': datetime.now().isoformat(),
+        'request_id': getattr(request, 'request_id', None)
+    })
+    response.status_code = status_code
+    
+    # Set CORS headers directly on the error response
+    origin = request.headers.get('Origin', '')
+    if origin:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    else:
+        # If no origin, set a wildcard for API tools to work
+        response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    return response
 
 # Success startup message
 logger.info("Backend service fully initialized and ready")
