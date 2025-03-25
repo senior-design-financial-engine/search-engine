@@ -54,7 +54,9 @@ function Results() {
                 ...article._source, 
                 id: article._id,
                 // Ensure sentiment_score is properly extracted
-                sentiment_score: article._source.sentiment_score
+                sentiment_score: article._source.sentiment_score,
+                // Process highlight data if available
+                highlight: article.highlight || {}
               };
             }
             return article;

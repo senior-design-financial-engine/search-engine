@@ -42,7 +42,28 @@ def register_diagnostic_endpoints(app: Flask) -> Blueprint:
     Returns:
         Blueprint: The diagnostic blueprint
     """
+    logger.info("Registering diagnostic endpoints")
     diagnostics_bp = Blueprint('diagnostics', __name__, url_prefix='/diagnostic')
+    
+    # Add explicit after_request handler for CORS on diagnostic blueprint
+    @diagnostics_bp.after_request
+    def add_cors_headers(response):
+        logger.debug("Adding CORS headers to diagnostic endpoint response")
+        origin = request.headers.get('Origin', '')
+        response.headers['Access-Control-Allow-Origin'] = origin or '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        if origin:
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Add OPTIONS handler for all diagnostic routes
+    @diagnostics_bp.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+    @diagnostics_bp.route('/<path:path>', methods=['OPTIONS'])
+    def handle_diagnostic_options(path):
+        logger.debug(f"Processing OPTIONS request for diagnostic path: {path}")
+        response = app.make_default_options_response()
+        return response
     
     @diagnostics_bp.route('/health', methods=['GET'])
     @performance_monitor(name="diagnostic_health")
@@ -251,8 +272,40 @@ def register_diagnostic_endpoints(app: Flask) -> Blueprint:
         return jsonify({
             "errors": errors,
             "count": len(errors),
-            "log_file": error_log_file
+            "timestamp": datetime.utcnow().isoformat()
         })
+    
+    @diagnostics_bp.route('/cors-test', methods=['GET', 'OPTIONS'])
+    def cors_test():
+        """
+        Special endpoint for testing CORS functionality.
+        
+        This endpoint returns the client's origin and headers for testing
+        if CORS is working properly.
+        """
+        logger.info(f"CORS test request received from origin: {request.headers.get('Origin', 'No Origin')}")
+        
+        # Extract all headers for debugging
+        headers = {k: v for k, v in request.headers.items()}
+        
+        response = {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "CORS test endpoint is working",
+            "request": {
+                "origin": request.headers.get('Origin', 'No Origin'),
+                "method": request.method, 
+                "headers": headers
+            },
+            "cors_configuration": {
+                "allowed_origins": os.getenv('CORS_ALLOWED_ORIGINS', '*').split(',')
+            }
+        }
+        
+        # Log more details about the test
+        logger.debug(f"CORS test response: {json.dumps(response)}")
+        
+        return jsonify(response)
     
     @diagnostics_bp.route('/report', methods=['GET'])
     def generate_diagnostic_report():

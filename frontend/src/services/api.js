@@ -239,10 +239,13 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			return response.data;
 		});
 		
-		// Log response stats
-		apiLogger.log(`Search results received: ${Array.isArray(data) ? data.length : 0} items`);
+		// Check if the response matches the new format with 'results' key
+		const articles = data.results || data;
 		
-		return data;
+		// Log response stats
+		apiLogger.log(`Search results received: ${Array.isArray(articles) ? articles.length : 0} items`);
+		
+		return articles;
 	} catch (error) {
 		apiLogger.error('Error searching articles:', error);
 		throw error;

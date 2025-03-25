@@ -9,7 +9,7 @@ import socket
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from functools import wraps
-from flask import request, g, Flask
+from flask import request, g, Flask, Blueprint
 import threading
 
 # Environment configuration
@@ -259,7 +259,30 @@ def setup_request_logging(app):
 
 def setup_debug_endpoints(app: Flask):
     """Add debugging endpoints to the Flask app."""
-    @app.route('/debug/logs', methods=['GET'])
+    debug_bp = Blueprint('debug', __name__, url_prefix='/debug')
+    
+    # Add CORS handler for debug endpoints
+    @debug_bp.after_request
+    def add_cors_headers(response):
+        """Add CORS headers to all debug endpoint responses"""
+        origin = request.headers.get('Origin', '')
+        response.headers['Access-Control-Allow-Origin'] = origin or '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        if origin:
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+        return response
+    
+    # Add OPTIONS handler for debug routes
+    @debug_bp.route('/<path:path>', methods=['OPTIONS'])
+    @debug_bp.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+    def handle_debug_options(path):
+        """Handle OPTIONS requests for debug endpoints"""
+        logger.debug(f"Processing OPTIONS request for debug path: {path}")
+        response = app.make_default_options_response()
+        return response
+    
+    @debug_bp.route('/logs', methods=['GET'])
     def get_recent_logs():
         try:
             count = min(int(request.args.get('count', 100)), 1000)
@@ -296,7 +319,7 @@ def setup_debug_endpoints(app: Flask):
             logger.exception(f"Error retrieving logs: {str(e)}")
             return {"error": str(e)}, 500
     
-    @app.route('/debug/performance', methods=['GET'])
+    @debug_bp.route('/performance', methods=['GET'])
     def get_performance_data():
         try:
             request_id = request.args.get('request_id')
@@ -317,7 +340,7 @@ def setup_debug_endpoints(app: Flask):
             logger.exception(f"Error retrieving performance data: {str(e)}")
             return {"error": str(e)}, 500
     
-    @app.route('/debug/status', methods=['GET'])
+    @debug_bp.route('/status', methods=['GET'])
     def get_debug_status():
         try:
             # Gather system information
@@ -370,6 +393,14 @@ def setup_debug_endpoints(app: Flask):
         app.error_count = getattr(app, 'error_count', 0) + 1
         # Re-raise to let other error handlers process it
         raise e
+    
+    # Register the blueprint with the app
+    logger.info("Registering debug endpoints blueprint")
+    app.register_blueprint(debug_bp)
+    logger.info(f"Debug endpoints registered with prefix: {debug_bp.url_prefix}")
+    
+    # Return the blueprint for testing purposes
+    return debug_bp
 
 # Elasticsearch logging utilities
 def log_elasticsearch_request(url, method, body=None, params=None):

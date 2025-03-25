@@ -345,10 +345,15 @@ class Engine:
                 filter_conditions.append({
                     "terms": {"regions": filters['regions']}
                 })
-            # if 'source' in filters:
-            #     filter_conditions.append({
-            #         "terms": {"source": filters['source']}
-            #     })
+            if 'source' in filters:
+                if isinstance(filters['source'], list):
+                    filter_conditions.append({
+                        "terms": {"source": filters['source']}
+                    })
+                else:
+                    filter_conditions.append({
+                        "term": {"source": filters['source']}
+                    })
 
         if time_range:
             filter_conditions.append({

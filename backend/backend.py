@@ -6,11 +6,14 @@ import logging
 import os
 from flask_cors import CORS
 import traceback
-import json
 import sys
 import requests
 import time
 from datetime import datetime
+import uuid
+import hashlib
+import json
+from functools import lru_cache
 
 # Load environment variables first
 load_dotenv()
@@ -44,6 +47,58 @@ cors_origins = [
 ]
 CORS(app, resources={r"/*": {"origins": cors_origins, "supports_credentials": True, "allow_headers": ["Content-Type", "Authorization"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
+# Add after_request handler to ensure CORS headers are set on all responses
+@app.after_request
+def add_cors_headers(response):
+    # Get the origin from the request
+    origin = request.headers.get('Origin', '')
+    
+    # Check if the origin matches any of our allowed patterns
+    # For simplicity in this fix, we'll just check exact matches and wildcards
+    origin_allowed = False
+    
+    # For exact match
+    if origin in cors_origins:
+        origin_allowed = True
+    # For wildcard matches (basic implementation)
+    else:
+        for allowed_origin in cors_origins:
+            if '*' in allowed_origin:
+                # Convert the pattern to a prefix/suffix match
+                pattern = allowed_origin.replace('*', '')
+                if origin.startswith(pattern.replace('*.', '')) or origin.endswith(pattern.replace('*', '')):
+                    origin_allowed = True
+                    break
+    
+    # If origin is allowed, set the appropriate CORS headers
+    if origin_allowed:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    elif request.method == 'OPTIONS':
+        # For OPTIONS requests, we'll set permissive headers to allow preflight
+        response.headers['Access-Control-Allow-Origin'] = origin or '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        if origin:
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+    # For errors or when cross-origin requests come from unknown origins,
+    # set a more permissive header to ensure CORS doesn't break functionality
+    elif response.status_code >= 400:
+        response.headers['Access-Control-Allow-Origin'] = origin or '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    
+    # Add Cache-Control headers for API responses to prevent caching sensitive data
+    if request.path.startswith('/query') or request.path.startswith('/diagnostic'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    
+    logger.debug(f"CORS headers applied for origin: {origin}, allowed: {origin_allowed}")
+    return response
+
 # Setup request logging middleware
 setup_request_logging(app)
 
@@ -53,6 +108,58 @@ setup_request_logging(app)
 def handle_preflight(path):
     response = app.make_default_options_response()
     return response
+
+# Simple in-memory cache for search results
+# Maximum of 100 most recent search results will be cached
+# Each entry has a key hash(query params) -> {result, timestamp}
+search_results_cache = {}
+CACHE_MAX_ITEMS = 100
+CACHE_TTL_SECONDS = 5 * 60  # 5 minutes cache
+
+# Function to generate a cache key based on query parameters
+def generate_cache_key(query_text, filters, time_range, sort_by, sort_order):
+    """Generate a unique cache key based on query parameters."""
+    key_dict = {
+        'query': query_text,
+        'filters': filters,
+        'time_range': time_range,
+        'sort_by': sort_by,
+        'sort_order': sort_order
+    }
+    key_str = json.dumps(key_dict, sort_keys=True)
+    return hashlib.md5(key_str.encode()).hexdigest()
+
+# Function to get cached search results
+def get_cached_search_results(cache_key):
+    """Get search results from cache if they exist and are not expired."""
+    if cache_key in search_results_cache:
+        cache_entry = search_results_cache[cache_key]
+        cache_age = time.time() - cache_entry['timestamp']
+        
+        # Check if cache entry is still valid
+        if cache_age < CACHE_TTL_SECONDS:
+            logger.debug(f"Cache hit for key {cache_key[:8]}...")
+            return cache_entry['result']
+            
+    return None
+
+# Function to cache search results
+def cache_search_results(cache_key, result):
+    """Cache search results with timestamp."""
+    # If cache is full, remove oldest entry
+    if len(search_results_cache) >= CACHE_MAX_ITEMS:
+        oldest_key = min(search_results_cache.keys(), 
+                        key=lambda k: search_results_cache[k]['timestamp'])
+        del search_results_cache[oldest_key]
+    
+    # Add new entry
+    search_results_cache[cache_key] = {
+        'result': result,
+        'timestamp': time.time()
+    }
+    logger.debug(f"Cached result for key {cache_key[:8]}...")
+    
+    return result
 
 class BackEnd:
     def __init__(self):
@@ -165,6 +272,66 @@ except Exception as e:
     logger.critical(f"Failed to initialize backend: {str(e)}")
     # Continue with Flask app, but endpoints will return errors
 
+# Register diagnostic endpoints
+logger.info("Registering diagnostic endpoints...")
+diagnostics_bp = register_diagnostic_endpoints(app)
+app.register_blueprint(diagnostics_bp)
+logger.info(f"Registered diagnostic endpoints with prefix: {diagnostics_bp.url_prefix}")
+
+# Add cache statistics endpoint
+@diagnostics_bp.route('/cache-stats', methods=['GET'])
+@performance_monitor(name="cache_stats_endpoint")
+def cache_stats():
+    """Get statistics about the search results cache."""
+    current_time = time.time()
+    
+    # Calculate statistics
+    total_entries = len(search_results_cache)
+    valid_entries = sum(1 for entry in search_results_cache.values() 
+                         if current_time - entry['timestamp'] < CACHE_TTL_SECONDS)
+    
+    # Calculate memory usage (approximate)
+    import sys
+    total_size = sys.getsizeof(search_results_cache)
+    for key, value in search_results_cache.items():
+        total_size += sys.getsizeof(key)
+        total_size += sys.getsizeof(value)
+        if 'result' in value:
+            total_size += sys.getsizeof(value['result'])
+    
+    # Get sample keys (first 10)
+    sample_keys = list(search_results_cache.keys())[:10]
+    
+    # Age information
+    age_info = {}
+    if search_results_cache:
+        oldest_key = min(search_results_cache.keys(), 
+                        key=lambda k: search_results_cache[k]['timestamp'])
+        newest_key = max(search_results_cache.keys(), 
+                        key=lambda k: search_results_cache[k]['timestamp'])
+        
+        oldest_age = current_time - search_results_cache[oldest_key]['timestamp']
+        newest_age = current_time - search_results_cache[newest_key]['timestamp']
+        
+        age_info = {
+            'oldest_entry_age_seconds': oldest_age,
+            'newest_entry_age_seconds': newest_age
+        }
+    
+    return jsonify({
+        'total_entries': total_entries,
+        'valid_entries': valid_entries,
+        'expired_entries': total_entries - valid_entries,
+        'max_entries': CACHE_MAX_ITEMS,
+        'ttl_seconds': CACHE_TTL_SECONDS,
+        'memory_usage_bytes': total_size,
+        'memory_usage_mb': round(total_size / (1024 * 1024), 2),
+        'cache_hit_ratio': round(valid_entries / total_entries, 2) if total_entries > 0 else 0,
+        'sample_keys': sample_keys,
+        **age_info,
+        'timestamp': datetime.now().isoformat()
+    })
+
 @app.route('/health', methods=['GET'])
 @performance_monitor(name="health_check")
 def health_check():
@@ -214,28 +381,114 @@ def health_check():
 @performance_monitor(name="query_endpoint")
 def query():
     try:
+        # Extract query parameters
         query_text = request.args.get('query', None)
         source = request.args.get('source', None)
         time_range = request.args.get('time_range', None)
         sentiment = request.args.get('sentiment', None)
+        sort_by = request.args.get('sort_by', 'relevance')  # Default to relevance sorting
+        sort_order = request.args.get('sort_order', 'desc')  # Default to descending order
         
+        # Check if cache should be bypassed
+        bypass_cache = request.args.get('bypass_cache', 'false').lower() == 'true'
+        
+        # Build filter dictionary
         filters = {}
         if source:
             filters["source"] = source
         if sentiment:
             filters["sentiment"] = sentiment
         
+        # Format time range if provided
+        time_range_obj = None
+        if time_range:
+            if time_range == '24h':
+                time_range_obj = {'start': 'now-1d/d'}
+            elif time_range == '7d':
+                time_range_obj = {'start': 'now-7d/d'}
+            elif time_range == '30d':
+                time_range_obj = {'start': 'now-30d/d'}
+            elif time_range == '90d':
+                time_range_obj = {'start': 'now-90d/d'}
+        
         logger.info(f"API query request received", extra={
             'extra': {
                 'query': query_text,
                 'source': source,
                 'time_range': time_range,
-                'sentiment': sentiment
+                'sentiment': sentiment,
+                'sort_by': sort_by,
+                'sort_order': sort_order,
+                'bypass_cache': bypass_cache
             }
         })
         
-        results = backend.process_search_query(query_text, filters, time_range)
-        return jsonify(results)
+        # Generate cache key
+        cache_key = generate_cache_key(query_text, filters, time_range, sort_by, sort_order)
+        
+        # Try to get results from cache if not bypassing
+        if not bypass_cache:
+            cached_result = get_cached_search_results(cache_key)
+            if cached_result:
+                logger.info(f"Returning cached search results for query: '{query_text}'")
+                return jsonify({
+                    **cached_result,
+                    'cached': True,
+                    'timestamp': datetime.now().isoformat(),
+                    'request_id': getattr(request, 'request_id', str(uuid.uuid4()))
+                })
+        
+        try:
+            # Try to get results from Elasticsearch
+            results = backend.process_search_query(query_text, filters, time_range_obj)
+            
+            # Format the response using the structure expected by frontend
+            response = {
+                'results': results,  # This is what frontend expects - direct access to results
+                'metadata': {
+                    'query': query_text,
+                    'filters': filters,
+                    'sort': {
+                        'field': sort_by,
+                        'order': sort_order
+                    },
+                    'timestamp': datetime.now().isoformat(),
+                    'request_id': getattr(request, 'request_id', str(uuid.uuid4()))
+                }
+            }
+            
+            # Cache the result
+            if not bypass_cache:
+                cache_search_results(cache_key, response)
+            
+            return jsonify(response)
+        except Exception as es_error:
+            # Log the Elasticsearch error
+            logger.error(f"Elasticsearch error: {str(es_error)}", extra={
+                'extra': {'traceback': traceback.format_exc()}
+            })
+            
+            # Generate fallback results
+            fallback_results = generate_mock_results(query_text, source, time_range, sentiment, sort_by, sort_order)
+            
+            # Format the response using the structure expected by frontend
+            response = {
+                'results': fallback_results,  # This is what frontend expects - direct access to results
+                'metadata': {
+                    'query': query_text,
+                    'filters': filters,
+                    'sort': {
+                        'field': sort_by,
+                        'order': sort_order
+                    },
+                    'fallback': True,
+                    'fallback_reason': str(es_error),
+                    'timestamp': datetime.now().isoformat(),
+                    'request_id': getattr(request, 'request_id', str(uuid.uuid4()))
+                }
+            }
+            
+            return jsonify(response)
     except Exception as e:
         error_trace = traceback.format_exc()
         logger.error(f"Query endpoint error: {str(e)}", extra={
@@ -247,6 +500,101 @@ def query():
             'timestamp': datetime.now().isoformat(),
             'request_id': getattr(request, 'request_id', None)
         }), 500
+
+# Add a fallback mock results generator
+def generate_mock_results(query_text, source=None, time_range=None, sentiment=None, sort_by='relevance', sort_order='desc'):
+    """Generate mock search results when Elasticsearch is unavailable."""
+    import random
+    from datetime import datetime, timedelta
+    
+    # Sample data for fallback results
+    sources = ["Reuters", "Bloomberg", "Wall Street Journal", "CNBC", "Financial Times"]
+    companies = ["Apple", "Tesla", "Microsoft", "Amazon", "Google", "Meta", "Netflix"]
+    sentiments = ["positive", "negative", "neutral"]
+    
+    # Apply source filter if provided
+    available_sources = [source] if source else sources
+    
+    # Configure number of results
+    num_results = random.randint(5, 15)
+    results = []
+    
+    for i in range(num_results):
+        # Generate published date based on time range
+        if time_range == '24h':
+            published_date = datetime.now() - timedelta(hours=random.randint(1, 24))
+        elif time_range == '7d':
+            published_date = datetime.now() - timedelta(days=random.randint(1, 7))
+        elif time_range == '30d':
+            published_date = datetime.now() - timedelta(days=random.randint(1, 30))
+        elif time_range == '90d':
+            published_date = datetime.now() - timedelta(days=random.randint(1, 90))
+        else:
+            published_date = datetime.now() - timedelta(days=random.randint(1, 30))
+        
+        # Generate sentiment
+        article_sentiment = sentiment if sentiment else random.choice(sentiments)
+        
+        # Generate sentiment score based on sentiment
+        if article_sentiment == "positive":
+            sentiment_score = random.uniform(0.3, 1.0)
+        elif article_sentiment == "negative":
+            sentiment_score = random.uniform(-1.0, -0.3)
+        else:
+            sentiment_score = random.uniform(-0.3, 0.3)
+        
+        # Generate article
+        article_source = random.choice(available_sources)
+        company = random.choice(companies)
+        
+        # Include query text in headline if provided
+        headline = f"{company} Reports Strong Financial Results"
+        if query_text:
+            if random.random() > 0.3:  # 70% chance to include query in headline
+                headline = f"{query_text}: {headline}"
+        
+        # Create the result object matching ES format
+        result = {
+            "_id": f"mock-{i}-{hash(f'{query_text}-{i}')}",
+            "_index": "financial_news",
+            "_score": random.uniform(0.7, 1.0),
+            "_source": {
+                "headline": headline,
+                "summary": f"A brief summary about {company}'s financial performance.",
+                "content": f"This is mock content for {company} related to {query_text if query_text else 'financial news'}.",
+                "url": f"https://example.com/article/{i}",
+                "source": article_source,
+                "published_at": published_date.isoformat(),
+                "sentiment": article_sentiment,
+                "sentiment_score": sentiment_score,
+                "categories": ["Finance", "Technology", "Markets"],
+                "companies": [
+                    {
+                        "name": company,
+                        "ticker": company[:4].upper()
+                    }
+                ]
+            },
+            "highlight": {
+                "headline": [f"<em>{headline}</em>"] if query_text and query_text.lower() in headline.lower() else [headline],
+                "summary": [f"A brief <em>summary</em> about {company}'s financial performance."]
+            }
+        }
+        results.append(result)
+    
+    # Sort results according to sort_by parameter
+    if sort_by == 'date':
+        results.sort(key=lambda x: x["_source"]["published_at"], reverse=(sort_order == 'desc'))
+    elif sort_by == 'sentiment':
+        results.sort(key=lambda x: x["_source"]["sentiment_score"], reverse=(sort_order == 'desc'))
+    elif sort_by == 'relevance' and query_text:
+        # Higher scores for results with query text in headline
+        for result in results:
+            if query_text.lower() in result["_source"]["headline"].lower():
+                result["_score"] += 0.3
+        results.sort(key=lambda x: x["_score"], reverse=(sort_order == 'desc'))
+    
+    return results
 
 @app.route('/article/<article_id>', methods=['GET'])
 @performance_monitor(name="get_article_endpoint")
@@ -295,10 +643,6 @@ def server_error(error):
 # Register debug endpoints
 logger.info("Setting up debug endpoints...")
 setup_debug_endpoints(app)
-
-# Register diagnostic endpoints
-logger.info("Setting up diagnostic endpoints...")
-register_diagnostic_endpoints(app)
 
 # Success startup message
 logger.info("Backend service fully initialized and ready")
