@@ -107,6 +107,11 @@ Parameters:
     Description: ID of the second private subnet
     Type: AWS::EC2::Subnet::Id
 
+  SSLCertificateArn:
+    Description: ARN of the SSL certificate from AWS Certificate Manager
+    Type: String
+    Default: "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERTIFICATE_ID"
+
 Mappings:
   RegionMap:
     us-east-1:
@@ -714,8 +719,8 @@ Resources:
         - Key: idle_timeout.timeout_seconds
           Value: '60'
       Subnets:
-        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
-        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
+        - !Ref PublicSubnet1ID
+        - !Ref PublicSubnet2ID
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       Tags:
@@ -723,6 +728,37 @@ Resources:
           Value: !Sub ${EnvironmentName}-backend-alb
         - Key: Environment
           Value: !Ref EnvironmentName
+
+  # HTTPS Listener
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      SslPolicy: ELBSecurityPolicy-TLS-1-2-2017-01
+
+  # HTTP Listener (redirects to HTTPS)
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: '443'
+            Host: '#{host}'
+            Path: '/#{path}'
+            Query: '#{query}'
+            StatusCode: HTTP_301
 
   # Target Group for Backend Servers
   BackendTargetGroup:
@@ -747,17 +783,6 @@ Resources:
           Value: !Sub ${EnvironmentName}-backend-tg
         - Key: Environment
           Value: !Ref EnvironmentName
-
-  # Listener for Application Load Balancer (HTTP)
-  LoadBalancerListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref BackendTargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
 
   # Auto Scaling Policies
   ScaleUpPolicy:

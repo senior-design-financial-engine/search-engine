@@ -14,12 +14,12 @@ Parameters:
   DomainName:
     Description: Domain name for the application (optional, leave empty to use CloudFront domain)
     Type: String
-    Default: ""
+    Default: "financialnewsengine.com"
   
   CreateRoute53Records:
     Description: Whether to create Route 53 records (set to false if DomainName is empty)
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues:
       - "true"
       - "false"

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Use environment variables with fallbacks
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // ms
