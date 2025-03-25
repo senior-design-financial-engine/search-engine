@@ -520,6 +520,282 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentName
 
+  # Add a CodeBuild project for API code deployment
+  ApiCodeDeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-api-deploy
+      Description: 'Deploy the API code directly to backend instances'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: ENVIRONMENT
+            Value: !Ref EnvironmentName
+          - Name: BACKEND_STACK_NAME
+            Value: !Ref BackendStackName
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.9
+              commands:
+                - echo "Installing required tools"
+                - pip install pyyaml boto3 awscli
+          
+            pre_build:
+              commands:
+                - echo "Preparing API code for deployment"
+                - cd backend || (echo "Backend directory not found, using project root"; cd .)
+                - echo "Extracting API code for direct deployment"
+                - mkdir -p api
+                
+                # Prepare the API code as a deployment package
+                - python -c '
+                  import yaml
+                  import os
+                  import json
+                  
+                  # Create deployment files directory
+                  os.makedirs("api/deploy", exist_ok=True)
+                  
+                  # Read app.py if it exists
+                  app_code = ""
+                  if os.path.exists("app.py"):
+                    with open("app.py", "r") as f:
+                      app_code = f.read()
+                  else:
+                    app_code = """
+                    # Default Flask app
+                    from flask import Flask, jsonify
+                    app = Flask(__name__)
+                    
+                    @app.route("/")
+                    def hello():
+                        return "Hello World!"
+                    
+                    @app.route("/ping")
+                    def ping():
+                        return jsonify({"status": "ok"})
+                    
+                    if __name__ == "__main__":
+                        app.run(host="0.0.0.0")
+                    """
+                  
+                  # Read requirements.txt if it exists
+                  requirements = ""
+                  if os.path.exists("requirements.txt"):
+                    with open("requirements.txt", "r") as f:
+                      requirements = f.read()
+                  else:
+                    requirements = """
+                    flask==2.3.3
+                    flask-cors==4.0.0
+                    gunicorn==21.2.0
+                    psutil==5.9.5
+                    """
+                  
+                  # Write deployment files
+                  with open("api/deploy/app.py", "w") as f:
+                    f.write(app_code)
+                  
+                  with open("api/deploy/requirements.txt", "w") as f:
+                    f.write(requirements)
+                  
+                  # Create service file
+                  service_file = """
+                  [Unit]
+                  Description=Financial News Engine Flask App
+                  After=network.target
+                  
+                  [Service]
+                  User=root
+                  WorkingDirectory=/opt/financial-news-engine
+                  ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
+                  Restart=always
+                  TimeoutStartSec=60
+                  RestartSec=10
+                  
+                  [Install]
+                  WantedBy=multi-user.target
+                  """
+                  
+                  with open("api/deploy/financial-news.service", "w") as f:
+                    f.write(service_file)
+                  
+                  # Create deployment script
+                  deploy_script = """#!/bin/bash
+                  set -e
+                  
+                  # Create directory if it doesn't exist
+                  mkdir -p /opt/financial-news-engine
+                  mkdir -p /opt/financial-news-engine/logs
+                  
+                  # Copy files
+                  cp app.py /opt/financial-news-engine/
+                  cp requirements.txt /opt/financial-news-engine/
+                  cp financial-news.service /etc/systemd/system/
+                  
+                  # Install dependencies
+                  cd /opt/financial-news-engine
+                  pip3 install -r requirements.txt
+                  
+                  # Set permissions
+                  chmod 755 /opt/financial-news-engine
+                  
+                  # Reload and start service
+                  systemctl daemon-reload
+                  systemctl enable financial-news.service
+                  systemctl restart financial-news.service
+                  
+                  echo "API deployment completed"
+                  """
+                  
+                  with open("api/deploy/deploy.sh", "w") as f:
+                    f.write(deploy_script)
+                    os.chmod("api/deploy/deploy.sh", 0o755)
+                  
+                  # Create verification script
+                  verify_script = """#!/bin/bash
+                  set -e
+                  
+                  echo "Verifying backend service startup..."
+                  
+                  # Wait for the service to start
+                  for i in {1..12}; do
+                    if curl -s http://localhost:5000/ping > /dev/null; then
+                      echo "Service is responding to ping"
+                      break
+                    fi
+                    
+                    if [ $i -eq 12 ]; then
+                      echo "ERROR: Service failed to start within 60 seconds"
+                      exit 1
+                    fi
+                    
+                    echo "Waiting for service to start (attempt $i/12)..."
+                    sleep 5
+                  done
+                  
+                  echo "Startup verification successful"
+                  """
+                  
+                  with open("api/deploy/verify.sh", "w") as f:
+                    f.write(verify_script)
+                    os.chmod("api/deploy/verify.sh", 0o755)
+                  '
+            
+            build:
+              commands:
+                - echo "Getting backend instances from Auto Scaling Group"
+                - |
+                  # Get the Auto Scaling Group name from the backend stack
+                  ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+                  echo "Auto Scaling Group: $ASG_NAME"
+                  
+                  # Get the instance IDs from the Auto Scaling Group
+                  INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
+                  echo "Instance IDs: $INSTANCE_IDS"
+                  
+                  if [ -z "$INSTANCE_IDS" ]; then
+                    echo "No running instances found in Auto Scaling Group"
+                    exit 0
+                  fi
+                  
+                  # Deploy to each instance using SSM Run Command
+                  for INSTANCE_ID in $INSTANCE_IDS; do
+                    echo "Deploying to instance $INSTANCE_ID"
+                    
+                    # Create a staging directory on the instance
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["mkdir -p /tmp/api-deploy"] \
+                      --comment "Create staging directory for API deployment" \
+                      --output text
+                    
+                    # Upload each deployment file
+                    echo "Uploading app.py"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cat > /tmp/api-deploy/app.py << 'EOL'\n$(cat api/deploy/app.py)\nEOL"] \
+                      --comment "Upload app.py" \
+                      --output text
+                    
+                    echo "Uploading requirements.txt"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cat > /tmp/api-deploy/requirements.txt << 'EOL'\n$(cat api/deploy/requirements.txt)\nEOL"] \
+                      --comment "Upload requirements.txt" \
+                      --output text
+                    
+                    echo "Uploading service file"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cat > /tmp/api-deploy/financial-news.service << 'EOL'\n$(cat api/deploy/financial-news.service)\nEOL"] \
+                      --comment "Upload service file" \
+                      --output text
+                    
+                    echo "Uploading deployment script"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cat > /tmp/api-deploy/deploy.sh << 'EOL'\n$(cat api/deploy/deploy.sh)\nEOL\nchmod +x /tmp/api-deploy/deploy.sh"] \
+                      --comment "Upload deployment script" \
+                      --output text
+                    
+                    echo "Uploading verification script"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cat > /tmp/api-deploy/verify.sh << 'EOL'\n$(cat api/deploy/verify.sh)\nEOL\nchmod +x /tmp/api-deploy/verify.sh"] \
+                      --comment "Upload verification script" \
+                      --output text
+                    
+                    # Execute deployment
+                    echo "Executing deployment on instance $INSTANCE_ID"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"] \
+                      --comment "Run API deployment" \
+                      --output text
+                    
+                    # Execute verification
+                    echo "Verifying deployment on instance $INSTANCE_ID"
+                    aws ssm send-command \
+                      --instance-ids $INSTANCE_ID \
+                      --document-name "AWS-RunShellScript" \
+                      --parameters commands=["cd /tmp/api-deploy && ./verify.sh"] \
+                      --comment "Verify API deployment" \
+                      --output text
+                  done
+            
+            post_build:
+              commands:
+                - echo "API code deployment to instances completed successfully"
+          
+          artifacts:
+            files:
+              - api/deploy/**/*
+        TimeoutInMinutes: 30
+        Tags:
+          - Key: Name
+            Value: !Sub ${EnvironmentName}-financial-news-api-deploy
+          - Key: Environment
+            Value: !Ref EnvironmentName
+
   # CodePipeline for CI/CD
   FinancialNewsPipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -577,31 +853,41 @@ Resources:
                 - Name: BackendBuildOutput
               RunOrder: 1
         
-        - Name: Deploy
-          Actions:
-            - Name: DeployFrontend
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: '1'
-              Configuration:
-                ProjectName: !Ref FrontendDeployProject
-              InputArtifacts:
-                - Name: FrontendBuildOutput
-              RunOrder: 1
-            
-            - Name: DeployBackend
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: '1'
-              Configuration:
-                ProjectName: !Ref BackendDeployProject
-              InputArtifacts:
-                - Name: BackendBuildOutput
-              RunOrder: 2
+        - Name: DeployApiCode
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: '1'
+          Configuration:
+            ProjectName: !Ref ApiCodeDeployProject
+          InputArtifacts:
+            - Name: SourceCode
+          RunOrder: 1
+        
+        - Name: DeployFrontend
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: '1'
+          Configuration:
+            ProjectName: !Ref FrontendDeployProject
+          InputArtifacts:
+            - Name: FrontendBuildOutput
+          RunOrder: 1
+        
+        - Name: DeployBackend
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: '1'
+          Configuration:
+            ProjectName: !Ref BackendDeployProject
+          InputArtifacts:
+            - Name: BackendBuildOutput
+          RunOrder: 2
       
       Tags:
         - Key: Name

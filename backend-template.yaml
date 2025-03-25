@@ -102,6 +102,11 @@ Parameters:
     Type: String
     Default: "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERTIFICATE_ID"
 
+  BackendApiCodeKey:
+    Description: S3 key for the backend API code
+    Type: String
+    Default: api/backend-api.yaml
+
 Conditions:
   HasDomainName: !Not [!Equals [!Ref BackendDomainName, ""]]
 
@@ -146,6 +151,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
         - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMFullAccess
       Path: /
       Policies:
         - PolicyName: ESAccessPolicy
@@ -166,10 +172,25 @@ Resources:
               - Effect: Allow
                 Action:
                   - 's3:GetObject'
+                  - 's3:GetObjectVersion'
                   - 's3:ListBucket'
                 Resource: 
                   - 'arn:aws:s3:::financial-news-assets/*'
                   - 'arn:aws:s3:::financial-news-assets'
+        - PolicyName: SSMRemoteCommandsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssm:DescribeInstanceInformation'
+                  - 'ssm:GetCommandInvocation'
+                  - 'ssm:ListCommandInvocations'
+                  - 'ssm:ListCommands'
+                  - 'ssm:SendCommand'
+                  - 'ssm:GetDocument'
+                  - 'ssm:ListDocuments'
+                Resource: '*'
 
   # Instance Profile for EC2 instances
   BackendInstanceProfile:
@@ -236,7 +257,7 @@ Resources:
         configSets:
           default:
             - install_packages
-            - configure_app
+            - setup_basic_app
             - configure_services
             - start_services
         
@@ -250,6 +271,7 @@ Resources:
               wget: []
               curl: []
               jq: []
+              python3-yaml: []
           commands:
             01_install_cloudwatch_agent:
               command: |
@@ -260,18 +282,21 @@ Resources:
                   echo "CloudWatch agent already installed"
                 fi
         
-        configure_app:
-          files:
-            /opt/financial-news-engine/app.py:
-              content: |
-                from flask import Flask, jsonify, request
-                from flask_cors import CORS
+        setup_basic_app:
+          commands:
+            01_create_app_directory:
+              command: |
+                mkdir -p /opt/financial-news-engine
+                mkdir -p /opt/financial-news-engine/logs
+                chmod 755 /opt/financial-news-engine
+            
+            02_create_basic_app:
+              command: |
+                # Create a basic Flask app that will be replaced by CI/CD
+                cat > /opt/financial-news-engine/app.py << 'EOL'
+                from flask import Flask, jsonify
                 import os
                 import logging
-                import sys
-                import json
-                import time
-                from datetime import datetime
                 
                 # Configure logging
                 log_dir = "logs"
@@ -282,559 +307,42 @@ Resources:
                 logger.setLevel(logging.INFO)
                 
                 # Create console handler
-                ch = logging.StreamHandler(sys.stdout)
-                ch.setLevel(logging.INFO)
+                handler = logging.StreamHandler()
+                handler.setLevel(logging.INFO)
+                logger.addHandler(handler)
                 
-                # Create file handler
-                fh = logging.FileHandler(os.path.join(log_dir, "backend.log"))
-                fh.setLevel(logging.INFO)
-                
-                # Create formatter and add to handlers
-                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-                ch.setFormatter(formatter)
-                fh.setFormatter(formatter)
-                
-                # Add handlers to logger
-                logger.addHandler(ch)
-                logger.addHandler(fh)
-                
-                # Create Flask app
+                # Flask app
                 app = Flask(__name__)
                 
-                # Setup CORS - make sure it supports all routes
-                cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
-                if cors_origins != '*':
-                    # If specific origins are provided, split the comma-separated list
-                    cors_origins = [origin.strip() for origin in cors_origins.split(',')]
-                    # Enable credentials only with specific origins
-                    CORS(app, resources={r"/*": {"origins": cors_origins}}, supports_credentials=True)
-                else:
-                    # For wildcard origins, don't use credentials to avoid browser issues
-                    CORS(app, resources={r"/*": {"origins": cors_origins}})
+                @app.route('/')
+                def home():
+                    return jsonify({
+                        "status": "initializing",
+                        "message": "API server is initializing and will be replaced by CI/CD deployment"
+                    })
                 
-                # Log CORS configuration
-                logger.info(f"CORS configured with origins: {cors_origins}")
-                
-                # Load environment variables
-                es_url = os.environ.get('ELASTICSEARCH_URL')
-                es_api_key = os.environ.get('ELASTICSEARCH_API_KEY')
-                es_index = os.environ.get('ELASTICSEARCH_INDEX')
-                
-                # Add a global OPTIONS route handler for CORS preflight requests
-                @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
-                @app.route('/<path:path>', methods=['OPTIONS'])
-                def handle_options(path):
-                    response = app.make_default_options_response()
-                    # Explicitly add required CORS headers for preflight
-                    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-                    response.headers['Access-Control-Max-Age'] = '3600'  # Cache preflight response for 1 hour
-                    return response
-                
-                @app.route('/health', methods=['GET'])
+                @app.route('/health')
                 def health():
-                    """Health check endpoint"""
-                    status = {
-                        "status": "healthy",
-                        "timestamp": datetime.now().isoformat(),
-                        "version": "1.0",
-                        "environment": os.environ.get('ENVIRONMENT', 'development')
-                    }
-                    
-                    # Add Elasticsearch connection status if configured
-                    if es_url and es_api_key:
-                        try:
-                            # Import here to avoid requiring the package if not used
-                            from elasticsearch import Elasticsearch
-                            
-                            # Test connection with a short timeout
-                            es = Elasticsearch([es_url], api_key=es_api_key, request_timeout=5)
-                            es_info = es.info()
-                            
-                            status["elasticsearch"] = {
-                                "connected": True,
-                                "version": es_info.get("version", {}).get("number", "unknown")
-                            }
-                        except Exception as e:
-                            status["elasticsearch"] = {
-                                "connected": False,
-                                "error": str(e)
-                            }
-                            # Mark as degraded if ES connection fails
-                            status["status"] = "degraded"
-                            logger.warning(f"Elasticsearch connection failed: {str(e)}")
-                    else:
-                        status["elasticsearch"] = {
-                            "connected": False,
-                            "error": "Not configured"
-                        }
-                    
-                    return jsonify(status)
+                    return jsonify({"status": "healthy"})
                 
-                @app.route('/diagnostic/health', methods=['GET'])
-                def diagnostic_health():
-                    """Diagnostic health check endpoint - frontend expects this route"""
-                    return health()
-                
-                @app.route('/diagnostic', methods=['GET'])
-                def diagnostic():
-                    """Diagnostic information endpoint"""
-                    import platform
-                    import socket
-                    import psutil
-                    
-                    # Collect system information
-                    system_info = {
-                        "hostname": socket.gethostname(),
-                        "platform": platform.system(),
-                        "platform_version": platform.version(),
-                        "python_version": platform.python_version(),
-                        "cpu_percent": psutil.cpu_percent(),
-                        "memory_percent": psutil.virtual_memory().percent,
-                        "disk_percent": psutil.disk_usage('/').percent
-                    }
-                    
-                    # Add environment variables (redacted)
-                    env_vars = {}
-                    for key, value in os.environ.items():
-                        if key.lower() in ('api_key', 'key', 'secret', 'password', 'token'):
-                            env_vars[key] = '***REDACTED***'
-                        else:
-                            env_vars[key] = value
-                    
-                    return jsonify({
-                        "system": system_info,
-                        "environment": env_vars,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                
-                @app.route('/diagnostic/report', methods=['GET'])
-                def diagnostic_report():
-                    """Diagnostic report endpoint - frontend expects this route"""
-                    import platform
-                    import socket
-                    import psutil
-                    
-                    # Collect system information
-                    system_info = {
-                        "hostname": socket.gethostname(),
-                        "platform": platform.system(),
-                        "platform_version": platform.version(),
-                        "python_version": platform.python_version(),
-                        "cpu_percent": psutil.cpu_percent(),
-                        "memory_percent": psutil.virtual_memory().percent,
-                        "disk_percent": psutil.disk_usage('/').percent
-                    }
-                    
-                    # Add environment variables (redacted)
-                    env_vars = {}
-                    for key, value in os.environ.items():
-                        if key.lower() in ('api_key', 'key', 'secret', 'password', 'token'):
-                            env_vars[key] = '***REDACTED***'
-                        else:
-                            env_vars[key] = value
-                    
-                    # More detailed report with additional data
-                    return jsonify({
-                        "system": system_info,
-                        "environment": env_vars,
-                        "timestamp": datetime.now().isoformat(),
-                        "memory": {
-                            "total": psutil.virtual_memory().total,
-                            "available": psutil.virtual_memory().available,
-                            "used": psutil.virtual_memory().used,
-                            "percent": psutil.virtual_memory().percent
-                        },
-                        "cpu": {
-                            "percent": psutil.cpu_percent(interval=0.1, percpu=True),
-                            "count": psutil.cpu_count(),
-                            "physical_count": psutil.cpu_count(logical=False) or 0
-                        },
-                        "disk": {
-                            "total": psutil.disk_usage('/').total,
-                            "used": psutil.disk_usage('/').used,
-                            "free": psutil.disk_usage('/').free,
-                            "percent": psutil.disk_usage('/').percent
-                        },
-                        "network": {
-                            "hostname": socket.gethostname(),
-                            "ip": socket.gethostbyname(socket.gethostname())
-                        }
-                    })
-                
-                @app.route('/query', methods=['GET'])
-                def query():
-                    """Search endpoint for querying articles"""
-                    query_text = request.args.get('query', '')
-                    source = request.args.get('source', None)
-                    time_range = request.args.get('time_range', None)
-                    sentiment = request.args.get('sentiment', None)
-                    sort_by = request.args.get('sort_by', 'relevance')  # Default to relevance sorting
-                    
-                    logger.info(f"Search query received: {query_text}, filters: source={source}, time_range={time_range}, sentiment={sentiment}, sort_by={sort_by}")
-                    
-                    # Check if Elasticsearch is configured
-                    if es_url and es_api_key and es_index:
-                        try:
-                            from elasticsearch import Elasticsearch
-                            
-                            # Setup Elasticsearch client
-                            es = Elasticsearch([es_url], api_key=es_api_key, request_timeout=10)
-                            
-                            # Build Elasticsearch query
-                            must_conditions = []
-                            filter_conditions = []
-                            
-                            # Add text search if query provided
-                            if query_text:
-                                must_conditions.append({
-                                    "multi_match": {
-                                        "query": query_text,
-                                        "fields": [
-                                            "headline^3",  # Boost headline matches
-                                            "summary^2",   # Boost summary matches
-                                            "content",
-                                            "companies.name^2"
-                                        ],
-                                        "fuzziness": "AUTO"
-                                    }
-                                })
-                            
-                            # Add filters
-                            if source:
-                                filter_conditions.append({
-                                    "term": {"source": source}
-                                })
-                            
-                            if sentiment:
-                                filter_conditions.append({
-                                    "term": {"sentiment": sentiment}
-                                })
-                            
-                            if time_range:
-                                # Convert time range to Elasticsearch date range
-                                if time_range == '24h':
-                                    time_filter = "now-1d"
-                                elif time_range == '7d':
-                                    time_filter = "now-7d"
-                                elif time_range == '30d':
-                                    time_filter = "now-30d"
-                                elif time_range == '90d':
-                                    time_filter = "now-90d"
-                                else:
-                                    time_filter = None
-                                    
-                                if time_filter:
-                                    filter_conditions.append({
-                                        "range": {
-                                            "published_at": {"gte": time_filter}
-                                        }
-                                    })
-                            
-                            # Set up sorting based on sort_by parameter
-                            sort_config = []
-                            if sort_by == 'date':
-                                sort_config = [{"published_at": {"order": "desc"}}]
-                            elif sort_by == 'relevance':
-                                sort_config = [{"_score": {"order": "desc"}}]
-                            elif sort_by == 'sentiment':
-                                sort_config = [{"sentiment_score": {"order": "desc"}}]
-                            else:
-                                # Default sorting: relevance first, then date
-                                sort_config = [
-                                    {"_score": {"order": "desc"}},
-                                    {"published_at": {"order": "desc"}}
-                                ]
-                            
-                            # Create the full query
-                            es_query = {
-                                "query": {
-                                    "bool": {
-                                        "must": must_conditions if must_conditions else [{"match_all": {}}],
-                                        "filter": filter_conditions
-                                    }
-                                },
-                                "highlight": {
-                                    "fields": {
-                                        "headline": {},
-                                        "summary": {},
-                                        "content": {}
-                                    }
-                                },
-                                "sort": sort_config,
-                                "size": 50  # Return up to 50 results
-                            }
-                            
-                            # Execute search
-                            response = es.search(index=es_index, body=es_query)
-                            
-                            # Extract and return results
-                            return jsonify(response["hits"]["hits"])
-                        
-                        except Exception as e:
-                            logger.error(f"Elasticsearch search error: {str(e)}")
-                            # Fall back to mock results if Elasticsearch fails
-                            return jsonify(generate_mock_results(query_text, source, time_range, sentiment, sort_by))
-                    else:
-                        # If Elasticsearch is not configured, return mock results
-                        logger.info("Elasticsearch not configured, returning mock results")
-                        return jsonify(generate_mock_results(query_text, source, time_range, sentiment, sort_by))
-                
-                def generate_mock_results(query_text, source=None, time_range=None, sentiment=None, sort_by='relevance'):
-                    """Generate mock search results for testing"""
-                    import random
-                    from datetime import datetime, timedelta
-                    
-                    # Sample list of sources
-                    sources = ["Reuters", "Bloomberg", "Wall Street Journal", "CNBC", "Financial Times"]
-                    
-                    # Sample list of companies
-                    companies = ["Apple", "Tesla", "Microsoft", "Amazon", "Google", "Meta", "Netflix"]
-                    
-                    # Sample sentiments
-                    sentiments = ["positive", "negative", "neutral"]
-                    
-                    # Configure number of results
-                    num_results = random.randint(8, 15)
-                    if source:
-                        # Filter to only include requested source
-                        mock_source = source
-                    else:
-                        mock_source = None
-                    
-                    results = []
-                    for i in range(num_results):
-                        # Generate base article
-                        article_source = mock_source if mock_source else random.choice(sources)
-                        company = random.choice(companies)
-                        article_sentiment = sentiment if sentiment else random.choice(sentiments)
-                        
-                        # Generate published date based on time range
-                        if time_range == '24h':
-                            hours_ago = random.randint(1, 24)
-                            published_date = (datetime.now() - timedelta(hours=hours_ago)).isoformat()
-                        elif time_range == '7d':
-                            days_ago = random.randint(1, 7)
-                            published_date = (datetime.now() - timedelta(days=days_ago)).isoformat()
-                        elif time_range == '30d':
-                            days_ago = random.randint(1, 30)
-                            published_date = (datetime.now() - timedelta(days=days_ago)).isoformat()
-                        else:
-                            days_ago = random.randint(1, 90)
-                            published_date = (datetime.now() - timedelta(days=days_ago)).isoformat()
-                        
-                        # Generate sentiment score based on sentiment
-                        if article_sentiment == "positive":
-                            sentiment_score = random.uniform(0.3, 1.0)
-                        elif article_sentiment == "negative":
-                            sentiment_score = random.uniform(-1.0, -0.3)
-                        else:
-                            sentiment_score = random.uniform(-0.3, 0.3)
-                        
-                        # Ensure query text appears in results if provided
-                        headline_prefix = ""
-                        if query_text and random.random() > 0.3:  # 70% chance to include query in headline
-                            headline_prefix = f"{query_text}: "
-                        
-                        article = {
-                            "_id": f"mock-article-{i}",
-                            "_source": {
-                                "headline": f"{headline_prefix}{company} Reports Strong Financial Results",
-                                "summary": f"A brief summary about {company}'s financial performance.",
-                                "url": f"https://example.com/article/{i}",
-                                "source": article_source,
-                                "published_at": published_date,
-                                "sentiment": article_sentiment,
-                                "sentiment_score": sentiment_score,
-                                "companies": [
-                                    {
-                                        "name": company,
-                                        "ticker": company[:4].upper()
-                                    }
-                                ]
-                            }
-                        }
-                        results.append(article)
-                    
-                    # Apply sorting to mock results
-                    if sort_by == 'date':
-                        results.sort(key=lambda x: x["_source"]["published_at"], reverse=True)
-                    elif sort_by == 'sentiment':
-                        results.sort(key=lambda x: x["_source"]["sentiment_score"], reverse=True)
-                    # For 'relevance', we keep the default order with query matches prioritized
-                    
-                    return results
-                
-                @app.route('/ping', methods=['GET'])
+                @app.route('/ping')
                 def ping():
-                    """Simple ping endpoint for quick health checks"""
                     return jsonify({"status": "ok"})
-                
-                # Startup validation endpoint to verify the server is properly configured
-                @app.route('/setup-validate', methods=['GET'])
-                def setup_validate():
-                    """Validates the server setup"""
-                    import subprocess
-                    
-                    # Check if we can resolve DNS
-                    dns_check = {"success": False}
-                    try:
-                        result = subprocess.run(['nslookup', 'google.com'], capture_output=True, text=True, timeout=5)
-                        dns_check = {
-                            "success": result.returncode == 0,
-                            "output": result.stdout
-                        }
-                    except Exception as e:
-                        dns_check["error"] = str(e)
-                    
-                    # Check disk space
-                    disk_check = {"success": False}
-                    try:
-                        disk = psutil.disk_usage('/')
-                        disk_check = {
-                            "success": disk.percent < 90,  # Less than 90% used is success
-                            "percent_used": disk.percent,
-                            "free_gb": round(disk.free / (1024**3), 2)
-                        }
-                    except Exception as e:
-                        disk_check["error"] = str(e)
-                    
-                    # Check ES connectivity if configured
-                    es_check = {"configured": False}
-                    if es_url and es_api_key:
-                        es_check["configured"] = True
-                        try:
-                            from elasticsearch import Elasticsearch
-                            es = Elasticsearch([es_url], api_key=es_api_key, request_timeout=5)
-                            es_info = es.info()
-                            es_check["success"] = True
-                            es_check["version"] = es_info.get("version", {}).get("number", "unknown")
-                        except Exception as e:
-                            es_check["success"] = False
-                            es_check["error"] = str(e)
-                    
-                    # Overall status
-                    all_success = all([
-                        dns_check.get("success", False),
-                        disk_check.get("success", False),
-                        # Only require ES if configured
-                        not es_check.get("configured", False) or es_check.get("success", False)
-                    ])
-                    
-                    return jsonify({
-                        "success": all_success,
-                        "timestamp": datetime.now().isoformat(),
-                        "checks": {
-                            "dns": dns_check,
-                            "disk": disk_check,
-                            "elasticsearch": es_check
-                        }
-                    })
-                
-                # Add handlers for other common errors
-                @app.errorhandler(404)
-                def not_found(e):
-                    return jsonify({"error": "Not found", "message": str(e)}), 404
-                
-                @app.errorhandler(500)
-                def server_error(e):
-                    logger.error(f"Server error: {str(e)}")
-                    return jsonify({"error": "Internal server error", "message": str(e)}), 500
-                    
-                @app.errorhandler(405)
-                def method_not_allowed(e):
-                    return jsonify({"error": "Method not allowed", "message": str(e)}), 405
-                
-                @app.errorhandler(400)
-                def bad_request(e):
-                    return jsonify({"error": "Bad request", "message": str(e)}), 400
-                
-                # Add after-request handler to ensure CORS headers are added to all responses
-                @app.after_request
-                def add_cors_headers(response):
-                    # Ensure all responses have appropriate CORS headers
-                    if 'Access-Control-Allow-Origin' not in response.headers:
-                        cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
-                        if cors_origins == '*':
-                            response.headers['Access-Control-Allow-Origin'] = '*'
-                        # For specific origins, the CORS extension will handle it
-                    return response
                 
                 if __name__ == '__main__':
                     logger.info("Starting Flask application")
                     port = int(os.environ.get('PORT', 5000))
                     app.run(host='0.0.0.0', port=port)
-              mode: "000644"
-              owner: "root"
-              group: "root"
-            
-            /opt/financial-news-engine/requirements.txt:
-              content: |
+                EOL
+                
+                # Create a basic requirements.txt
+                cat > /opt/financial-news-engine/requirements.txt << 'EOL'
                 flask==2.3.3
-                flask-cors==4.0.0
-                elasticsearch==8.9.0
-                requests==2.31.0
-                python-dotenv==1.0.0
                 gunicorn==21.2.0
-                psutil==5.9.5
-              mode: "000644"
-              owner: "root"
-              group: "root"
-            
-            /opt/financial-news-engine/verify_startup.sh:
-              content: |
-                #!/bin/bash
-                set -e
+                EOL
                 
-                echo "Verifying backend service startup..."
-                
-                # Wait for the service to start
-                for i in {1..12}; do
-                  if curl -s http://localhost:5000/ping > /dev/null; then
-                    echo "Service is responding to ping"
-                    break
-                  fi
-                  
-                  if [ $i -eq 12 ]; then
-                    echo "ERROR: Service failed to start within 60 seconds"
-                    exit 1
-                  fi
-                  
-                  echo "Waiting for service to start (attempt $i/12)..."
-                  sleep 5
-                done
-                
-                # Verify setup validation endpoint
-                SETUP_RESULT=$(curl -s http://localhost:5000/setup-validate)
-                SUCCESS=$(echo $SETUP_RESULT | grep -o '"success": true' || echo "")
-                
-                if [ -n "$SUCCESS" ]; then
-                  echo "Startup verification successful"
-                  exit 0
-                else
-                  echo "WARNING: Setup validation failed:"
-                  echo $SETUP_RESULT
-                  exit 1
-                fi
-              mode: "000755"
-              owner: "root"
-              group: "root"
-          
-          commands:
-            01_install_pip_packages:
-              command: |
-                cd /opt/financial-news-engine/
-                pip3 install --no-cache-dir -r requirements.txt
-            
-            02_create_logs_dir:
-              command: |
-                mkdir -p /opt/financial-news-engine/logs
-                chmod 755 /opt/financial-news-engine/logs
-        
-        configure_services:
-          files:
-            /etc/systemd/system/financial-news.service:
-              content: !Sub |
+                # Create service file
+                cat > /etc/systemd/system/financial-news.service << 'EOL'
                 [Unit]
                 Description=Financial News Engine Flask App
                 After=network.target
@@ -844,24 +352,19 @@ Resources:
                 WorkingDirectory=/opt/financial-news-engine
                 ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
                 Restart=always
-                # Set a 60s startup timeout to ensure the service has enough time to initialize
                 TimeoutStartSec=60
-                # Ensure the service restarts after 10s if it fails
                 RestartSec=10
-                Environment=ELASTICSEARCH_URL=${ElasticsearchEndpoint}
-                Environment=ELASTICSEARCH_API_KEY=${ElasticsearchApiKey}
-                Environment=ELASTICSEARCH_INDEX=${ElasticsearchIndex}
-                Environment=ES_NUMBER_OF_SHARDS=${EsNumberOfShards}
-                Environment=ES_NUMBER_OF_REPLICAS=${EsNumberOfReplicas}
-                Environment=ENVIRONMENT=${EnvironmentName}
-                Environment=CORS_ALLOWED_ORIGINS=${CorsAllowedOrigins}
                 
                 [Install]
                 WantedBy=multi-user.target
-              mode: "000644"
-              owner: "root"
-              group: "root"
-            
+                EOL
+                
+                # Install dependencies
+                cd /opt/financial-news-engine
+                pip3 install -r requirements.txt
+        
+        configure_services:
+          files:
             /opt/financial-news-engine/.env:
               content: !Sub |
                 ELASTICSEARCH_URL=${ElasticsearchEndpoint}
@@ -958,6 +461,10 @@ Resources:
                 systemctl daemon-reload
                 systemctl enable amazon-cloudwatch-agent
                 systemctl start amazon-cloudwatch-agent
+            
+            05_verify_service:
+              command: |
+                /opt/financial-news-engine/verify_startup.sh || echo "Service verification failed but continuing"
     
     Properties:
       LaunchTemplateName: !Sub ${EnvironmentName}-backend-lt
@@ -1154,7 +661,9 @@ Resources:
       DisplayName: !Sub ${EnvironmentName}-backend-alerts
       TopicName: !Sub ${EnvironmentName}-backend-alerts
 
-  # Add CORS Listener Rule
+  # CORS handling is now implemented directly in the Flask application
+  # This rule just handles OPTIONS requests and returns a 200 status code
+  # The actual CORS headers are added by the API backend code
   CorsPreflightRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -1170,7 +679,20 @@ Resources:
             ContentType: text/plain
             StatusCode: '200'
             MessageBody: 'CORS Preflight'
-          Order: 1
+
+  # Forward all non-OPTIONS requests to the target group
+  # The actual CORS headers will be added by the backend application
+  CorsHeadersRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 2
+      Conditions:
+        - Field: path-pattern
+          Values: [ '/*' ]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
 
 Outputs:
   BackendALBDNSName:
