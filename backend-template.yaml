@@ -16,6 +16,11 @@ Parameters:
     Type: String
     Default: ""
   
+  CorsAllowedOrigins:
+    Description: Comma-separated list of domains allowed to access the API (e.g., financialnewsengine.com,www.financialnewsengine.com)
+    Type: String
+    Default: "*"
+  
   VpcStackName:
     Description: Name of the VPC CloudFormation stack
     Type: String
@@ -296,6 +301,7 @@ Resources:
             log "Creating Flask application"
             cat > app.py << 'EOL'
             from flask import Flask, jsonify, request
+            from flask_cors import CORS
             import os
             import logging
             import sys
@@ -330,6 +336,12 @@ Resources:
             
             # Create Flask app
             app = Flask(__name__)
+            
+            # Setup CORS
+            cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
+            if cors_origins != '*':
+                cors_origins = [origin.strip() for origin in cors_origins.split(',')]
+            CORS(app, resources={r"/*": {"origins": cors_origins}})
             
             # Load environment variables
             es_url = os.environ.get('ELASTICSEARCH_URL')
@@ -527,6 +539,7 @@ Resources:
             Environment=ES_NUMBER_OF_SHARDS=${EsNumberOfShards}
             Environment=ES_NUMBER_OF_REPLICAS=${EsNumberOfReplicas}
             Environment=ENVIRONMENT=${EnvironmentName}
+            Environment=CORS_ALLOWED_ORIGINS=${CorsAllowedOrigins}
             
             [Install]
             WantedBy=multi-user.target
@@ -541,6 +554,7 @@ Resources:
             ES_NUMBER_OF_SHARDS=${EsNumberOfShards}
             ES_NUMBER_OF_REPLICAS=${EsNumberOfReplicas}
             ENVIRONMENT=${EnvironmentName}
+            CORS_ALLOWED_ORIGINS=${CorsAllowedOrigins}
             EOL
             
             # Create a startup verification script
