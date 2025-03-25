@@ -564,12 +564,17 @@ Resources:
                   mkdir -p api/deploy
                   cat > api/deploy/app.py << 'EOF'
                   # Default Flask app
-                  from flask import Flask, jsonify, request
+                  from flask import Flask, jsonify, request, Blueprint
                   from flask_cors import CORS
                   import os
                   import logging
                   import sys
                   import time
+                  import json
+                  from datetime import datetime
+                  import platform
+                  import socket
+                  import psutil
                   
                   # Configure logging
                   log_dir = "logs"
@@ -584,71 +589,63 @@ Resources:
                   ch.setLevel(logging.INFO)
                   logger.addHandler(ch)
                   
+                  # Create file handler
+                  fh = logging.FileHandler(os.path.join(log_dir, "backend.log"))
+                  fh.setLevel(logging.INFO)
+                  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                  fh.setFormatter(formatter)
+                  ch.setFormatter(formatter)
+                  logger.addHandler(fh)
+                  
                   # Create Flask app
                   app = Flask(__name__)
                   
-                  # Setup CORS properly - allow specific domains
-                  cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://financialnewsengine.com")
+                  # Create diagnostic blueprint
+                  diagnostics_bp = Blueprint('diagnostics', __name__, url_prefix='/diagnostic')
                   
-                  # Define origins list for later use in middleware
+                  # Get CORS allowed origins from environment or use defaults
+                  cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://financialnewsengine.com,https://www.financialnewsengine.com")
+                  
+                  # Parse origins into a list
                   if cors_origins == "*":
-                      # For wildcard origins, don't use credentials
-                      CORS(app, resources={r"/*": {"origins": "*"}})
-                      logger.info(f"CORS configured with wildcard origin")
                       origins = ["*"]
                   else:
-                      # If specific origins are provided, split the comma-separated list
                       origins = [origin.strip() for origin in cors_origins.split(",")]
-                      # Enable credentials with specific origins
-                      CORS(app, resources={r"/*": {"origins": origins}}, supports_credentials=True)
-                      logger.info(f"CORS configured with origins: {origins}")
                   
-                  # Add custom CORS middleware to handle all requests properly
-                  @app.before_request
-                  def handle_preflight():
-                      if request.method == "OPTIONS":
-                          # Create a response with appropriate CORS headers
-                          response = app.make_default_options_response()
-                          if origins == ["*"]:
-                              response.headers["Access-Control-Allow-Origin"] = "*"
-                          else:
-                              # Get the origin from the request
-                              origin = request.headers.get("Origin", "")
-                              # Check if the origin is in the allowed origins
-                              if origin in origins:
-                                  response.headers["Access-Control-Allow-Origin"] = origin
-                                  response.headers["Access-Control-Allow-Credentials"] = "true"
-                          
-                          response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                          response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-                          response.headers["Access-Control-Max-Age"] = "3600"
-                          return response
+                  logger.info(f"Configuring CORS with origins: {origins}")
                   
-                  # Ensure CORS headers are added to all responses
+                  # Configure CORS
+                  CORS(app, resources={r"/*": {"origins": "*" if origins == ["*"] else origins}}, 
+                       supports_credentials=True if origins != ["*"] else False)
+                  
+                  # Setup CORS headers middleware to ensure all responses have proper headers
                   @app.after_request
                   def add_cors_headers(response):
-                      # Get the origin from the request
-                      origin = request.headers.get("Origin", "")
+                      origin = request.headers.get('Origin', '')
                       
+                      # If wildcard is allowed or origin is in our list
                       if origins == ["*"]:
-                          response.headers["Access-Control-Allow-Origin"] = "*"
-                      else:
-                          # Check if the origin is in the allowed origins
-                          if origin in origins:
-                              response.headers["Access-Control-Allow-Origin"] = origin
-                              response.headers["Access-Control-Allow-Credentials"] = "true"
-                          else:
-                              # If domain not in allowed list but we need to support preflight
-                              logger.warning(f"Request from non-allowed origin: {origin}")
+                          response.headers['Access-Control-Allow-Origin'] = '*'
+                      elif origin in origins:
+                          response.headers['Access-Control-Allow-Origin'] = origin
+                          response.headers['Access-Control-Allow-Credentials'] = 'true'
                       
-                      response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                      response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                      response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+                      response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
                       
-                      if request.method == "OPTIONS":
-                          response.headers["Access-Control-Max-Age"] = "3600"
-                          
+                      if request.method == 'OPTIONS':
+                          response.headers['Access-Control-Max-Age'] = '3600'
+                      
                       return response
                   
+                  # Global OPTIONS handler for preflight requests
+                  @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+                  @app.route('/<path:path>', methods=['OPTIONS'])
+                  def handle_options(path):
+                      response = app.make_default_options_response()
+                      return response
+                  
+                  # Basic routes
                   @app.route("/")
                   def hello():
                       return jsonify({"status": "ok", "message": "API is running"})
@@ -659,32 +656,20 @@ Resources:
                   
                   @app.route("/health")
                   def health():
-                      return jsonify({"status": "healthy", "environment": os.environ.get("ENVIRONMENT", "development")})
-                  
-                  @app.route("/diagnostic/health")
-                  def diagnostic_health():
-                      return health()
-                  
-                  @app.route("/diagnostic/cors-test")
-                  def cors_test():
-                      """Test endpoint for CORS configuration."""
-                      origin = request.headers.get("Origin", "Unknown")
                       return jsonify({
-                          "status": "ok",
-                          "message": "CORS test successful",
-                          "request_origin": origin,
-                          "allowed_origins": origins,
-                          "timestamp": time.time()
+                          "status": "healthy", 
+                          "environment": os.environ.get("ENVIRONMENT", "development"),
+                          "timestamp": datetime.now().isoformat()
                       })
                   
+                  # Query endpoint
                   @app.route("/query")
                   def query():
                       """Basic query endpoint to handle search requests."""
                       query_text = request.args.get("query", "")
                       logger.info(f"Received search query: {query_text}")
                       
-                      # This is a placeholder implementation
-                      # In production, this would query Elasticsearch
+                      # Placeholder implementation
                       return jsonify({
                           "status": "ok",
                           "query": query_text,
@@ -702,6 +687,79 @@ Resources:
                           "timestamp": time.time()
                       })
                   
+                  # Diagnostic endpoints
+                  @diagnostics_bp.route("/health")
+                  def diagnostic_health():
+                      return health()
+                  
+                  @diagnostics_bp.route("/report")
+                  def diagnostic_report():
+                      """Generate a comprehensive diagnostic report."""
+                      system_info = {
+                          "hostname": socket.gethostname(),
+                          "platform": platform.system(),
+                          "version": platform.version(),
+                          "python": platform.python_version(),
+                          "memory": {
+                              "total": psutil.virtual_memory().total,
+                              "available": psutil.virtual_memory().available,
+                              "percent": psutil.virtual_memory().percent
+                          },
+                          "cpu": {
+                              "cores": psutil.cpu_count(),
+                              "usage": psutil.cpu_percent(interval=0.1)
+                          },
+                          "disk": {
+                              "total": psutil.disk_usage('/').total,
+                              "free": psutil.disk_usage('/').free,
+                              "percent": psutil.disk_usage('/').percent
+                          }
+                      }
+                      
+                      return jsonify({
+                          "status": "ok",
+                          "timestamp": datetime.now().isoformat(),
+                          "environment": os.environ.get("ENVIRONMENT", "development"),
+                          "cors_config": {
+                              "origins": origins
+                          },
+                          "system": system_info,
+                          "diagnostics": {
+                              "api_status": "operational"
+                          }
+                      })
+                  
+                  @diagnostics_bp.route("/cors-test")
+                  def cors_test():
+                      """Test endpoint for CORS configuration."""
+                      origin = request.headers.get("Origin", "Unknown")
+                      return jsonify({
+                          "status": "ok",
+                          "message": "CORS test successful",
+                          "request_origin": origin,
+                          "allowed_origins": origins,
+                          "timestamp": time.time()
+                      })
+                  
+                  # Register the diagnostic blueprint
+                  app.register_blueprint(diagnostics_bp)
+                  
+                  # Error handlers
+                  @app.errorhandler(404)
+                  def not_found(error):
+                      return jsonify({
+                          "error": "Not found",
+                          "message": "The requested resource could not be found."
+                      }), 404
+                  
+                  @app.errorhandler(500)
+                  def server_error(error):
+                      return jsonify({
+                          "error": "Internal server error",
+                          "message": "An unexpected error occurred."
+                      }), 500
+                  
+                  # Main entry point
                   if __name__ == "__main__":
                       logger.info("Starting Flask application")
                       port = int(os.environ.get("PORT", 5000))
@@ -715,6 +773,7 @@ Resources:
                   flask-cors==4.0.0
                   gunicorn==21.2.0
                   psutil==5.9.5
+                  python-dotenv==1.0.0
                   EOF
 
                 # Create systemd service file
@@ -728,6 +787,8 @@ Resources:
                   User=root
                   WorkingDirectory=/opt/financial-news-engine
                   Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
+                  Environment="FLASK_ENV=production"
+                  Environment="PYTHONUNBUFFERED=1"
                   ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
                   Restart=always
                   TimeoutStartSec=60
@@ -791,6 +852,35 @@ Resources:
                     echo "Waiting for service to start (attempt $i/12)..."
                     sleep 5
                   done
+                  
+                  echo "Testing CORS configuration..."
+                  # Test CORS with Origin header
+                  CORS_TEST=$(curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/cors-test)
+                  echo "CORS test response: $CORS_TEST"
+                  
+                  # Check for CORS headers
+                  CORS_HEADERS=$(curl -s -I -H "Origin: https://financialnewsengine.com" http://localhost:5000/health | grep -i "Access-Control-Allow")
+                  if [ -z "$CORS_HEADERS" ]; then
+                    echo "WARNING: CORS headers not found in response"
+                  else
+                    echo "CORS headers found:"
+                    echo "$CORS_HEADERS"
+                  fi
+                  
+                  # Test OPTIONS request (preflight)
+                  OPTIONS_RESPONSE=$(curl -s -I -X OPTIONS -H "Origin: https://financialnewsengine.com" -H "Access-Control-Request-Method: GET" http://localhost:5000/query | grep -i "Access-Control-Allow")
+                  if [ -z "$OPTIONS_RESPONSE" ]; then
+                    echo "WARNING: OPTIONS request did not return CORS headers"
+                  else
+                    echo "OPTIONS request CORS headers:"
+                    echo "$OPTIONS_RESPONSE"
+                  fi
+                  
+                  echo "Checking diagnostic report endpoint..."
+                  curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/report | grep -q "status" && echo "Diagnostic report endpoint is working" || echo "WARNING: Diagnostic report endpoint is not responding properly"
+                  
+                  echo "Checking query endpoint..."
+                  curl -s -H "Origin: https://financialnewsengine.com" "http://localhost:5000/query?query=test" | grep -q "results" && echo "Query endpoint is working" || echo "WARNING: Query endpoint is not responding properly"
                   
                   echo "Startup verification successful"
                   EOF
