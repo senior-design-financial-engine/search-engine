@@ -740,7 +740,7 @@ Resources:
         - CertificateArn: !Ref SSLCertificateArn
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref TargetGroup
+          TargetGroupArn: !Ref BackendTargetGroup
       SslPolicy: ELBSecurityPolicy-TLS-1-2-2017-01
 
   # HTTP Listener (redirects to HTTPS)
