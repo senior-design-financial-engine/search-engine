@@ -37,7 +37,7 @@ const DiagnosticTool = () => {
 
   useEffect(() => {
     // Get environment info
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
     
     setEnvInfo({
       apiUrl,
