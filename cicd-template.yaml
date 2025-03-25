@@ -211,6 +211,7 @@ Resources:
                 Action:
                   - 'cloudformation:DescribeStacks'
                   - 'cloudformation:ListStackResources'
+                  - 'cloudformation:ListStacks'
                 Resource: '*'
 
   # Frontend CodeBuild Project
@@ -520,7 +521,7 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentName
 
-  # Add a CodeBuild project for API code deployment
+  # ApiCodeDeployProject
   ApiCodeDeployProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -575,19 +576,103 @@ Resources:
                   else:
                     app_code = """
                     # Default Flask app
-                    from flask import Flask, jsonify
+                    from flask import Flask, jsonify, request
+                    from flask_cors import CORS
+                    import os
+                    import logging
+                    import sys
+                    
+                    # Configure logging
+                    log_dir = "logs"
+                    if not os.path.exists(log_dir):
+                        os.makedirs(log_dir)
+                        
+                    logger = logging.getLogger("backend")
+                    logger.setLevel(logging.INFO)
+                    
+                    # Create console handler
+                    ch = logging.StreamHandler(sys.stdout)
+                    ch.setLevel(logging.INFO)
+                    logger.addHandler(ch)
+                    
+                    # Create Flask app
                     app = Flask(__name__)
+                    
+                    # Setup CORS properly - allow specific domains
+                    cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://financialnewsengine.com")
+                    if cors_origins == "*":
+                        # For wildcard origins, don't use credentials
+                        CORS(app, resources={r"/*": {"origins": "*"}})
+                        logger.info(f"CORS configured with wildcard origin")
+                    else:
+                        # If specific origins are provided, split the comma-separated list
+                        origins = [origin.strip() for origin in cors_origins.split(",")]
+                        # Enable credentials with specific origins
+                        CORS(app, resources={r"/*": {"origins": origins}}, supports_credentials=True)
+                        logger.info(f"CORS configured with origins: {origins}")
+                    
+                    # Add custom CORS middleware to handle all requests properly
+                    @app.before_request
+                    def handle_preflight():
+                        if request.method == "OPTIONS":
+                            # Create a response with appropriate CORS headers
+                            response = app.make_default_options_response()
+                            if cors_origins == "*":
+                                response.headers["Access-Control-Allow-Origin"] = "*"
+                            else:
+                                # Get the origin from the request
+                                origin = request.headers.get("Origin", "")
+                                # Check if the origin is in the allowed origins
+                                if origin in origins:
+                                    response.headers["Access-Control-Allow-Origin"] = origin
+                                    response.headers["Access-Control-Allow-Credentials"] = "true"
+                            
+                            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                            response.headers["Access-Control-Max-Age"] = "3600"
+                            return response
+                    
+                    # Ensure CORS headers are added to all responses
+                    @app.after_request
+                    def add_cors_headers(response):
+                        if cors_origins == "*":
+                            response.headers["Access-Control-Allow-Origin"] = "*"
+                        else:
+                            # Get the origin from the request
+                            origin = request.headers.get("Origin", "")
+                            # Check if the origin is in the allowed origins
+                            if origin in origins:
+                                response.headers["Access-Control-Allow-Origin"] = origin
+                                response.headers["Access-Control-Allow-Credentials"] = "true"
+                        
+                        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+                        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                        
+                        if request.method == "OPTIONS":
+                            response.headers["Access-Control-Max-Age"] = "3600"
+                            
+                        return response
                     
                     @app.route("/")
                     def hello():
-                        return "Hello World!"
+                        return jsonify({"status": "ok", "message": "API is running"})
                     
                     @app.route("/ping")
                     def ping():
                         return jsonify({"status": "ok"})
                     
+                    @app.route("/health")
+                    def health():
+                        return jsonify({"status": "healthy", "environment": os.environ.get("ENVIRONMENT", "development")})
+                    
+                    @app.route("/diagnostic/health")
+                    def diagnostic_health():
+                        return health()
+                    
                     if __name__ == "__main__":
-                        app.run(host="0.0.0.0")
+                        logger.info("Starting Flask application")
+                        port = int(os.environ.get("PORT", 5000))
+                        app.run(host="0.0.0.0", port=port)
                     """
                   
                   # Read requirements.txt if it exists
@@ -602,6 +687,9 @@ Resources:
                     gunicorn==21.2.0
                     psutil==5.9.5
                     """
+                    # Make sure flask-cors is in requirements
+                    if "flask-cors" not in requirements.lower():
+                      requirements += "\nflask-cors==4.0.0"
                   
                   # Write deployment files
                   with open("api/deploy/app.py", "w") as f:
@@ -789,12 +877,12 @@ Resources:
           artifacts:
             files:
               - api/deploy/**/*
-        TimeoutInMinutes: 30
-        Tags:
-          - Key: Name
-            Value: !Sub ${EnvironmentName}-financial-news-api-deploy
-          - Key: Environment
-            Value: !Ref EnvironmentName
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-api-deploy
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
   # CodePipeline for CI/CD
   FinancialNewsPipeline:
@@ -853,41 +941,43 @@ Resources:
                 - Name: BackendBuildOutput
               RunOrder: 1
         
-        - Name: DeployApiCode
-          ActionTypeId:
-            Category: Build
-            Owner: AWS
-            Provider: CodeBuild
-            Version: '1'
-          Configuration:
-            ProjectName: !Ref ApiCodeDeployProject
-          InputArtifacts:
-            - Name: SourceCode
-          RunOrder: 1
-        
-        - Name: DeployFrontend
-          ActionTypeId:
-            Category: Build
-            Owner: AWS
-            Provider: CodeBuild
-            Version: '1'
-          Configuration:
-            ProjectName: !Ref FrontendDeployProject
-          InputArtifacts:
-            - Name: FrontendBuildOutput
-          RunOrder: 1
-        
-        - Name: DeployBackend
-          ActionTypeId:
-            Category: Build
-            Owner: AWS
-            Provider: CodeBuild
-            Version: '1'
-          Configuration:
-            ProjectName: !Ref BackendDeployProject
-          InputArtifacts:
-            - Name: BackendBuildOutput
-          RunOrder: 2
+        - Name: Deploy
+          Actions:
+            - Name: DeployApiCode
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref ApiCodeDeployProject
+              InputArtifacts:
+                - Name: SourceCode
+              RunOrder: 1
+            
+            - Name: DeployFrontend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref FrontendDeployProject
+              InputArtifacts:
+                - Name: FrontendBuildOutput
+              RunOrder: 1
+            
+            - Name: DeployBackend
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BackendDeployProject
+              InputArtifacts:
+                - Name: BackendBuildOutput
+              RunOrder: 2
       
       Tags:
         - Key: Name
