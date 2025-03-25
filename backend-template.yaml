@@ -34,7 +34,7 @@ Parameters:
   AMIId:
     Description: AMI ID for the EC2 instances
     Type: AWS::EC2::Image::Id
-    Default: ami-0261755bbcb8c4a84  # Amazon Linux 2 in us-east-1 (update for your region)
+    Default: ami-0261755bbcb8c4a84  # Ubuntu 20.04 LTS in us-east-1 (update for your region)
   
   ElasticsearchEndpoint:
     Description: Endpoint URL for Elasticsearch
@@ -110,15 +110,15 @@ Parameters:
 Mappings:
   RegionMap:
     us-east-1:
-      AMI: ami-0261755bbcb8c4a84  # Amazon Linux 2
+      AMI: ami-0261755bbcb8c4a84  # Ubuntu 20.04 LTS
     us-east-2:
-      AMI: ami-0430580de6244e02e  # Amazon Linux 2
+      AMI: ami-0430580de6244e02e  # Ubuntu 20.04 LTS
     us-west-1:
-      AMI: ami-04669a22aad391419  # Amazon Linux 2
+      AMI: ami-04669a22aad391419  # Ubuntu 20.04 LTS
     us-west-2:
-      AMI: ami-0efa651876de2a5ce  # Amazon Linux 2
+      AMI: ami-0efa651876de2a5ce  # Ubuntu 20.04 LTS
     eu-west-1:
-      AMI: ami-0a8e758f5e873d1c1  # Amazon Linux 2
+      AMI: ami-0a8e758f5e873d1c1  # Ubuntu 20.04 LTS
 
 Resources:
   # IAM Role for EC2 instances
@@ -231,13 +231,15 @@ Resources:
             #!/bin/bash -xe
             
             # Update system packages
-            yum update -y
+            apt-get update
+            apt-get upgrade -y
             
             # Install Python and development tools
-            yum install -y python3 python3-pip python3-devel gcc git
+            apt-get install -y python3 python3-pip python3-dev gcc git wget unzip
             
             # Install CloudWatch agent
-            yum install -y amazon-cloudwatch-agent
+            wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+            dpkg -i amazon-cloudwatch-agent.deb
             
             # Create app directory
             mkdir -p /opt/financial-news-engine
@@ -355,7 +357,7 @@ Resources:
             systemctl enable financial-news.service
             systemctl start financial-news.service
             
-            # Configure CloudWatch agent
+            # Configure CloudWatch agent for Ubuntu
             cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOL'
             {
               "agent": {
@@ -367,7 +369,7 @@ Resources:
                   "files": {
                     "collect_list": [
                       {
-                        "file_path": "/var/log/messages",
+                        "file_path": "/var/log/syslog",
                         "log_group_name": "/financial-news/system",
                         "log_stream_name": "{instance_id}"
                       },
@@ -401,6 +403,7 @@ Resources:
             EOL
             
             # Start CloudWatch agent
+            systemctl daemon-reload
             systemctl enable amazon-cloudwatch-agent
             systemctl start amazon-cloudwatch-agent
             
