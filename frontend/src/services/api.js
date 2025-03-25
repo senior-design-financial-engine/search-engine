@@ -1,7 +1,17 @@
 import axios from 'axios';
 
 // Use environment variables with fallbacks
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://development-backend-alb-708631307.us-east-1.elb.amazonaws.com';
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+if (!API_BASE_URL) {
+	console.error('[API ERROR] REACT_APP_API_URL environment variable is not set. Please ensure the frontend is built with the correct environment variables.');
+	// In development, you might want to use a default URL
+	if (process.env.NODE_ENV === 'development') {
+		console.warn('[API WARNING] Using default development URL. This should only happen in local development.');
+		API_BASE_URL = 'http://localhost:5000';
+	} else {
+		throw new Error('REACT_APP_API_URL environment variable is required in production');
+	}
+}
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // ms

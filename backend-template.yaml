@@ -11,6 +11,11 @@ Parameters:
       - staging
       - production
   
+  BackendDomainName:
+    Description: Custom domain name for the backend ALB (e.g., api.yourdomain.com)
+    Type: String
+    Default: ""
+  
   VpcStackName:
     Description: Name of the VPC CloudFormation stack
     Type: String
@@ -87,30 +92,13 @@ Parameters:
     Default: 0.0.0.0/0
     AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
   
-  PublicSubnet1ID:
-    Description: ID of the first public subnet
-    Type: AWS::EC2::Subnet::Id
-  
-  PublicSubnet2ID:
-    Description: ID of the second public subnet
-    Type: AWS::EC2::Subnet::Id
-  
-  VPCID:
-    Description: ID of the VPC
-    Type: AWS::EC2::VPC::Id
-  
-  PrivateSubnet1ID:
-    Description: ID of the first private subnet
-    Type: AWS::EC2::Subnet::Id
-  
-  PrivateSubnet2ID:
-    Description: ID of the second private subnet
-    Type: AWS::EC2::Subnet::Id
-
   SSLCertificateArn:
     Description: ARN of the SSL certificate from AWS Certificate Manager
     Type: String
     Default: "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERTIFICATE_ID"
+
+Conditions:
+  HasDomainName: !Not [!Equals [!Ref BackendDomainName, ""]]
 
 Mappings:
   RegionMap:
@@ -126,6 +114,19 @@ Mappings:
       AMI: ami-0a8e758f5e873d1c1  # Ubuntu 20.04 LTS
 
 Resources:
+  # SSL Certificate
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: HasDomainName
+    Properties:
+      DomainName: !Ref BackendDomainName
+      ValidationMethod: DNS
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-certificate
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
   # IAM Role for EC2 instances
   BackendInstanceRole:
     Type: AWS::IAM::Role
@@ -194,6 +195,11 @@ Resources:
           Value: !Sub ${EnvironmentName}-backend-sg
         - Key: Environment
           Value: !Ref EnvironmentName
+      # Reference the App Server Security Group from VPC Stack for additional security rules
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
 
   # Security Group for Application Load Balancer
   LoadBalancerSecurityGroup:
@@ -229,6 +235,7 @@ Resources:
         KeyName: !Ref KeyName
         SecurityGroupIds:
           - !Ref BackendSecurityGroup
+          - Fn::ImportValue: !Sub "${VpcStackName}-AppServerSG"
         IamInstanceProfile:
           Name: !Ref BackendInstanceProfile
         UserData:
@@ -719,8 +726,8 @@ Resources:
         - Key: idle_timeout.timeout_seconds
           Value: '60'
       Subnets:
-        - !Ref PublicSubnet1ID
-        - !Ref PublicSubnet2ID
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       Tags:
@@ -737,7 +744,10 @@ Resources:
       Port: 443
       Protocol: HTTPS
       Certificates:
-        - CertificateArn: !Ref SSLCertificateArn
+        - CertificateArn: !If 
+            - HasDomainName
+            - !Ref SSLCertificate
+            - !Ref SSLCertificateArn
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref BackendTargetGroup
@@ -829,7 +839,10 @@ Outputs:
   
   BackendALBFullQualifiedDNSName:
     Description: Full DNS Name of the Application Load Balancer
-    Value: !Sub https://${ApplicationLoadBalancer.DNSName}
+    Value: !If
+      - HasDomainName
+      - !Sub https://${BackendDomainName}
+      - !Sub https://${ApplicationLoadBalancer.DNSName}
     Export:
       Name: !Sub "${AWS::StackName}-BackendALBURL"
   
@@ -851,14 +864,17 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-BackendSNSTopicARN"
   
-  ApiGatewayUrl:
-    Description: "URL of the Backend API endpoint"
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-    Export:
-      Name: !Sub "${AWS::StackName}-ApiGatewayUrl"
-  
   ElasticsearchSettings:
     Description: "Elasticsearch configuration used"
     Value: !Sub "URL: ${ElasticsearchEndpoint}, Index: ${ElasticsearchIndex}"
     Export:
-      Name: !Sub "${AWS::StackName}-ElasticsearchSettings" 
+      Name: !Sub "${AWS::StackName}-ElasticsearchSettings"
+  
+  SSLCertificateArn:
+    Description: ARN of the SSL certificate
+    Value: !If
+      - HasDomainName
+      - !Ref SSLCertificate
+      - !Ref SSLCertificateArn
+    Export:
+      Name: !Sub "${AWS::StackName}-SSLCertificateArn" 

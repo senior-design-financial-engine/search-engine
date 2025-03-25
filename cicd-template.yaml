@@ -229,10 +229,8 @@ Resources:
         PrivilegedMode: true
         EnvironmentVariables:
           - Name: REACT_APP_API_URL
-            Value: !Sub 
-              - "https://${ApiDomainName}"
-              - ApiDomainName: 
-                  Fn::ImportValue: !Sub "${BackendStackName}-ApiGatewayUrl"
+            Value: 
+              Fn::ImportValue: !Sub "${BackendStackName}-BackendALBURL"
           - Name: ENVIRONMENT
             Value: !Ref EnvironmentName
       Source:

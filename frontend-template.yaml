@@ -34,12 +34,26 @@ Parameters:
     Type: String
     Default: financial-news-backend
 
+  CICDStackName:
+    Description: Name of the CICD CloudFormation stack
+    Type: String
+    Default: financial-news-cicd
+
 Conditions:
   HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
   CreateDNSRecords: !And 
     - !Equals [!Ref CreateRoute53Records, "true"]
     - !Not [!Equals [!Ref DomainName, ""]]
     - !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Mappings:
+  EnvironmentConfig:
+    development:
+      CorsAllowedOrigins: "*"
+    staging:
+      CorsAllowedOrigins: "*" 
+    production:
+      CorsAllowedOrigins: "financialnewsengine.com,www.financialnewsengine.com"
 
 Resources:
   # S3 bucket for static website hosting
@@ -62,8 +76,8 @@ Resources:
               - "*"
             AllowedMethods:
               - GET
-            AllowedOrigins:
-              - "*"
+            AllowedOrigins: 
+              - !FindInMap [EnvironmentConfig, !Ref EnvironmentName, CorsAllowedOrigins]
             MaxAge: 3000
       Tags:
         - Key: Name
