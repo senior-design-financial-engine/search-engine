@@ -19,6 +19,7 @@ phases:
       - ls -la
       - cd backend || echo 'Backend directory not found, proceeding anyway'
       - mkdir -p scripts
+      - mkdir -p deployment-scripts
       - echo 'Creating deployment scripts...'
       
       # Create deployment script
