@@ -31,18 +31,23 @@ npm run build
 The application uses environment variables for configuration:
 
 ### Development
-Create a `.env.development` file with:
+In `.env.development`:
 ```
-REACT_APP_API_URL=http://localhost:5000
-REACT_APP_USE_MOCK_API=false
+REACT_APP_API_URL=https://api.financialnewsengine.com
+REACT_APP_API_FALLBACK_URL=https://direct-api.financialnewsengine.com
+REACT_APP_ENV=development
 ```
 
 ### Production
-Create a `.env.production` file with:
+In `.env.production`:
 ```
-REACT_APP_API_URL=[your-backend-url]
-REACT_APP_USE_MOCK_API=false
+REACT_APP_API_URL=https://api.financialnewsengine.com
+REACT_APP_API_FALLBACK_URL=https://direct-api.financialnewsengine.com
+REACT_APP_ENV=production
+GENERATE_SOURCEMAP=false
 ```
+
+The application uses a fallback API URL when the primary API endpoint is unreachable, providing enhanced reliability.
 
 ## Mock API Mode
 
@@ -52,10 +57,25 @@ For development without a backend, set `REACT_APP_USE_MOCK_API=true`. This gener
 
 ```
 src/
-├── components/       # React components
-├── services/         # API and data services
-├── styles/           # CSS and styling
-└── assets/           # Static assets
+├── components/            # React components
+│   ├── Article.js         # Article display component
+│   ├── DiagnosticTool.js  # Diagnostic tool component
+│   ├── DiagnosticTool/    # Sub-components for diagnostic tool
+│   ├── AnalyticsSideMenu.js # Analytics menu component
+│   ├── Filters.js         # Search filters component
+│   ├── Footer.js          # Page footer component
+│   ├── Header.js          # Page header component
+│   ├── Home.js            # Homepage component
+│   ├── Results.js         # Search results component
+│   └── unused/            # Archived components
+├── services/              # API and data services
+│   └── api.js             # API interaction service
+├── styles/                # CSS and styling files
+├── App.js                 # Main application component
+├── App.css                # Main application styles
+├── App.test.js            # Application tests
+├── index.js               # Application entry point
+└── index.css              # Global CSS styles
 ```
 
 ## AWS Deployment

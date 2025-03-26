@@ -206,6 +206,53 @@ For detailed setup instructions, refer to the dedicated README files:
 - [Frontend Setup](frontend-setup-readme.md)
 - [CI/CD Pipeline Setup](cicd-setup-readme.md)
 
+## Deployment Paths and Structure
+
+The application uses the following standardized paths for deployment:
+
+- **Application Directory**: `/opt/financial-news-engine`
+- **Logs Directory**: `/opt/financial-news-engine/logs`
+- **Deployment Scripts**: `/opt/financial-news-engine/deploy_scripts`
+- **Environment File**: `/opt/financial-news-engine/.env`
+- **Service File**: `/etc/systemd/system/financial-news.service`
+
+### Parameter Retrieval
+
+The application retrieves configuration parameters from AWS Parameter Store using either:
+1. Batch retrieval with `get-parameters-by-path` from path `/financial-news/`
+2. Fallback to individual parameter retrieval if batch retrieval fails
+
+### Log Files
+
+- Application logs: `/opt/financial-news-engine/logs/backend.log`
+- Service output: `/opt/financial-news-engine/logs/service-output.log`
+- Service errors: `/opt/financial-news-engine/logs/service-error.log`
+
+### Troubleshooting
+
+If you're experiencing issues with the deployment:
+
+1. Check service status:
+   ```
+   sudo systemctl status financial-news
+   ```
+
+2. Check logs:
+   ```
+   sudo cat /opt/financial-news-engine/logs/service-error.log
+   sudo cat /opt/financial-news-engine/logs/backend.log
+   ```
+
+3. Test API locally:
+   ```
+   curl http://localhost:5000/health
+   ```
+
+4. Verify parameters are correctly loaded:
+   ```
+   sudo cat /opt/financial-news-engine/.env
+   ```
+
 ## Development Environment
 
 To set up a local development environment:

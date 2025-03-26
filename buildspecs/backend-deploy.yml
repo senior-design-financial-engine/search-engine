@@ -22,53 +22,181 @@ phases:
         cat > scripts/deploy.sh << 'EOF'
         #!/bin/bash
         cd /opt/financial-news-engine
-        unzip -o /tmp/backend.zip -d .
-        pip3 install -r requirements.txt
+        
+        # Check if backend.zip exists and extract it
+        if [ -f "/tmp/backend.zip" ]; then
+          echo "Extracting backend.zip..."
+          unzip -o /tmp/backend.zip -d .
+          if [ $? -ne 0 ]; then
+            echo "Error extracting backend.zip"
+          fi
+        else
+          echo "backend.zip not found, checking for app.py in S3"
+        fi
+        
+        # Check if app.py exists, if not try to extract from backend-api.yaml in S3
+        if [ ! -f "app.py" ]; then
+          echo "Trying to fetch app.py from backend-api.yaml in S3"
+          
+          # Get the S3 bucket name
+          BUCKET_NAME=$(aws cloudformation describe-stacks --query "Stacks[?contains(StackName, 'financial-news')].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+          
+          if [ -n "$BUCKET_NAME" ]; then
+            echo "Found assets bucket: $BUCKET_NAME"
+            
+            # Download the backend-api.yaml file
+            aws s3 cp s3://$BUCKET_NAME/api/backend-api.yaml /tmp/backend-api.yaml
+            
+            if [ -f "/tmp/backend-api.yaml" ]; then
+              echo "Extracting app.py from backend-api.yaml"
+              # Extract app_code section
+              grep -A10000 "app_code: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > app.py
+              
+              # Make it executable
+              chmod +x app.py
+              
+              # Extract requirements if needed
+              if [ ! -f "requirements.txt" ]; then
+                echo "Extracting requirements.txt from backend-api.yaml"
+                grep -A10000 "requirements: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > requirements.txt
+              fi
+              
+              # Extract service file
+              grep -A10000 "service_definition: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > /etc/systemd/system/financial-news.service
+            else
+              echo "Failed to download backend-api.yaml"
+            fi
+          else
+            echo "Could not determine S3 bucket name"
+          fi
+        fi
+        
+        # Create a default service file if it doesn't exist
+        if [ ! -f "/etc/systemd/system/financial-news.service" ]; then
+          echo "Creating default service file"
+          cat > /etc/systemd/system/financial-news.service << EOL
+        [Unit]
+        Description=Financial News API Service
+        After=network.target
+
+        [Service]
+        Type=simple
+        User=ubuntu
+        WorkingDirectory=/opt/financial-news-engine
+        Environment=PYTHONUNBUFFERED=1
+        ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
+        Restart=on-failure
+        RestartSec=5
+        StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
+        StandardError=append:/opt/financial-news-engine/logs/service-error.log
+        SyslogIdentifier=financial-news
+
+        [Install]
+        WantedBy=multi-user.target
+        EOL
+        fi
+        
+        # Install requirements
+        if [ -f "requirements.txt" ]; then
+          echo "Installing Python requirements"
+          pip3 install -r requirements.txt
+        else
+          echo "requirements.txt not found, installing minimal requirements"
+          pip3 install flask flask-cors boto3 elasticsearch requests psutil
+        fi
+        
+        # Reload systemd and start service
         systemctl daemon-reload
-        systemctl start financial-news.service
+        systemctl enable financial-news.service
+        
+        # Check if we have an app.py file before starting the service
+        if [ -f "app.py" ]; then
+          echo "Starting financial-news service"
+          systemctl restart financial-news.service
+        else
+          echo "ERROR: No app.py found, service not started"
+          exit 1
+        fi
         EOF
       - chmod +x scripts/deploy.sh
       - |
         cat > scripts/before_install.sh << 'EOF'
         #!/bin/bash
+        # Create necessary directories
         mkdir -p /opt/financial-news-engine
+        mkdir -p /opt/financial-news-engine/logs
+        mkdir -p /opt/financial-news-engine/deploy_scripts
+        
+        # Install required dependencies
+        apt-get update -y || yum update -y
+        apt-get install -y python3-pip jq unzip || yum install -y python3-pip jq unzip
+        
+        # Set proper permissions
+        chmod 755 /opt/financial-news-engine
+        chmod 755 /opt/financial-news-engine/logs
+        chmod 755 /opt/financial-news-engine/deploy_scripts
         EOF
       - chmod +x scripts/before_install.sh
       - |
         cat > scripts/create_env_file.sh << 'EOF'
         #!/bin/bash
         # Create .env file with environment variables by fetching from SSM Parameter Store
-        echo "Fetching credentials from SSM Parameter Store..."
+        echo "Fetching credentials from SSM Parameter Store using get-parameters-by-path..."
 
-        # Function to get parameters from SSM with proper error handling
-        function get_parameter() {
-            local param_name=$1
-            local default_value=$2
-            
-            echo "Fetching parameter: $param_name"
-            local value
-            value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
-            local exit_code=$?
-            
-            if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then
-                echo "Successfully retrieved parameter: $param_name"
-                echo "$value"
-            else
-                echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
-                echo "$default_value"
-            fi
-        }
+        # Use get-parameters-by-path to get all parameters at once
+        echo "Retrieving all parameters at once"
+        PARAMS=$(aws ssm get-parameters-by-path --path "/financial-news/" --recursive --with-decryption --query "Parameters[*].[Name,Value]" --output json)
 
-        # Get parameters with default fallbacks
-        ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
-        ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
-        ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
-        ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
-        ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
-        ENV=$(get_parameter "/financial-news/environment" "development")
+        # Check if parameters were retrieved successfully
+        if [ -z "$PARAMS" ] || [ "$PARAMS" == "[]" ]; then
+            echo "WARNING: No parameters found at path /financial-news/"
+            # Fall back to individual parameter retrieval
+            function get_parameter() {
+                local param_name=$1
+                local default_value=$2
+                
+                echo "Fetching parameter: $param_name"
+                local value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
+                local exit_code=$?
+                
+                if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then
+                    echo "Successfully retrieved parameter: $param_name"
+                    echo "$value"
+                else
+                    echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
+                    echo "$default_value"
+                fi
+            }
+            
+            # Get parameters with default fallbacks
+            ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://fc9fa0b183414ca28ea4c7288ad74e23.us-east-1.aws.found.io:443")
+            ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
+            ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
+            ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "1")
+            ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "0")
+            ENV=$(get_parameter "/financial-news/environment" "development")
+        else
+            # Extract each parameter value from the JSON response
+            echo "Parameters retrieved successfully, extracting values"
+            ES_URL=$(echo $PARAMS | jq -r '.[] | select(.[0]=="/financial-news/elasticsearch-url") | .[1]')
+            ES_API_KEY=$(echo $PARAMS | jq -r '.[] | select(.[0]=="/financial-news/elasticsearch-api-key") | .[1]')
+            ES_INDEX=$(echo $PARAMS | jq -r '.[] | select(.[0]=="/financial-news/elasticsearch-index") | .[1]')
+            ES_SHARDS=$(echo $PARAMS | jq -r '.[] | select(.[0]=="/financial-news/es-number-of-shards") | .[1]')
+            ES_REPLICAS=$(echo $PARAMS | jq -r '.[] | select(.[0]=="/financial-news/es-number-of-replicas") | .[1]')
+            ENV=$(echo $PARAMS | jq -r '.[] | select(.[0]=="/financial-news/environment") | .[1]')
+        fi
+
+        # Fallback to defaults if values are empty
+        ES_URL=${ES_URL:-"https://fc9fa0b183414ca28ea4c7288ad74e23.us-east-1.aws.found.io:443"}
+        ES_API_KEY=${ES_API_KEY:-"default-api-key"}
+        ES_INDEX=${ES_INDEX:-"financial_news"}
+        ES_SHARDS=${ES_SHARDS:-"1"}
+        ES_REPLICAS=${ES_REPLICAS:-"0"}
+        ENV=${ENV:-"development"}
 
         # Create the .env file
         mkdir -p /opt/financial-news-engine
+        mkdir -p /opt/financial-news-engine/logs
         cat > /opt/financial-news-engine/.env << EOL
         ELASTICSEARCH_URL=$ES_URL
         ELASTICSEARCH_API_KEY=$ES_API_KEY

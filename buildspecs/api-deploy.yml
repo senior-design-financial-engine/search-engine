@@ -13,7 +13,7 @@ phases:
       - "echo \"Preparing API code for deployment\""
       - "cd backend || (echo \"Backend directory not found, using project root\"; cd .)"
       - "mkdir -p api/deploy"
-      - "cp backend.py api/deploy/app.py || echo \"Using fallback app.py\""
+      - "cp backend.py api/deploy/app.py || cp app.py api/deploy/app.py || echo \"Using fallback app.py\""
       - "cp requirements.txt api/deploy/requirements.txt || echo \"Using fallback requirements.txt\""
       
       # Get assets bucket name from CloudFormation
@@ -21,28 +21,22 @@ phases:
       - "export ASSETS_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue\" --output text)"
       - "echo \"Assets bucket name: $ASSETS_BUCKET_NAME\""
       
-      # Create scripts directory if it doesn't exist
-      - "mkdir -p scripts"
-      - "mkdir -p buildspecs/api-deploy/scripts"
+      # Create proper directory structure
+      - "mkdir -p api/deploy/deploy_scripts"
       
       # Copy deployment scripts
       - "echo \"Copying deployment scripts\""
-      - "cp buildspecs/api-deploy/scripts/extract_app.py scripts/ || echo \"extract_app.py not found, creating empty file\""
-      - "if [ ! -f \"scripts/extract_app.py\" ]; then echo '#!/usr/bin/env python3' > scripts/extract_app.py; echo 'print(\"Extraction script placeholder\")' >> scripts/extract_app.py; fi"
-      - "cp buildspecs/api-deploy/scripts/deploy.sh api/deploy/ || echo \"deploy.sh not found, creating empty file\""
-      - "if [ ! -f \"api/deploy/deploy.sh\" ]; then echo '#!/bin/bash' > api/deploy/deploy.sh; echo 'echo \"Deployment script placeholder\"' >> api/deploy/deploy.sh; fi"
-      - "cp buildspecs/api-deploy/scripts/verify.sh api/deploy/ || echo \"verify.sh not found, creating empty file\""
-      - "if [ ! -f \"api/deploy/verify.sh\" ]; then echo '#!/bin/bash' > api/deploy/verify.sh; echo 'echo \"Verification script placeholder\"' >> api/deploy/verify.sh; fi"
-      - "cp buildspecs/api-deploy/scripts/financial-news.service api/deploy/ || echo \"financial-news.service not found, creating empty file\""
-      - "if [ ! -f \"api/deploy/financial-news.service\" ]; then echo '[Unit]' > api/deploy/financial-news.service; echo 'Description=Financial News API Service' >> api/deploy/financial-news.service; fi"
+      - "cp buildspecs/api-deploy/scripts/extract_app.py api/deploy/deploy_scripts/ || echo \"extract_app.py not found\""
+      - "cp buildspecs/api-deploy/scripts/deploy.sh api/deploy/ || echo \"deploy.sh not found\""
+      - "cp buildspecs/api-deploy/scripts/verify.sh api/deploy/ || echo \"verify.sh not found\""
       
       # Make scripts executable
-      - "chmod +x scripts/extract_app.py"
-      - "chmod +x api/deploy/deploy.sh"
-      - "chmod +x api/deploy/verify.sh"
+      - "chmod +x api/deploy/deploy_scripts/extract_app.py || echo \"No extract_app.py found\""
+      - "chmod +x api/deploy/deploy.sh || echo \"No deploy.sh found\""
+      - "chmod +x api/deploy/verify.sh || echo \"No verify.sh found\""
       
       # Execute app extraction if needed
-      - "if [ ! -f \"api/deploy/app.py\" ]; then python3 scripts/extract_app.py; fi"
+      - "if [ ! -f \"api/deploy/app.py\" ]; then python3 api/deploy/deploy_scripts/extract_app.py; fi"
   
   build:
     commands:
@@ -70,7 +64,6 @@ phases:
       - "echo \"Uploading deployment files to S3\""
       - "aws s3 cp api/deploy/app.py s3://$ASSETS_BUCKET_NAME/temp/app.py"
       - "aws s3 cp api/deploy/requirements.txt s3://$ASSETS_BUCKET_NAME/temp/requirements.txt"
-      - "aws s3 cp api/deploy/financial-news.service s3://$ASSETS_BUCKET_NAME/temp/financial-news.service"
       - "aws s3 cp api/deploy/deploy.sh s3://$ASSETS_BUCKET_NAME/temp/deploy.sh"
       - "aws s3 cp api/deploy/verify.sh s3://$ASSETS_BUCKET_NAME/temp/verify.sh"
       
@@ -82,7 +75,7 @@ phases:
             echo "Deploying to instance $INSTANCE_ID"
             aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text || echo "Failed to create staging directory on $INSTANCE_ID"
             if [ $? -eq 0 ]; then
-              DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/financial-news.service . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
+              DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
               aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text || echo "Failed to deploy to $INSTANCE_ID"
               echo "Deployment to instance $INSTANCE_ID completed"
             fi
@@ -103,7 +96,24 @@ phases:
       - "sed 's/^/  /' api/deploy/requirements.txt >> backend-api.yaml"
       - "echo \"\" >> backend-api.yaml"
       - "echo \"service_definition: |\" >> backend-api.yaml"
-      - "sed 's/^/  /' api/deploy/financial-news.service >> backend-api.yaml"
+      - "echo \"[Unit]\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"Description=Financial News API Service\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"After=network.target\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"[Service]\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"Type=simple\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"User=ubuntu\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"WorkingDirectory=/opt/financial-news-engine\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"Environment=PYTHONUNBUFFERED=1\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"Restart=on-failure\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"RestartSec=5\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"StandardOutput=append:/opt/financial-news-engine/logs/service-output.log\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"StandardError=append:/opt/financial-news-engine/logs/service-error.log\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"SyslogIdentifier=financial-news\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"[Install]\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"WantedBy=multi-user.target\" | sed 's/^/  /' >> backend-api.yaml"
       - "echo \"\" >> backend-api.yaml"
       - "echo \"verification_script: |\" >> backend-api.yaml"
       - "sed 's/^/  /' api/deploy/verify.sh >> backend-api.yaml"

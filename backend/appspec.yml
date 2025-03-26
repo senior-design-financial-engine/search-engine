@@ -11,4 +11,7 @@ hooks:
   AfterInstall:
     - location: scripts/deploy.sh
       timeout: 300
+      runas: root
+    - location: scripts/create_env_file.sh
+      timeout: 300
       runas: root 

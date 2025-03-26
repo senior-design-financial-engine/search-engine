@@ -12,24 +12,35 @@ The backend consists of several key components:
    - Provides CORS support for cross-domain requests
 
 2. **Web Scraper** (`scraper/`)
-   - Collects news articles from various sources
+   - Collects news articles from various sources using `scrapers.py`
+   - Entry point for scraping via `run_scrapers.py`
    - Processes and normalizes article content
    - Stores data in Elasticsearch
 
 3. **Database Interface** (`es_database/`)
-   - Elasticsearch client interface
-   - Manages indices and document storage
-   - Handles search queries and aggregations
+   - Elasticsearch client interface through `Engine.py`
+   - Configuration via `EngineConfig.py`
+   - Data validation via `DataValidator.py`
+   - Storage management via `StorageManager.py`
 
-4. **Machine Learning Utils** (`ml_utils/`)
-   - Provides sentiment analysis
-   - Generates article summarization
-   - Processes text data for insights
+4. **Utilities** (`utils/`)
+   - Helper functions for various backend operations
+   - Reusable code shared across components
 
-5. **Indexer** (`indexer/`)
-   - Processes and indexes documents
-   - Manages document metadata
-   - Handles real-time updates
+5. **API Definitions** (`api/`)
+   - API endpoints and routing
+   - Request handling and response formatting
+
+6. **Scripts** (`scripts/`)
+   - Maintenance and deployment scripts
+   - Helper utilities for various operations
+
+7. **Database Update Tools**
+   - `update_es_database.py` - Updates the Elasticsearch database
+   - `update_processed_urls.py` - Updates processed URL entries
+   - `update_all_processed_urls.py` - Batch updates of processed URLs
+   - `reset_and_scrape.py` - Resets database and initiates scraping
+   - `check_es_connection.py` - Validates Elasticsearch connectivity
 
 ## Setup and Development
 
@@ -139,7 +150,31 @@ When adding a new news source:
 To reindex the Elasticsearch database:
 
 ```bash
-python update_database.py --reset-index
+python update_es_database.py --reset-index
+```
+
+To reset the database and scrape new articles:
+
+```bash
+python reset_and_scrape.py
+```
+
+To update processed URLs in the database:
+
+```bash
+python update_processed_urls.py
+```
+
+To batch update all processed URLs:
+
+```bash
+python update_all_processed_urls.py
+```
+
+To check Elasticsearch connectivity:
+
+```bash
+python check_es_connection.py
 ```
 
 ## Troubleshooting
