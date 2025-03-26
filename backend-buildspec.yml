@@ -19,121 +19,114 @@ phases:
   
   pre_build:
     commands:
-      - echo Preparing for deployment...
-      - cd backend
-      - mkdir -p scripts
-      - echo "Creating deployment script"
-      - echo '#!/bin/bash' > scripts/deploy.sh
-      - echo '# Stop the current service if it exists' >> scripts/deploy.sh
-      - echo 'if systemctl is-active --quiet financial-news.service; then' >> scripts/deploy.sh
-      - echo '  systemctl stop financial-news.service' >> scripts/deploy.sh
-      - echo 'fi' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '# Extract the deployment package' >> scripts/deploy.sh
-      - echo 'cd /opt/financial-news-engine' >> scripts/deploy.sh
-      - echo 'unzip -o /tmp/backend.zip -d .' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '# Install dependencies' >> scripts/deploy.sh
-      - echo 'pip3 install -r requirements.txt' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '# Create .env file with proper environment variables' >> scripts/deploy.sh
-      - echo 'cat > /opt/financial-news-engine/.env << EOF' >> scripts/deploy.sh
-      - echo 'ELASTICSEARCH_URL=$ELASTICSEARCH_URL' >> scripts/deploy.sh
-      - echo 'ELASTICSEARCH_API_KEY=$ELASTICSEARCH_API_KEY' >> scripts/deploy.sh
-      - echo 'ELASTICSEARCH_INDEX=$ELASTICSEARCH_INDEX' >> scripts/deploy.sh
-      - echo 'ES_NUMBER_OF_SHARDS=$ES_NUMBER_OF_SHARDS' >> scripts/deploy.sh
-      - echo 'ES_NUMBER_OF_REPLICAS=$ES_NUMBER_OF_REPLICAS' >> scripts/deploy.sh
-      - echo 'EOF' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '# Update the systemd service file to include environment variables' >> scripts/deploy.sh
-      - echo 'cat > /etc/systemd/system/financial-news.service << EOF' >> scripts/deploy.sh
-      - echo '[Unit]' >> scripts/deploy.sh
-      - echo 'Description=Financial News Engine Flask App' >> scripts/deploy.sh
-      - echo 'After=network.target' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '[Service]' >> scripts/deploy.sh
-      - echo 'User=root' >> scripts/deploy.sh
-      - echo 'WorkingDirectory=/opt/financial-news-engine' >> scripts/deploy.sh
-      - echo 'ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app' >> scripts/deploy.sh
-      - echo 'Restart=always' >> scripts/deploy.sh
-      - echo 'Environment=ELASTICSEARCH_URL=$ELASTICSEARCH_URL' >> scripts/deploy.sh
-      - echo 'Environment=ELASTICSEARCH_API_KEY=$ELASTICSEARCH_API_KEY' >> scripts/deploy.sh
-      - echo 'Environment=ELASTICSEARCH_INDEX=$ELASTICSEARCH_INDEX' >> scripts/deploy.sh
-      - echo 'Environment=ES_NUMBER_OF_SHARDS=$ES_NUMBER_OF_SHARDS' >> scripts/deploy.sh
-      - echo 'Environment=ES_NUMBER_OF_REPLICAS=$ES_NUMBER_OF_REPLICAS' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '[Install]' >> scripts/deploy.sh
-      - echo 'WantedBy=multi-user.target' >> scripts/deploy.sh
-      - echo 'EOF' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '# Restart the service' >> scripts/deploy.sh
-      - echo 'systemctl daemon-reload' >> scripts/deploy.sh
-      - echo 'systemctl start financial-news.service' >> scripts/deploy.sh
-      - echo '' >> scripts/deploy.sh
-      - echo '# Check status' >> scripts/deploy.sh
-      - echo 'systemctl status financial-news.service' >> scripts/deploy.sh
-      - chmod +x scripts/deploy.sh
-      - echo "Creating appspec.yml"
-      - echo 'version: 0.0' > appspec.yml
-      - echo 'os: linux' >> appspec.yml
-      - echo 'files:' >> appspec.yml
-      - echo '  - source: dist/backend.zip' >> appspec.yml
-      - echo '    destination: /tmp/' >> appspec.yml
-      - echo 'hooks:' >> appspec.yml
-      - echo '  BeforeInstall:' >> appspec.yml
-      - echo '    - location: scripts/before_install.sh' >> appspec.yml
-      - echo '      timeout: 300' >> appspec.yml
-      - echo '      runas: root' >> appspec.yml
-      - echo '  AfterInstall:' >> appspec.yml
-      - echo '    - location: scripts/deploy.sh' >> appspec.yml
-      - echo '      timeout: 300' >> appspec.yml
-      - echo '      runas: root' >> appspec.yml
-      - echo "Creating before_install script"
-      - echo '#!/bin/bash' > scripts/before_install.sh
-      - echo '' >> scripts/before_install.sh
-      - echo '# Create app directory if it doesn'\''t exist' >> scripts/before_install.sh
-      - echo 'mkdir -p /opt/financial-news-engine' >> scripts/before_install.sh
-      - echo '' >> scripts/before_install.sh
-      - echo '# Backup existing application' >> scripts/before_install.sh
-      - echo 'if [ -d "/opt/financial-news-engine/backup" ]; then' >> scripts/before_install.sh
-      - echo '  rm -rf /opt/financial-news-engine/backup' >> scripts/before_install.sh
-      - echo 'fi' >> scripts/before_install.sh
-      - echo '' >> scripts/before_install.sh
-      - echo 'if [ -f "/opt/financial-news-engine/app.py" ]; then' >> scripts/before_install.sh
-      - echo '  mkdir -p /opt/financial-news-engine/backup' >> scripts/before_install.sh
-      - echo '  cp -r /opt/financial-news-engine/* /opt/financial-news-engine/backup/' >> scripts/before_install.sh
-      - echo 'fi' >> scripts/before_install.sh
-      - chmod +x scripts/before_install.sh
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo Installing dependencies...
+      - pip install -r backend/requirements.txt
+      - pip install pytest pytest-cov
+      - echo Running tests...
+      - cd backend && python -m pytest --cov=. && cd ..
   
   build:
     commands:
-      - echo Getting backend auto scaling group...
-      - "export ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue\" --output text)"
-      - echo "Auto Scaling Group $ASG_NAME"
-      - "export INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query \"AutoScalingGroups[0].Instances[].InstanceId\" --output text)"
-      - echo "Instances to deploy to $INSTANCE_IDS"
-      - echo "Preparing environment variables for service files..."
-      - echo "Creating environment variables file..."
-      - "cd backend"
-      - "echo \"# Auto-generated environment file\" > .env"
-      - "echo \"ELASTICSEARCH_URL=${ELASTICSEARCH_URL}\" >> .env"
-      - "echo \"ELASTICSEARCH_API_KEY=${ELASTICSEARCH_API_KEY}\" >> .env"
-      - "echo \"ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX}\" >> .env"
-      - "echo \"ES_NUMBER_OF_SHARDS=${ES_NUMBER_OF_SHARDS}\" >> .env"
-      - "echo \"ES_NUMBER_OF_REPLICAS=${ES_NUMBER_OF_REPLICAS}\" >> .env"
-      - "zip -r dist/backend.zip ."
-      - echo Deployment ready
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - docker build -t $ECR_REPOSITORY_URI:latest -t $ECR_REPOSITORY_URI:$IMAGE_TAG -f backend/Dockerfile .
+      - echo Build completed on `date`
   
   post_build:
     commands:
-      - echo Starting deployment to instances...
-      - echo Backend deployment completed
+      - echo Pushing the Docker image...
+      - docker push $ECR_REPOSITORY_URI:latest
+      - docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - aws cloudformation describe-stacks --stack-name search-engine-infra --query "Stacks[0].Outputs[?OutputKey=='EcsTaskDefinition'].OutputValue" --output text > taskdef.json
+      - aws cloudformation describe-stacks --stack-name search-engine-infra --query "Stacks[0].Outputs[?OutputKey=='EcsCluster'].OutputValue" --output text > cluster.txt
+      - aws cloudformation describe-stacks --stack-name search-engine-infra --query "Stacks[0].Outputs[?OutputKey=='EcsService'].OutputValue" --output text > service.txt
+      - echo Preparing deployment scripts...
+      - mkdir -p deploy_scripts
+      - cat > deploy_scripts/create_env_file.sh << 'EOF'
+#!/bin/bash
+# Create .env file with environment variables
+cat > /opt/search-engine/.env << EOL
+ELASTICSEARCH_URL=$ELASTICSEARCH_URL
+ELASTICSEARCH_API_KEY=$ELASTICSEARCH_API_KEY
+ELASTICSEARCH_INDEX=$ELASTICSEARCH_INDEX
+EOL
+chmod 600 /opt/search-engine/.env
+echo "Created .env file with environment variables"
+EOF
+      - cat > deploy_scripts/prepare_check_es.sh << 'EOF'
+#!/bin/bash
+# Make sure check_es_connection.py is in the right place and executable
+mkdir -p /opt/search-engine/backend
+cp /opt/search-engine/backend/check_es_connection.py /opt/search-engine/backend/check_es_connection.py
+chmod +x /opt/search-engine/backend/check_es_connection.py
+echo "Prepared check_es_connection.py script"
+EOF
+      - cat > deploy_scripts/verify_startup.sh << 'EOF'
+#!/bin/bash
+# Verify backend service startup and test Elasticsearch connectivity
+echo "Waiting for backend service to start up..."
+sleep 10
+# Check if the service is running
+systemctl is-active --quiet search-engine-backend
+if [ $? -ne 0 ]; then
+  echo "ERROR: search-engine-backend service is not running"
+  systemctl status search-engine-backend
+  exit 1
+fi
+echo "Backend service is running"
+
+# Check Elasticsearch connectivity
+echo "Testing Elasticsearch connectivity..."
+mkdir -p /opt/search-engine/scripts
+cp /opt/search-engine/scripts/verify_es.sh /opt/search-engine/scripts/verify_es.sh
+chmod +x /opt/search-engine/scripts/verify_es.sh
+/opt/search-engine/scripts/verify_es.sh
+if [ $? -ne 0 ]; then
+  echo "WARNING: Elasticsearch connectivity check failed"
+  # Don't fail deployment if ES check fails, log it and continue
+  echo "Continuing deployment despite Elasticsearch connectivity issues"
+fi
+EOF
+      - chmod +x deploy_scripts/create_env_file.sh
+      - chmod +x deploy_scripts/prepare_check_es.sh
+      - chmod +x deploy_scripts/verify_startup.sh
+      - echo Preparing SSM commands...
+      - cat > deploy_commands.json << EOF
+{
+  "commands": [
+    "mkdir -p /opt/search-engine/backend",
+    "mkdir -p /opt/search-engine/scripts",
+    "aws s3 cp s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY} /tmp/artifacts.zip",
+    "unzip -o /tmp/artifacts.zip -d /opt/search-engine/",
+    "chmod +x /opt/search-engine/deploy_scripts/create_env_file.sh",
+    "chmod +x /opt/search-engine/deploy_scripts/prepare_check_es.sh",
+    "chmod +x /opt/search-engine/deploy_scripts/verify_startup.sh",
+    "/opt/search-engine/deploy_scripts/create_env_file.sh",
+    "/opt/search-engine/deploy_scripts/prepare_check_es.sh",
+    "systemctl restart search-engine-backend",
+    "/opt/search-engine/deploy_scripts/verify_startup.sh"
+  ]
+}
+EOF
+      - echo Updating service...
+      - aws ecs update-service --cluster $(cat cluster.txt) --service $(cat service.txt) --force-new-deployment
+      - echo Deployment update initiated...
 
 artifacts:
   files:
-    - backend/appspec.yml
-    - backend/scripts/**/*
-    - backend/dist/backend.zip
+    - appspec.yml
+    - taskdef.json
+    - cluster.txt
+    - service.txt
+    - deploy_commands.json
+    - backend/**/*
+    - deploy_scripts/**/*
+    - scripts/**/*
   discard-paths: no
 
 cache:

@@ -4,6 +4,18 @@ Elasticsearch Connection Tester
 
 This script tests the connection to Elasticsearch using the configured
 environment variables. It helps diagnose common connection issues.
+
+Usage:
+  python check_es_connection.py [--verbose]
+
+Returns:
+  Exit code 0 if all tests pass
+  Exit code 1 if basic connectivity fails
+  Exit code 2 if HTTP connectivity fails
+  Exit code 3 if Elasticsearch client connection fails
+  Exit code 4 if index operations fail
+
+This makes it suitable for use in CI/CD pipelines and automated scripts.
 """
 
 import os
@@ -17,6 +29,7 @@ import traceback
 from elasticsearch import Elasticsearch
 import urllib3
 import socket
+import argparse
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +44,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def get_elasticsearch_config():
     """Get Elasticsearch configuration from environment variables"""
+    # Load environment variables from .env file
+    load_dotenv()
+    
     config = {
         'url': os.getenv('ELASTICSEARCH_URL'),
         'api_key': os.getenv('ELASTICSEARCH_API_KEY'),
@@ -202,36 +218,9 @@ def test_index_operations(es, index_name):
         else:
             logger.warning(f"⚠️ Index '{index_name}' does not exist")
             
-            # Optionally create the index for testing
-            create = input("Would you like to create a test index? (y/n): ")
-            if create.lower() == 'y':
-                es.indices.create(index=index_name)
-                logger.info(f"✅ Created index '{index_name}'")
-                
-                # Insert a test document
-                test_doc = {
-                    "title": "Test Document",
-                    "content": "This is a test document to verify ES connectivity",
-                    "timestamp": time.time()
-                }
-                
-                es.index(index=index_name, body=test_doc)
-                logger.info("✅ Inserted test document")
-                
-                # Refresh the index
-                es.indices.refresh(index=index_name)
-                
-                # Verify the document was inserted
-                search_result = es.search(
-                    index=index_name,
-                    body={"query": {"match": {"title": "Test Document"}}},
-                    size=1
-                )
-                
-                if search_result['hits']['total']['value'] > 0:
-                    logger.info("✅ Test document search successful")
-                else:
-                    logger.warning("❌ Test document not found")
+            # For CI/CD, we'll just warn but not try to create the index
+            logger.warning("Index creation skipped in automated testing mode")
+            return True
         
         return True
     except Exception as e:
@@ -240,6 +229,15 @@ def test_index_operations(es, index_name):
 
 def main():
     """Main function to test Elasticsearch connectivity."""
+    parser = argparse.ArgumentParser(description='Test Elasticsearch connectivity')
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
+    parser.add_argument('--no-prompt', action='store_true', help='Run without interactive prompts (for CI/CD)')
+    args = parser.parse_args()
+    
+    # Set logging level based on verbosity
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    
     logger.info("=== Elasticsearch Connection Checker ===")
     
     # Get config from environment
@@ -264,7 +262,7 @@ def main():
         logger.error("  - SSL/TLS configuration")
         logger.error("  - HTTP proxy settings")
         logger.error("  - API Gateway/Load Balancer settings if applicable")
-        sys.exit(1)
+        sys.exit(2)
     
     # Test Elasticsearch client
     success, es_client = test_es_client(config['url'], config['api_key'])
@@ -273,7 +271,7 @@ def main():
         logger.error("  - API Key validity")
         logger.error("  - Elasticsearch service health")
         logger.error("  - Network ACLs and security groups")
-        sys.exit(1)
+        sys.exit(3)
     
     # Test index operations
     if not test_index_operations(es_client, config['index']):
@@ -281,7 +279,7 @@ def main():
         logger.error("  - Index permissions")
         logger.error("  - Index configuration")
         logger.error("  - Elasticsearch disk space and quotas")
-        sys.exit(1)
+        sys.exit(4)
     
     logger.info("\n✅ SUCCESS: All Elasticsearch connection tests passed!")
     
@@ -308,18 +306,12 @@ def main():
         logger.error(f"Error getting cluster information: {str(e)}")
     
     logger.info("\nTroubleshooting Suggestions:")
-    logger.info("---------------------------")
-    logger.info("1. Verify Elasticsearch service is running")
-    logger.info("2. Check that your API key has appropriate permissions")
-    logger.info("3. Ensure correct URL and port in the ELASTICSEARCH_URL")
-    logger.info("4. Check for network/firewall restrictions")
-    logger.info("5. Verify SSL certificates if using HTTPS")
-    logger.info("6. Make sure the index exists and contains data")
+    logger.info("1. If you're seeing authentication errors, verify your API key")
+    logger.info("2. If you're having connectivity issues, check your VPC and security group settings")
+    logger.info("3. For AWS Elasticsearch Service, verify domain access policies")
+    
+    # Exit with success code
+    sys.exit(0)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        logger.error(traceback.format_exc())
-        sys.exit(1) 
+    main() 
