@@ -778,7 +778,7 @@ Resources:
               'https://financialnewsengine.com',
               'https://www.financialnewsengine.com',
               'http://localhost:3000',
-              'https://d3dw79zwd8sn9g.cloudfront.net'  // CloudFront domain (replace with actual)
+              'https://d3dw79zwd8sn9g.cloudfront.net'  // CloudFront domain
             ];
             
             // Determine if the origin should be allowed
@@ -788,8 +788,17 @@ Resources:
               if (allowedOrigins.includes(origin)) {
                 corsOrigin = origin;
               } else {
-                // Default to the first allowed origin if the requesting origin isn't allowed
-                corsOrigin = allowedOrigins[0];
+                // For basic wildcard matching
+                for (let allowedOrigin of allowedOrigins) {
+                  if (allowedOrigin.includes('*')) {
+                    const pattern = allowedOrigin.replace('*', '');
+                    if (origin.startsWith(pattern.replace('*.', '')) || 
+                        origin.endsWith(pattern.replace('*', ''))) {
+                      corsOrigin = origin;
+                      break;
+                    }
+                  }
+                }
               }
             }
             
@@ -803,7 +812,12 @@ Resources:
             headers['access-control-allow-origin'] = [{ key: 'Access-Control-Allow-Origin', value: corsOrigin }];
             headers['access-control-allow-methods'] = [{ key: 'Access-Control-Allow-Methods', value: 'GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS' }];
             headers['access-control-allow-headers'] = [{ key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization,X-Requested-With,X-Amz-Date,X-Api-Key,X-Amz-Security-Token' }];
-            headers['access-control-allow-credentials'] = [{ key: 'Access-Control-Allow-Credentials', value: 'true' }];
+            
+            // Only set credentials if we have a specific origin
+            if (corsOrigin !== '*') {
+              headers['access-control-allow-credentials'] = [{ key: 'Access-Control-Allow-Credentials', value: 'true' }];
+            }
+            
             headers['access-control-max-age'] = [{ key: 'Access-Control-Max-Age', value: '86400' }];
             
             // For OPTIONS request, return directly with CORS headers
@@ -849,6 +863,8 @@ Resources:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols:
                 - TLSv1.2
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 30
             OriginCustomHeaders:
               - HeaderName: X-Forwarded-Host
                 HeaderValue: !If [HasDomainName, !Ref BackendDomainName, !GetAtt ApplicationLoadBalancer.DNSName]

@@ -44,7 +44,8 @@ cors_origins = [
     "https://*.amazonaws.com",                       # Any AWS domain
     "https://financialnewsengine.com",               # Production domain
     "https://www.financialnewsengine.com",           # www subdomain
-    "https://development-backend-alb-261878750.us-east-1.elb.amazonaws.com"  # ALB domain
+    "https://development-backend-alb-261878750.us-east-1.elb.amazonaws.com",  # ALB domain
+    "https://d3dw79zwd8sn9g.cloudfront.net"          # CloudFront distribution domain
 ]
 
 # Get CORS allowed origins from environment variable if available
@@ -58,7 +59,7 @@ if cors_env:
 # Log the configured CORS origins
 logger.info(f"Configured CORS origins: {cors_origins}")
 
-CORS(app, resources={r"/*": {"origins": cors_origins, "supports_credentials": True, "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
+CORS(app, resources={r"/*": {"origins": cors_origins, "supports_credentials": True, "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "X-Api-Key", "X-Amz-Date", "X-Amz-Security-Token"], "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]}})
 
 # Add after_request handler to ensure CORS headers are set on all responses
 @app.after_request
@@ -70,60 +71,40 @@ def add_cors_headers(response):
     logger.debug(f"CORS request from origin: {origin}")
     
     # For production domains, set permissive CORS headers regardless of path
-    if origin and ('financialnewsengine.com' in origin or 'localhost' in origin):
-        logger.debug(f"Setting permissive CORS headers for known domain: {origin}")
+    if origin:
+        # Check if origin matches any allowed pattern
+        origin_allowed = False
+        
+        # For exact match
+        if origin in cors_origins:
+            origin_allowed = True
+        # For wildcard matches
+        else:
+            for allowed_origin in cors_origins:
+                if '*' in allowed_origin:
+                    # Convert the pattern to a prefix/suffix match
+                    pattern = allowed_origin.replace('*', '')
+                    if origin.startswith(pattern.replace('*.', '')) or origin.endswith(pattern.replace('*', '')):
+                        origin_allowed = True
+                        break
+        
+        # If origin is allowed or in development mode, set CORS headers
+        if origin_allowed or os.getenv('FLASK_ENV') == 'development':
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-Api-Key, X-Amz-Date, X-Amz-Security-Token'
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Max-Age'] = '3600'
+    
+    # For OPTIONS requests always return 200 with headers
+    if request.method == 'OPTIONS':
         response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response
-    
-    # Otherwise check if the origin matches any of our allowed patterns
-    # For simplicity in this fix, we'll just check exact matches and wildcards
-    origin_allowed = False
-    
-    # For exact match
-    if origin in cors_origins:
-        origin_allowed = True
-    # For wildcard matches (basic implementation)
-    else:
-        for allowed_origin in cors_origins:
-            if '*' in allowed_origin:
-                # Convert the pattern to a prefix/suffix match
-                pattern = allowed_origin.replace('*', '')
-                if origin.startswith(pattern.replace('*.', '')) or origin.endswith(pattern.replace('*', '')):
-                    origin_allowed = True
-                    break
-    
-    # If origin is allowed, set the appropriate CORS headers
-    if origin_allowed:
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-    elif request.method == 'OPTIONS':
-        # For OPTIONS requests, we'll always set permissive headers to allow preflight
-        response.headers['Access-Control-Allow-Origin'] = origin or '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-Api-Key, X-Amz-Date, X-Amz-Security-Token'
+        response.headers['Access-Control-Max-Age'] = '3600'
         if origin:
             response.headers['Access-Control-Allow-Credentials'] = 'true'
-    # For errors or when cross-origin requests come from unknown origins,
-    # set a more permissive header to ensure CORS doesn't break functionality
-    elif response.status_code >= 400:
-        response.headers['Access-Control-Allow-Origin'] = origin or '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        if origin:
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-    
-    # Add Cache-Control headers for API responses to prevent caching sensitive data
-    if request.path.startswith('/query') or request.path.startswith('/diagnostic'):
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-    
-    logger.debug(f"CORS headers applied for origin: {origin}, allowed: {origin_allowed or request.method == 'OPTIONS' or response.status_code >= 400}")
+            
     return response
 
 # Setup request logging middleware
