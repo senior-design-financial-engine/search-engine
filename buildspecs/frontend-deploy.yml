@@ -18,7 +18,17 @@ phases:
       - find . -name "package.json" -type f | sort
       - echo "Checking for build artifacts..."
       - |
-        if [ ! -d "build" ] && [ ! -d "frontend/build" ]; then
+        # Check for index.html in root to determine if build artifacts are already in root
+        if [ -f "index.html" ] && [ -d "static" ]; then
+          echo "Found build artifacts directly in root directory"
+          BUILD_DIR="."
+        elif [ -d "build" ]; then
+          echo "Found build directory at root level"
+          BUILD_DIR="build"
+        elif [ -d "frontend/build" ]; then
+          echo "Found build directory in frontend folder"
+          BUILD_DIR="frontend/build"
+        elif [ ! -d "build" ] && [ ! -d "frontend/build" ]; then
           echo "No build directory found, attempting to build from source..."
           if [ -d "frontend" ]; then
             cd frontend
@@ -29,6 +39,7 @@ phases:
             cd ..
             mkdir -p build
             cp -r frontend/build/* build/
+            BUILD_DIR="build"
           else
             echo "ERROR: No frontend directory or build artifacts found"
             exit 1
@@ -40,6 +51,7 @@ phases:
       - echo "Preparing deployment artifacts..."
       - echo "Listing contents of current directory:"
       - ls -la
+      - echo "Using build directory: $BUILD_DIR"
   
   post_build:
     commands:
@@ -51,14 +63,7 @@ phases:
         fi
       - echo "Retrieved bucket name: $BUCKET_NAME"
       - echo "Syncing build files to S3 bucket..."
-      - if [ -d "build" ]; then
-          aws s3 sync build/ s3://$BUCKET_NAME/ --delete;
-        elif [ -d "frontend/build" ]; then
-          aws s3 sync frontend/build/ s3://$BUCKET_NAME/ --delete;
-        else
-          echo "ERROR: No build directory found";
-          exit 1;
-        fi
+      - aws s3 sync $BUILD_DIR/ s3://$BUCKET_NAME/ --delete
       - echo "Creating CloudFront invalidation..."
       - CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
       - if [ -n "$CLOUDFRONT_ID" ]; then
@@ -71,7 +76,7 @@ phases:
 artifacts:
   files:
     - '**/*'
-  base-directory: build
+  base-directory: $BUILD_DIR
   discard-paths: no
 
 cache:

@@ -16,7 +16,11 @@ phases:
       - find . -name "build" -type d | sort
       - find . -name "package.json" -type f | sort
       - |
-        if [ -d "build" ]; then
+        # Check for index.html in root to determine if build artifacts are already in root
+        if [ -f "index.html" ] && [ -d "static" ]; then
+          echo "Found build artifacts directly in root directory"
+          BUILD_DIR="."
+        elif [ -d "build" ]; then
           echo "Found build directory at root level"
           BUILD_DIR="build"
         elif [ -d "frontend/build" ]; then
@@ -46,6 +50,7 @@ phases:
           exit 1
         fi
       - echo "Syncing files to S3 bucket $BUCKET_NAME"
+      - echo "Using build directory: $BUILD_DIR"
       - aws s3 sync $BUILD_DIR/ s3://$BUCKET_NAME/ --delete
   
   post_build:
