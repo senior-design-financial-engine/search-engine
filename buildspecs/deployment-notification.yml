@@ -7,10 +7,11 @@ phases:
       - echo "Installing dependencies for deployment notifications"
       - pip install boto3 awscli jq
   
-  build:
+  pre_build:
     commands:
-      - echo "Checking deployment status"
       - |
+        cat > check_deployment.sh << 'EOF'
+        #!/bin/bash
         # Get ASG name from stack outputs
         ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
         
@@ -60,6 +61,13 @@ EOF
           echo "Could not find Auto Scaling Group name in stack outputs"
           aws sns publish --topic-arn $SNS_TOPIC_ARN --subject "Financial News Engine Deployment Status: $ENVIRONMENT" --message "Deployment completed but could not find Auto Scaling Group information."
         fi
+        EOF
+      - chmod +x check_deployment.sh
+  
+  build:
+    commands:
+      - echo "Checking deployment status"
+      - ./check_deployment.sh
   
   post_build:
     commands:
