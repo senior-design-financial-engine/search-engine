@@ -1,6 +1,12 @@
 {
     "npr": {
         "rss_feed": "https://feeds.npr.org/1019/rss.xml",
+        "base_url": "https://www.npr.org",
+        "article_selector": "article",
+        "headline_selector": "h1",
+        "content_selector": "article",
+        "timestamp_selector": "time",
+        "timestamp_format": "%Y-%m-%dT%H:%M:%S%z",
         "headline": {"tag": "h1"},
         "content": {
             "container": {"tag": "div", "id": "storytext"},
@@ -11,6 +17,12 @@
         ]
     },
     "ap_news": {
+        "base_url": "https://apnews.com",
+        "article_selector": "article",
+        "headline_selector": "h1",
+        "content_selector": "article",
+        "timestamp_selector": "time",
+        "timestamp_format": "%Y-%m-%dT%H:%M:%S%z",
         "headline": {"tag": "h1", "class": "Page-headline"},
         "content": {
             "container": {"tag": "div", "class": "RichTextStoryBody"},
@@ -19,14 +31,40 @@
     },
     "bbc": {
         "rss_feed": "http://feeds.bbci.co.uk/news/technology/rss.xml",
+        "base_url": "https://www.bbc.com",
+        "article_selector": "article",
+        "headline_selector": "h1",
+        "content_selector": "article",
+        "timestamp_selector": "time",
+        "timestamp_format": "%Y-%m-%dT%H:%M:%S%z",
         "headline": {"tag": "h1"},
         "content": {
             "containers": {"tag": "div", "attrs": {"data-component": "text-block"}},
             "paragraphs": {"tag": "p"}
         },
+        "cleanup": [
+            {"tag": "div", "class": "credit-caption"}
+        ],
         "additional_feeds": [
             "http://feeds.bbci.co.uk/news/business/rss.xml",
             "http://feeds.bbci.co.uk/news/technology/rss.xml"
+        ]
+    },
+    "cnn": {
+        "base_url": "https://www.cnn.com",
+        "article_selector": "div.article__content",
+        "headline_selector": "h1.headline__text",
+        "content_selector": "div.article__content p.paragraph",
+        "timestamp_selector": "div.timestamp",
+        "timestamp_format": "%I:%M %p %Z, %a %B %d, %Y",
+        "exclude_selectors": [
+            "div.editor-note",
+            "div.source",
+            "div.ad-slot-dynamic",
+            "div.related-content",
+            "div.podcast-episode",
+            "div.openweb-comment-counter",
+            "div.bizdev-lending-tree"
         ]
     }
 }

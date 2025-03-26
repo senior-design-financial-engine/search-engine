@@ -186,7 +186,7 @@ class RedditScraper:
     def save_threads(self):
         """Save all threads to a single JSON file."""
         os.makedirs("data", exist_ok=True)
-        filename = "articles/reddit_threads.json"
+        filename = "data/reddit_threads.json"
         
         # Check for existing data
         if os.path.exists(filename):

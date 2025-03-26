@@ -5,6 +5,16 @@ import time
 import os
 import feedparser
 from urllib.parse import urljoin
+from datetime import datetime, timezone, timedelta
+
+# Define headers for requests
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1"
+}
 
 # Define topics and their related keywords
 TOPICS = {
@@ -27,182 +37,7 @@ TOPICS = {
 # Load sources configuration
 with open("data/sources.json") as f:
     NEWS_SOURCES = json.load(f)
-
-class RSSFeedScraper:
-    def __init__(self, source, processed_urls_file='data/processed_urls.json'):
-        self.source = source
-
-        with open("sources.json") as f:
-            self.feed_url = json.load(f).get(self.source, {}).get('rss_feed')
-        
-        if not self.feed_url:
-            raise ValueError(f"No RSS feed URL defined for source: {self.source}")
-        self.processed_urls_file = processed_urls_file
-        self.processed_urls = self.load_processed_urls()
-        self.articles_data = []  
-
-    def load_processed_urls(self):
-        if os.path.exists(self.processed_urls_file):
-            with open(self.processed_urls_file, 'r') as f:
-                return set(json.load(f))
-        return set()
-
-    def save_processed_urls(self):
-        with open(self.processed_urls_file, 'w') as f:
-            json.dump(list(self.processed_urls), f, indent=4)
-
-    def get_articles(self):
-        feed = feedparser.parse(self.feed_url)
-        articles = []
-        for entry in feed.entries:
-            articles.append((entry.link, entry.title))
-        return articles
-
-    def scrape_new_articles(self):
-        articles = self.get_articles()
-        new_articles = []
-        for url, title in articles:
-            if url not in self.processed_urls:
-                new_articles.append((url, title))
-                self.processed_urls.add(url)
-        self.save_processed_urls()
-        return new_articles
-
-    def scrape(self):
-        new_articles = self.scrape_new_articles()
-        for url, title in new_articles:
-            scraper = WebScraper(url, self.source)
-            try:
-                article_data = scraper.scrape()  
-                self.articles_data.append(article_data)  
-                print(f"Scraped article: {title}")
-                time.sleep(5)  
-            except Exception as e:
-                print(f"Error scraping {url}: {e}")
-
-        self.save_articles_data()
-
-    def save_articles_data(self):
-        """Save all scraped articles to a JSON file."""
-        os.makedirs('articles', exist_ok=True)
-        filename = f"articles/{self.source}_articles.json"
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                existing_data = json.load(f)
-
-            urls_in_existing = {article['url'] for article in existing_data}
-            new_articles = [article for article in self.articles_data if article['url'] not in urls_in_existing]
-            combined_data = existing_data + new_articles
-        else:
-            combined_data = self.articles_data
-
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(combined_data, f, ensure_ascii=False, indent=4)
-        print(f"Saved {len(combined_data)} articles to {filename}")
-
-        self.articles_data = []
-
-
-
-
-class APNewsScraper:
-    def __init__(self, processed_urls_file='data/processed_urls_ap_news.json'):
-        self.hub_urls = [
-            "https://apnews.com/hub/economy",
-            "https://apnews.com/hub/financial-wellness",
-            "https://apnews.com/hub/financial-markets"
-        ]
-        self.processed_urls_file = processed_urls_file
-        self.processed_urls = self.load_processed_urls()
-        self.articles_data = []
-
-    def load_processed_urls(self):
-        if os.path.exists(self.processed_urls_file):
-            with open(self.processed_urls_file, 'r') as f:
-                return set(json.load(f))
-        return set()
-
-    def save_processed_urls(self):
-        with open(self.processed_urls_file, 'w') as f:
-            json.dump(list(self.processed_urls), f, indent=4)
-
-    def scrape_article_urls(self, url):
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; ArticleScraper/1.0; +http://yourwebsite.com/)"
-        }
-        try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as http_err:
-            print(f"HTTP error occurred while accessing {url}: {http_err}")
-            return []
-        except Exception as err:
-            print(f"An error occurred while accessing {url}: {err}")
-            return []
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        article_urls = []
-
-        articles = soup.find_all('div', class_='PageList-items-item')
-
-        for article in articles:
-            title_div = article.find('h3', class_='PagePromo-title')
-            if title_div:
-                link_tag = title_div.find('a', class_='Link')
-                if link_tag and 'href' in link_tag.attrs:
-                    article_url = urljoin('https://apnews.com', link_tag['href'])
-                    if article_url not in self.processed_urls:
-                        article_urls.append(article_url)
-                        self.processed_urls.add(article_url)
-
-        return article_urls
     
-    def scrape(self):
-        for hub_url in self.hub_urls:
-            print(f"Scraping articles from: {hub_url}")
-            article_urls = self.scrape_article_urls(hub_url)
-            print(f"Found {len(article_urls)} new articles.")
-            time.sleep(2)  
-
-            for url in article_urls:
-                print(f"Scraping article: {url}")
-                scraper = WebScraper(url, "ap_news")
-                article_data = scraper.scrape()
-                if article_data:
-                    self.articles_data.append(article_data)
-                    print(f"Scraped article: {article_data['headline']}")
-                else:
-                    print(f"Failed to scrape article at {url}")
-                time.sleep(5)  
-
-        self.save_processed_urls()
-        self.save_articles_data()
-
-    def save_articles_data(self):
-        """Save all scraped articles to a JSON file."""
-        os.makedirs('articles', exist_ok=True)
-        filename = "articles/ap_articles.json"
-        new_articles = []
-        if os.path.exists(filename):
-            with open(filename, 'r', encoding='utf-8') as f:
-                existing_data = json.load(f)
-            urls_in_existing = {article['url'] for article in existing_data}
-            new_articles = [article for article in self.articles_data if article['url'] not in urls_in_existing]
-            combined_data = existing_data + new_articles
-        else:
-            combined_data = self.articles_data
-            new_articles = self.articles_data  
-
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(combined_data, f, ensure_ascii=False, indent=4)
-        print(f"Saved {len(new_articles)} new article{'s' if len(new_articles) != 1 else ''} to {filename}")
-
-        self.articles_data = []
-
-
-
-
-
 class WebScraper:
     def __init__(self, url: str, source: str):
         """Initialize with the URL and news source type."""
@@ -373,7 +208,7 @@ class TopicTagger:
         # Check each topic's keywords against the content
         for topic, keywords in TOPICS.items():
             # If any keyword for this topic is found in the content, add the topic tag
-            if any(keyword.lower() in full_content for keyword in keywords):
+            if any(f" {keyword.lower()} " in f" {full_content} " for keyword in keywords):
                 tags.append(topic)
         
         # If no tags were found, mark as miscellaneous
@@ -383,7 +218,7 @@ class TopicTagger:
         return tags
 
 class OptimizedRSSFeedScraper:
-    def __init__(self, source, processed_urls_file='data/processed_urls_optimized.json'):
+    def __init__(self, source, processed_urls_file=None):
         self.source = source
 
         with open("data/sources.json") as f:
@@ -391,6 +226,11 @@ class OptimizedRSSFeedScraper:
         
         if not self.feed_url:
             raise ValueError(f"No RSS feed URL defined for source: {self.source}")
+            
+        # Use source-specific processed URLs file if not provided
+        if processed_urls_file is None:
+            processed_urls_file = f'data/processed_urls_{self.source}.json'
+            
         self.processed_urls_file = processed_urls_file
         self.processed_urls = self.load_processed_urls()
         self.articles_data = []
@@ -579,4 +419,204 @@ class OptimizedAPNewsScraper:
             json.dump(combined_data, f, ensure_ascii=False, indent=4)
         print(f"Saved {len(new_articles)} new article{'s' if len(new_articles) != 1 else ''} to {filename}")
 
+        self.articles_data = []
+
+class CNNScraper:
+    def __init__(self):
+        self.base_url = "https://www.cnn.com/business"
+        self.processed_urls_file = 'data/processed_urls_cnn.json'
+        self.processed_urls = self.load_processed_urls()
+        self.articles_data = []
+        self.topic_tagger = TopicTagger()
+        
+        # Load source configuration
+        with open("data/sources.json") as f:
+            self.config = json.load(f)["cnn"]
+            
+    def load_processed_urls(self):
+        """Load the set of processed URLs from file."""
+        if os.path.exists(self.processed_urls_file):
+            with open(self.processed_urls_file, 'r') as f:
+                return set(json.load(f))
+        return set()
+        
+    def save_processed_urls(self):
+        """Save the set of processed URLs to file."""
+        with open(self.processed_urls_file, 'w') as f:
+            json.dump(list(self.processed_urls), f, indent=4)
+        
+    def extract_date_from_url(self, url):
+        """Extract date from CNN URL pattern (YYYY/MM/DD)."""
+        try:
+            # Split URL by '/' and look for the date pattern
+            parts = url.split('/')
+            # Find the index where the year starts
+            for i, part in enumerate(parts):
+                if part.isdigit() and len(part) == 4:  # Found the year
+                    if i + 2 < len(parts):  # Make sure we have month and day
+                        year = int(parts[i])
+                        month = int(parts[i + 1])
+                        day = int(parts[i + 2])
+                        # Return just the date in YYYY-MM-DD format
+                        return f"{year}-{month:02d}-{day:02d}"
+        except Exception as e:
+            print(f"Error extracting date from URL {url}: {str(e)}")
+        return None
+
+    def scrape_article_content(self, url):
+        """Scrape the content of a CNN article."""
+        try:
+            response = requests.get(url, headers=HEADERS)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Get headline
+            headline = soup.select_one(self.config['headline_selector'])
+            if not headline:
+                return None
+            headline = headline.get_text(strip=True)
+            
+            # Get content
+            content_div = soup.select_one(self.config['article_selector'])
+            if not content_div:
+                return None
+                
+            # Get all paragraphs, excluding unwanted elements
+            paragraphs = []
+            for p in content_div.select(self.config['content_selector']):
+                # Skip if paragraph is in an excluded section
+                if any(p.find_parent(selector) for selector in self.config['exclude_selectors']):
+                    continue
+                paragraphs.append(p.get_text(strip=True))
+            
+            content = '\n\n'.join(paragraphs)
+            
+            # Get tags
+            headline_tags = self.topic_tagger.get_article_tags("", headline)
+            content_tags = self.topic_tagger.get_article_tags(content)
+            all_tags = list(set(headline_tags + content_tags))
+            
+            # Get date from URL
+            timestamp = self.extract_date_from_url(url)
+            
+            return {
+                "url": url,
+                "headline": headline,
+                "content": content,
+                "source": "CNN",
+                "tags": all_tags,
+                "headline_tags": headline_tags,
+                "timestamp": timestamp
+            }
+            
+        except Exception as e:
+            print(f"Error scraping article {url}: {str(e)}")
+            return None
+            
+    def scrape_article_urls(self):
+        """Scrape article URLs from CNN's business section."""
+        try:
+            response = requests.get(self.base_url, headers=HEADERS)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find all article links
+            articles = []
+            seen_urls = set()  # Track unique URLs
+            
+            for link in soup.find_all('a', href=True):
+                url = link.get('href')
+                if not url:
+                    continue
+                    
+                # Ensure URL is absolute
+                if not url.startswith('http'):
+                    url = urljoin(self.base_url, url)
+                
+                # Skip if URL is already processed or seen in this run
+                if url in self.processed_urls or url in seen_urls:
+                    continue
+                
+                # Get headline text
+                headline = link.get_text(strip=True)
+                if not headline:
+                    continue
+                
+                # Check if article is relevant using headline
+                headline_tags = self.topic_tagger.get_article_tags("", headline)
+                if "misc" not in headline_tags:
+                    articles.append({
+                        "url": url,
+                        "headline": headline,
+                        "headline_tags": headline_tags
+                    })
+                    seen_urls.add(url)  # Mark URL as seen
+                    print(f"Found relevant headline: {headline} (Tags: {headline_tags})")
+            
+            return articles
+            
+        except Exception as e:
+            print(f"Error scraping article URLs: {str(e)}")
+            return []
+            
+    def scrape(self):
+        """Main scraping method for CNN articles."""
+        print(f"\nScraping CNN articles...")
+        
+        # Get article URLs
+        articles = self.scrape_article_urls()
+        print(f"Found {len(articles)} new articles")
+        
+        # Scrape each article
+        for article in articles:
+            url = article['url']
+            print(f"\nScraping article: {url}")
+            
+            # Scrape article content
+            article_data = self.scrape_article_content(url)
+            if article_data:
+                self.articles_data.append(article_data)
+                self.processed_urls.add(url)
+                print(f"Successfully scraped article: {article_data['headline']}")
+            else:
+                print(f"Failed to scrape article: {url}")
+        
+        # Save processed URLs
+        self.save_processed_urls()
+        
+        # Save articles data
+        self.save_articles_data()
+        
+        print(f"\nCNN scraping complete. Scraped {len(self.articles_data)} new articles.")
+
+    def save_articles_data(self):
+        """Save all scraped articles to a JSON file."""
+        os.makedirs('articles', exist_ok=True)
+        filename = "articles/cnn_articles.json"
+        
+        # Load existing data
+        existing_data = []
+        if os.path.exists(filename):
+            with open(filename, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+        
+        # Create a set of existing URLs for faster lookup
+        existing_urls = {article['url'] for article in existing_data}
+        
+        # Filter out any duplicates from new articles
+        new_articles = []
+        for article in self.articles_data:
+            if article['url'] not in existing_urls:
+                new_articles.append(article)
+        
+        # Combine existing and new articles
+        combined_data = existing_data + new_articles
+        
+        # Save the updated data
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(combined_data, f, ensure_ascii=False, indent=4)
+            
+        print(f"Saved {len(new_articles)} new article{'s' if len(new_articles) != 1 else ''} to {filename}")
+        
+        # Clear the articles data for the next run
         self.articles_data = []
