@@ -18,80 +18,92 @@ phases:
       - cd backend || echo 'Backend directory not found, proceeding anyway'
       - mkdir -p scripts
       - echo 'Creating deployment scripts...'
-      - echo '#!/bin/bash' > scripts/deploy.sh
-      - echo 'cd /opt/financial-news-engine' >> scripts/deploy.sh
-      - echo 'unzip -o /tmp/backend.zip -d .' >> scripts/deploy.sh
-      - echo 'pip3 install -r requirements.txt' >> scripts/deploy.sh
-      - echo 'systemctl daemon-reload' >> scripts/deploy.sh
-      - echo 'systemctl start financial-news.service' >> scripts/deploy.sh
+      - |
+        cat > scripts/deploy.sh << 'EOF'
+        #!/bin/bash
+        cd /opt/financial-news-engine
+        unzip -o /tmp/backend.zip -d .
+        pip3 install -r requirements.txt
+        systemctl daemon-reload
+        systemctl start financial-news.service
+        EOF
       - chmod +x scripts/deploy.sh
-      - echo '#!/bin/bash' > scripts/before_install.sh
-      - echo 'mkdir -p /opt/financial-news-engine' >> scripts/before_install.sh
+      - |
+        cat > scripts/before_install.sh << 'EOF'
+        #!/bin/bash
+        mkdir -p /opt/financial-news-engine
+        EOF
       - chmod +x scripts/before_install.sh
-      - echo '#!/bin/bash' > scripts/create_env_file.sh
-      - echo '# Create .env file with environment variables by fetching from SSM Parameter Store' >> scripts/create_env_file.sh
-      - echo 'echo "Fetching credentials from SSM Parameter Store..."' >> scripts/create_env_file.sh
-      - echo '' >> scripts/create_env_file.sh
-      - echo '# Function to get parameters from SSM with proper error handling' >> scripts/create_env_file.sh
-      - echo 'function get_parameter() {' >> scripts/create_env_file.sh
-      - echo '    local param_name=$1' >> scripts/create_env_file.sh
-      - echo '    local default_value=$2' >> scripts/create_env_file.sh
-      - echo '    ' >> scripts/create_env_file.sh
-      - echo '    echo "Fetching parameter: $param_name"' >> scripts/create_env_file.sh
-      - echo '    local value' >> scripts/create_env_file.sh
-      - echo '    value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)' >> scripts/create_env_file.sh
-      - echo '    local exit_code=$?' >> scripts/create_env_file.sh
-      - echo '    ' >> scripts/create_env_file.sh
-      - echo "    if [ \$exit_code -eq 0 ] && [ -n \"\$value\" ] && [ \"\$value\" != \"None\" ]; then" >> scripts/create_env_file.sh
-      - echo '        echo "Successfully retrieved parameter: $param_name"' >> scripts/create_env_file.sh
-      - echo '        echo "$value"' >> scripts/create_env_file.sh
-      - echo '    else' >> scripts/create_env_file.sh
-      - echo '        echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"' >> scripts/create_env_file.sh
-      - echo '        echo "$default_value"' >> scripts/create_env_file.sh
-      - echo '    fi' >> scripts/create_env_file.sh
-      - echo '}' >> scripts/create_env_file.sh
-      - echo '' >> scripts/create_env_file.sh
-      - echo '# Get parameters with default fallbacks' >> scripts/create_env_file.sh
-      - echo 'ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")' >> scripts/create_env_file.sh
-      - echo 'ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")' >> scripts/create_env_file.sh
-      - echo 'ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")' >> scripts/create_env_file.sh
-      - echo 'ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")' >> scripts/create_env_file.sh
-      - echo 'ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")' >> scripts/create_env_file.sh
-      - echo 'ENV=$(get_parameter "/financial-news/environment" "development")' >> scripts/create_env_file.sh
-      - echo '' >> scripts/create_env_file.sh
-      - echo '# Create the .env file' >> scripts/create_env_file.sh
-      - echo 'mkdir -p /opt/financial-news-engine' >> scripts/create_env_file.sh
-      - echo 'cat > /opt/financial-news-engine/.env << EOL' >> scripts/create_env_file.sh
-      - echo 'ELASTICSEARCH_URL=$ES_URL' >> scripts/create_env_file.sh
-      - echo 'ELASTICSEARCH_API_KEY=$ES_API_KEY' >> scripts/create_env_file.sh
-      - echo 'ELASTICSEARCH_INDEX=$ES_INDEX' >> scripts/create_env_file.sh
-      - echo 'ES_NUMBER_OF_SHARDS=$ES_SHARDS' >> scripts/create_env_file.sh
-      - echo 'ES_NUMBER_OF_REPLICAS=$ES_REPLICAS' >> scripts/create_env_file.sh
-      - echo 'ENVIRONMENT=$ENV' >> scripts/create_env_file.sh
-      - echo 'CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000' >> scripts/create_env_file.sh
-      - echo 'EOL' >> scripts/create_env_file.sh
-      - echo '' >> scripts/create_env_file.sh
-      - echo '# Set secure permissions' >> scripts/create_env_file.sh
-      - echo 'chmod 600 /opt/financial-news-engine/.env' >> scripts/create_env_file.sh
-      - echo 'echo "Created .env file with environment variables from SSM Parameter Store"' >> scripts/create_env_file.sh
+      - |
+        cat > scripts/create_env_file.sh << 'EOF'
+        #!/bin/bash
+        # Create .env file with environment variables by fetching from SSM Parameter Store
+        echo "Fetching credentials from SSM Parameter Store..."
+
+        # Function to get parameters from SSM with proper error handling
+        function get_parameter() {
+            local param_name=$1
+            local default_value=$2
+            
+            echo "Fetching parameter: $param_name"
+            local value
+            value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
+            local exit_code=$?
+            
+            if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then
+                echo "Successfully retrieved parameter: $param_name"
+                echo "$value"
+            else
+                echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
+                echo "$default_value"
+            fi
+        }
+
+        # Get parameters with default fallbacks
+        ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
+        ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
+        ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
+        ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
+        ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
+        ENV=$(get_parameter "/financial-news/environment" "development")
+
+        # Create the .env file
+        mkdir -p /opt/financial-news-engine
+        cat > /opt/financial-news-engine/.env << EOL
+        ELASTICSEARCH_URL=$ES_URL
+        ELASTICSEARCH_API_KEY=$ES_API_KEY
+        ELASTICSEARCH_INDEX=$ES_INDEX
+        ES_NUMBER_OF_SHARDS=$ES_SHARDS
+        ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+        ENVIRONMENT=$ENV
+        CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
+        EOL
+
+        # Set secure permissions
+        chmod 600 /opt/financial-news-engine/.env
+        echo "Created .env file with environment variables from SSM Parameter Store"
+        EOF
       - chmod +x scripts/create_env_file.sh
-      - "echo 'version: 0.0' > appspec.yml"
-      - "echo 'os: linux' >> appspec.yml"
-      - "echo 'files:' >> appspec.yml"
-      - "echo '  - source: dist/backend.zip' >> appspec.yml"
-      - "echo '    destination: /tmp/' >> appspec.yml"
-      - "echo 'hooks:' >> appspec.yml"
-      - "echo '  BeforeInstall:' >> appspec.yml"
-      - "echo '    - location: scripts/before_install.sh' >> appspec.yml"
-      - "echo '      timeout: 300' >> appspec.yml"
-      - "echo '      runas: root' >> appspec.yml"
-      - "echo '  AfterInstall:' >> appspec.yml"
-      - "echo '    - location: scripts/deploy.sh' >> appspec.yml"
-      - "echo '      timeout: 300' >> appspec.yml"
-      - "echo '      runas: root' >> appspec.yml"
-      - "echo '    - location: scripts/create_env_file.sh' >> appspec.yml"
-      - "echo '      timeout: 300' >> appspec.yml"
-      - "echo '      runas: root' >> appspec.yml"
+      - |
+        cat > appspec.yml << 'EOF'
+        version: 0.0
+        os: linux
+        files:
+          - source: dist/backend.zip
+            destination: /tmp/
+        hooks:
+          BeforeInstall:
+            - location: scripts/before_install.sh
+              timeout: 300
+              runas: root
+          AfterInstall:
+            - location: scripts/deploy.sh
+              timeout: 300
+              runas: root
+            - location: scripts/create_env_file.sh
+              timeout: 300
+              runas: root
+        EOF
   build:
     commands:
       - echo 'Checking AWS CLI configuration:'
