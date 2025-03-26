@@ -28,20 +28,20 @@ phases:
       - echo '#!/bin/bash' > scripts/before_install.sh
       - echo 'mkdir -p /opt/financial-news-engine' >> scripts/before_install.sh
       - chmod +x scripts/before_install.sh
-      - echo 'version: 0.0' > appspec.yml
-      - echo 'os: linux' >> appspec.yml
-      - echo 'files:' >> appspec.yml
-      - echo '  - source: dist/backend.zip' >> appspec.yml
-      - echo '    destination: /tmp/' >> appspec.yml
-      - echo 'hooks:' >> appspec.yml
-      - echo '  BeforeInstall:' >> appspec.yml
-      - echo '    - location: scripts/before_install.sh' >> appspec.yml
-      - echo '      timeout: 300' >> appspec.yml
-      - echo '      runas: root' >> appspec.yml
-      - echo '  AfterInstall:' >> appspec.yml
-      - echo '    - location: scripts/deploy.sh' >> appspec.yml
-      - echo '      timeout: 300' >> appspec.yml
-      - echo '      runas: root' >> appspec.yml
+      - "echo 'version: 0.0' > appspec.yml"
+      - "echo 'os: linux' >> appspec.yml"
+      - "echo 'files:' >> appspec.yml"
+      - "echo '  - source: dist/backend.zip' >> appspec.yml"
+      - "echo '    destination: /tmp/' >> appspec.yml"
+      - "echo 'hooks:' >> appspec.yml"
+      - "echo '  BeforeInstall:' >> appspec.yml"
+      - "echo '    - location: scripts/before_install.sh' >> appspec.yml"
+      - "echo '      timeout: 300' >> appspec.yml"
+      - "echo '      runas: root' >> appspec.yml"
+      - "echo '  AfterInstall:' >> appspec.yml"
+      - "echo '    - location: scripts/deploy.sh' >> appspec.yml"
+      - "echo '      timeout: 300' >> appspec.yml"
+      - "echo '      runas: root' >> appspec.yml"
   build:
     commands:
       - echo 'Checking AWS CLI configuration:'
