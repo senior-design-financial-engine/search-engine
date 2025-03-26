@@ -16,23 +16,23 @@ phases:
       - cp backend.py api/deploy/app.py || echo "Using fallback app.py"
       - cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
       
-      # Create scripts in separate files
+      # Create scripts in separate files using proper quoting for YAML
       - echo "Creating deployment scripts"
-      - echo '#!/usr/bin/env python3
+      - "echo '#!/usr/bin/env python3
 import yaml
 import sys
 
 try:
-    with open("backend-api.yaml", "r") as f:
+    with open(\"backend-api.yaml\", \"r\") as f:
         config = yaml.safe_load(f)
-        with open("api/deploy/app.py", "w") as app_file:
-            app_file.write(config.get("app_code", ""))
-    print("Successfully extracted app.py from backend-api.yaml")
+        with open(\"api/deploy/app.py\", \"w\") as app_file:
+            app_file.write(config.get(\"app_code\", \"\"))
+    print(\"Successfully extracted app.py from backend-api.yaml\")
 except Exception as e:
-    print(f"Error extracting app.py: {e}")
-    sys.exit(1)' > scripts/extract_app.py
+    print(f\"Error extracting app.py: {e}\")
+    sys.exit(1)' > scripts/extract_app.py"
       
-      - echo '#!/bin/bash
+      - "echo '#!/bin/bash
 set -e
 
 # Create directory if it does not exist
@@ -45,10 +45,10 @@ cp requirements.txt /opt/financial-news-engine/
 cp financial-news.service /etc/systemd/system/
 
 # Fetch parameters from SSM
-echo "Fetching credentials from SSM Parameter Store..."
-ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
-ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
-ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
+echo \"Fetching credentials from SSM Parameter Store...\"
+ES_URL=$(aws ssm get-parameter --name \"/financial-news/elasticsearch-url\" --with-decryption --query \"Parameter.Value\" --output text)
+ES_API_KEY=$(aws ssm get-parameter --name \"/financial-news/elasticsearch-api-key\" --with-decryption --query \"Parameter.Value\" --output text)
+ES_INDEX=$(aws ssm get-parameter --name \"/financial-news/elasticsearch-index\" --with-decryption --query \"Parameter.Value\" --output text)
 
 # Create .env file with environment variables
 cat > /opt/financial-news-engine/.env << EOLENV
@@ -57,7 +57,7 @@ ELASTICSEARCH_API_KEY=$ES_API_KEY
 ELASTICSEARCH_INDEX=$ES_INDEX
 EOLENV
 chmod 600 /opt/financial-news-engine/.env
-echo "Created .env file with credentials from SSM Parameter Store"
+echo \"Created .env file with credentials from SSM Parameter Store\"
 
 # Install dependencies
 cd /opt/financial-news-engine
@@ -71,47 +71,47 @@ systemctl daemon-reload
 systemctl enable financial-news.service
 systemctl restart financial-news.service
 
-echo "API deployment completed"' > api/deploy/deploy.sh
+echo \"API deployment completed\"' > api/deploy/deploy.sh"
       
-      - echo '#!/bin/bash
+      - "echo '#!/bin/bash
 set -e
 
-echo "Verifying backend service startup..."
+echo \"Verifying backend service startup...\"
 
 # Wait for the service to start
 for i in {1..12}; do
   if curl -s http://localhost:5000/ping > /dev/null; then
-    echo "Service is responding to ping"
+    echo \"Service is responding to ping\"
     break
   fi
   
   if [ $i -eq 12 ]; then
-    echo "ERROR: Service failed to start within 60 seconds"
+    echo \"ERROR: Service failed to start within 60 seconds\"
     exit 1
   fi
   
-  echo "Waiting for service to start (attempt $i/12)..."
+  echo \"Waiting for service to start (attempt $i/12)...\"
   sleep 5
 done
 
-echo "Checking diagnostic report endpoint..."
-curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/report | grep -q "status" && echo "Diagnostic endpoint working" || echo "WARNING: Diagnostic endpoint not responding properly"
+echo \"Checking diagnostic report endpoint...\"
+curl -s -H \"Origin: https://financialnewsengine.com\" http://localhost:5000/diagnostic/report | grep -q \"status\" && echo \"Diagnostic endpoint working\" || echo \"WARNING: Diagnostic endpoint not responding properly\"
 
-echo "Checking query endpoint..."
-curl -s -H "Origin: https://financialnewsengine.com" "http://localhost:5000/query?query=test" | grep -q "results" && echo "Query endpoint working" || echo "WARNING: Query endpoint not responding properly"
+echo \"Checking query endpoint...\"
+curl -s -H \"Origin: https://financialnewsengine.com\" \"http://localhost:5000/query?query=test\" | grep -q \"results\" && echo \"Query endpoint working\" || echo \"WARNING: Query endpoint not responding properly\"
 
-echo "Startup verification successful"' > api/deploy/verify.sh
+echo \"Startup verification successful\"' > api/deploy/verify.sh"
       
-      - echo '[Unit]
+      - "echo '[Unit]
 Description=Financial News Engine Flask App
 After=network.target
 
 [Service]
 User=root
 WorkingDirectory=/opt/financial-news-engine
-Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
-Environment="FLASK_ENV=production"
-Environment="PYTHONUNBUFFERED=1"
+Environment=\"CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com\"
+Environment=\"FLASK_ENV=production\"
+Environment=\"PYTHONUNBUFFERED=1\"
 EnvironmentFile=/opt/financial-news-engine/.env
 ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
 Restart=always
@@ -119,7 +119,7 @@ TimeoutStartSec=60
 RestartSec=10
 
 [Install]
-WantedBy=multi-user.target' > api/deploy/financial-news.service
+WantedBy=multi-user.target' > api/deploy/financial-news.service"
       
       # Make scripts executable
       - chmod +x scripts/extract_app.py
@@ -133,9 +133,9 @@ WantedBy=multi-user.target' > api/deploy/financial-news.service
     commands:
       - echo "Getting backend instances from Auto Scaling Group"
       - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-      - echo "Auto Scaling Group: $ASG_NAME"
+      - echo "Auto Scaling Group $ASG_NAME"
       - INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
-      - echo "Instance IDs: $INSTANCE_IDS"
+      - echo "Instance IDs $INSTANCE_IDS"
       - if [ -z "$INSTANCE_IDS" ]; then echo "No running instances found in Auto Scaling Group"; exit 0; fi
       
       # Upload files to S3 for transfer
@@ -172,7 +172,7 @@ WantedBy=multi-user.target' > api/deploy/financial-news.service
       
       - echo "Starting ASG instance refresh"
       - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-      - if [ -n "$ASG_NAME" ]; then echo "Found ASG: $ASG_NAME"; REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text); if [ -n "$REFRESH_ID" ]; then echo "Started instance refresh with ID: $REFRESH_ID"; else echo "WARNING: Could not start instance refresh"; fi; else echo "WARNING: Could not find Auto Scaling Group name"; fi
+      - if [ -n "$ASG_NAME" ]; then echo "Found ASG $ASG_NAME"; REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text); if [ -n "$REFRESH_ID" ]; then echo "Started instance refresh with ID $REFRESH_ID"; else echo "WARNING Could not start instance refresh"; fi; else echo "WARNING Could not find Auto Scaling Group name"; fi
       
       - echo "API deployment completed"
 

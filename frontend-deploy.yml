@@ -5,9 +5,9 @@ phases:
       nodejs: 16
     commands:
       - echo "Running frontend deployment..."
-      - echo "Debugging workspace contents:"
+      - echo "Debugging workspace contents"
       - ls -la
-      - echo "Checking frontend directory:"
+      - echo "Checking frontend directory"
       - ls -la frontend || echo "No frontend directory found"
   
   pre_build:
@@ -15,42 +15,43 @@ phases:
       - echo "Preparing for deployment..."
       - find . -name "build" -type d | sort
       - find . -name "package.json" -type f | sort
-      - echo "Creating build directory detection script"
-      - echo '#!/bin/bash
-if [ -f "index.html" ] && [ -d "static" ]; then
-  echo "."
-elif [ -d "build" ]; then
-  echo "build"
-elif [ -d "frontend/build" ]; then
-  echo "frontend/build"
-elif [ -f "frontend/package.json" ]; then
+      - "cat > detect_build.sh << 'EOF'
+#!/bin/bash
+if [ -f \"index.html\" ] && [ -d \"static\" ]; then
+  echo \".\"
+elif [ -d \"build\" ]; then
+  echo \"build\"
+elif [ -d \"frontend/build\" ]; then
+  echo \"frontend/build\"
+elif [ -f \"frontend/package.json\" ]; then
   cd frontend && npm install && npm run build && cd ..
-  echo "frontend/build"
-elif [ -f "package.json" ]; then
+  echo \"frontend/build\"
+elif [ -f \"package.json\" ]; then
   npm install && npm run build
-  echo "build"
+  echo \"build\"
 else
-  echo ""
-fi' > detect_build.sh
+  echo \"\"
+fi
+EOF"
       - chmod +x detect_build.sh
       - BUILD_DIR=$(./detect_build.sh)
-      - if [ -z "$BUILD_DIR" ]; then echo "ERROR: No build directory or source files found"; exit 1; fi
-      - echo "Using build directory: $BUILD_DIR"
+      - if [ -z "$BUILD_DIR" ]; then echo "No build directory or source files found"; exit 1; fi
+      - echo "Using build directory $BUILD_DIR"
   
   build:
     commands:
       - echo "Retrieving S3 bucket name from CloudFormation stack"
       - BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
-      - if [ -z "$BUCKET_NAME" ]; then echo "ERROR: Could not retrieve bucket name from CloudFormation stack"; aws s3 ls | grep frontend; exit 1; fi
+      - if [ -z "$BUCKET_NAME" ]; then echo "Could not retrieve bucket name from CloudFormation stack"; aws s3 ls | grep frontend; exit 1; fi
       - echo "Syncing files to S3 bucket $BUCKET_NAME"
-      - echo "Using build directory: $BUILD_DIR"
+      - echo "Using build directory $BUILD_DIR"
       - aws s3 sync $BUILD_DIR/ s3://$BUCKET_NAME/ --delete
   
   post_build:
     commands:
       - echo "Creating CloudFront invalidation"
       - CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-      - if [ -n "$CLOUDFRONT_ID" ]; then aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"; else echo "WARNING: Could not retrieve CloudFront distribution ID"; fi
+      - if [ -n "$CLOUDFRONT_ID" ]; then aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"; else echo "Could not retrieve CloudFront distribution ID"; fi
       - echo "Frontend deployment completed"
 
 artifacts:
