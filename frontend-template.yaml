@@ -53,7 +53,7 @@ Mappings:
     staging:
       CorsAllowedOrigins: "*" 
     production:
-      CorsAllowedOrigins: "financialnewsengine.com,www.financialnewsengine.com"
+      CorsAllowedOrigins: "https://financialnewsengine.com,https://www.financialnewsengine.com,https://api.financialnewsengine.com"
 
 Resources:
   # S3 bucket for static website hosting
