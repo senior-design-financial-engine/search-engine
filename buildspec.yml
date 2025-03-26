@@ -1,44 +1,90 @@
 version: 0.2
-# Root-level buildspec.yml that works for both CodeBuild and CodeDeploy
+# Root-level universal buildspec that handles both frontend and backend builds
 
 phases:
   install:
     runtime-versions:
       nodejs: 16
+      python: 3.9
     commands:
-      - echo "Installing dependencies"
+      - echo "Installing dependencies for universal build"
       - npm --version
+      - python --version
+      - echo "Directory structure:"
+      - find . -type d -maxdepth 3 | sort
+      - echo "Buildspec files in workspace:"
+      - find . -name "*buildspec*.yml" -o -name "*deploy*.yml" | sort
   
   pre_build:
     commands:
       - echo "Running pre-build steps"
-      - cd frontend
-      - echo "Installing frontend dependencies"
-      - npm install --production=false
-      - echo "Validating package installation"
-      - npm list date-fns || npm install date-fns@2.30.0
-      - cd ..
+      - if [ -d "frontend" ]; then
+          echo "Preparing frontend build";
+          cd frontend;
+          echo "Installing frontend dependencies";
+          npm install --production=false;
+          echo "Validating package installation";
+          npm list date-fns || npm install date-fns@2.30.0;
+          cd ..;
+        fi
+      - if [ -d "backend" ]; then
+          echo "Preparing backend build";
+          cd backend;
+          echo "Installing backend dependencies";
+          pip install -r requirements.txt;
+          pip install pytest pytest-cov;
+          cd ..;
+        fi
   
   build:
     commands:
       - echo "Building the application"
-      - cd frontend
-      - echo "Building with environment variables"
-      - npm run build
-      - echo "Build completed"
-      - cd ..
+      - if [ -d "frontend" ]; then
+          echo "Building frontend";
+          cd frontend;
+          npm run build;
+          cd ..;
+        fi
+      - if [ -d "backend" ]; then
+          echo "Building backend";
+          cd backend;
+          mkdir -p dist;
+          zip -r dist/backend.zip .;
+          cd ..;
+        fi
   
   post_build:
     commands:
-      - echo "Post-build completed"
+      - echo "Creating unified artifact structure"
+      - mkdir -p artifact_output
+      - if [ -d "frontend/build" ]; then
+          echo "Adding frontend build artifacts";
+          mkdir -p artifact_output/frontend;
+          cp -r frontend/build/* artifact_output/frontend/;
+        fi
+      - if [ -d "backend/dist" ]; then
+          echo "Adding backend build artifacts";
+          mkdir -p artifact_output/backend/dist;
+          cp -r backend/dist/* artifact_output/backend/dist/;
+        fi
+      - echo "Adding configuration files"
+      - mkdir -p artifact_output/buildspecs
+      - if [ -d "buildspecs" ]; then cp -r buildspecs/* artifact_output/buildspecs/; fi
+      - mkdir -p artifact_output/scripts
+      - if [ -d "scripts" ]; then cp -r scripts/* artifact_output/scripts/; fi
+      - if [ -d "backend/scripts" ]; then cp -r backend/scripts/* artifact_output/scripts/; fi
+      - find . -name "*.yml" -maxdepth 1 -type f -exec cp {} artifact_output/ \; || true
+      - find . -name "*.yaml" -maxdepth 1 -type f -exec cp {} artifact_output/ \; || true
+      - echo "Final artifact contents:"
+      - find artifact_output -type f | sort
 
 artifacts:
+  base-directory: artifact_output
   files:
-    - appspec.yml
-    - scripts/**/*
-    - frontend/build/**/*
+    - '**/*'
   discard-paths: no
 
 cache:
   paths:
-    - 'frontend/node_modules/**/*' 
+    - 'frontend/node_modules/**/*'
+    - '/root/.cache/pip' 

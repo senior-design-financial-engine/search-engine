@@ -26,12 +26,24 @@ phases:
   post_build:
     commands:
       - echo "Backend post-build phase completed"
+      - cd ..
+      - echo "Creating full artifact structure"
+      - mkdir -p artifact_output/backend
+      - mkdir -p artifact_output/scripts
+      - echo "Copying backend files"
+      - cp -r backend/dist artifact_output/backend/
+      - if [ -f "appspec.yml" ]; then cp appspec.yml artifact_output/; fi
+      - if [ -d "scripts" ]; then cp -r scripts/* artifact_output/scripts/; fi
+      - if [ -d "backend/scripts" ]; then cp -r backend/scripts/* artifact_output/scripts/; fi
+      - if [ -d "buildspecs" ]; then cp -r buildspecs artifact_output/; fi
+      - find . -name "*.yml" -maxdepth 1 -type f -exec cp {} artifact_output/ \; || true
+      - echo "Contents of artifact output:"
+      - find artifact_output -type f | sort
 
 artifacts:
+  base-directory: artifact_output
   files:
-    - "backend/dist/backend.zip"
-    - "appspec.yml"
-    - "backend/scripts/**/*"
+    - '**/*'
   discard-paths: no
 
 cache:

@@ -307,7 +307,7 @@ Resources:
             Value: !Ref FrontendStackName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: buildspecs/frontend-deploy.yml
+        BuildSpec: frontend-deploy.yml
       TimeoutInMinutes: 15
       Tags:
         - Key: Name
@@ -490,8 +490,10 @@ Resources:
                 Version: '1'
               Configuration:
                 ProjectName: !Ref FrontendDeployProject
+                PrimarySource: FrontendBuildOutput
               InputArtifacts:
                 - Name: FrontendBuildOutput
+                - Name: SourceCode
               RunOrder: 1
             
             - Name: DeployBackend

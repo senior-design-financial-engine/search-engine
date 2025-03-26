@@ -6,6 +6,7 @@ phases:
     commands:
       - echo "Installing frontend dependencies..."
       - pwd
+      - ls -la
       - echo "Checking directory structure"
       - if [ -d "frontend" ]; then cd frontend; elif [ -d "../frontend" ]; then cd ../frontend; fi
       - npm install
@@ -24,9 +25,24 @@ phases:
   post_build:
     commands:
       - echo "Post-build phase completed successfully"
+      - echo "Setting up artifact structure"
+      - cd ..  # Return to root directory
+      - mkdir -p artifact_output
+      - echo "Copying frontend build files"
+      - cp -r frontend/build/* artifact_output/
+      - echo "Copying buildspecs directory"
+      - cp -r buildspecs artifact_output/
+      - echo "Copying root-level buildspec files"
+      - cp *.yml artifact_output/ || true
+      - echo "Copying deployment scripts"
+      - mkdir -p artifact_output/scripts
+      - cp -r scripts/* artifact_output/scripts/ || true
+      - echo "Contents of the artifact_output directory:"
+      - ls -la artifact_output
+      - find artifact_output -type f | sort
 
 artifacts:
-  base-directory: frontend/build
+  base-directory: artifact_output
   files:
     - '**/*'
 
