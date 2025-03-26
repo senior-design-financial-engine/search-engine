@@ -49,14 +49,28 @@ phases:
       - mkdir -p deploy_scripts
       - cat > deploy_scripts/create_env_file.sh << 'EOF'
 #!/bin/bash
-# Create .env file with environment variables
+# Create .env file with environment variables by fetching directly from SSM Parameter Store
+echo "Fetching credentials from SSM Parameter Store..."
+
+# Get parameters from SSM Parameter Store
+ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
+ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
+ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
+ES_SHARDS=$(aws ssm get-parameter --name "/financial-news/es-number-of-shards" --with-decryption --query "Parameter.Value" --output text)
+ES_REPLICAS=$(aws ssm get-parameter --name "/financial-news/es-number-of-replicas" --with-decryption --query "Parameter.Value" --output text)
+
+# Create the .env file
 cat > /opt/search-engine/.env << EOL
-ELASTICSEARCH_URL=$ELASTICSEARCH_URL
-ELASTICSEARCH_API_KEY=$ELASTICSEARCH_API_KEY
-ELASTICSEARCH_INDEX=$ELASTICSEARCH_INDEX
+ELASTICSEARCH_URL=$ES_URL
+ELASTICSEARCH_API_KEY=$ES_API_KEY
+ELASTICSEARCH_INDEX=$ES_INDEX
+ES_NUMBER_OF_SHARDS=$ES_SHARDS
+ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
 EOL
+
+# Set secure permissions
 chmod 600 /opt/search-engine/.env
-echo "Created .env file with environment variables"
+echo "Created .env file with environment variables from SSM Parameter Store"
 EOF
       - cat > deploy_scripts/prepare_check_es.sh << 'EOF'
 #!/bin/bash
@@ -95,6 +109,29 @@ fi
 
 echo "Dependencies installation completed"
 EOF
+      - cat > deploy_scripts/create_service_file.sh << 'EOF'
+#!/bin/bash
+# Create systemd service file
+cat > /etc/systemd/system/search-engine-backend.service << EOL
+[Unit]
+Description=Search Engine Backend Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/search-engine/backend
+EnvironmentFile=/opt/search-engine/.env
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/usr/bin/python3 -m gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOL
+chmod 644 /etc/systemd/system/search-engine-backend.service
+echo "Created systemd service file"
+EOF
       - cat > deploy_scripts/verify_startup.sh << 'EOF'
 #!/bin/bash
 # Verify backend service startup and test Elasticsearch connectivity
@@ -124,6 +161,7 @@ EOF
       - chmod +x deploy_scripts/create_env_file.sh
       - chmod +x deploy_scripts/prepare_check_es.sh
       - chmod +x deploy_scripts/install_dependencies.sh
+      - chmod +x deploy_scripts/create_service_file.sh
       - chmod +x deploy_scripts/verify_startup.sh
       - echo Preparing SSM commands...
       - cat > deploy_commands.json << EOF
@@ -136,10 +174,12 @@ EOF
     "chmod +x /opt/search-engine/deploy_scripts/create_env_file.sh",
     "chmod +x /opt/search-engine/deploy_scripts/prepare_check_es.sh",
     "chmod +x /opt/search-engine/deploy_scripts/install_dependencies.sh",
+    "chmod +x /opt/search-engine/deploy_scripts/create_service_file.sh",
     "chmod +x /opt/search-engine/deploy_scripts/verify_startup.sh",
     "/opt/search-engine/deploy_scripts/create_env_file.sh",
     "/opt/search-engine/deploy_scripts/prepare_check_es.sh",
     "/opt/search-engine/deploy_scripts/install_dependencies.sh",
+    "/opt/search-engine/deploy_scripts/create_service_file.sh",
     "systemctl restart search-engine-backend",
     "/opt/search-engine/deploy_scripts/verify_startup.sh"
   ]

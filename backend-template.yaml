@@ -185,6 +185,17 @@ Resources:
                 Resource: 
                   - 'arn:aws:s3:::financial-news-assets/*'
                   - 'arn:aws:s3:::financial-news-assets'
+        - PolicyName: SSMParameterStorePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssm:GetParameter'
+                  - 'ssm:GetParameters'
+                  - 'ssm:GetParametersByPath'
+                Resource: 
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/financial-news/*'
         - PolicyName: SSMRemoteCommandsPolicy
           PolicyDocument:
             Version: '2012-10-17'

@@ -789,6 +789,7 @@ Resources:
                   Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
                   Environment="FLASK_ENV=production"
                   Environment="PYTHONUNBUFFERED=1"
+                  EnvironmentFile=/opt/financial-news-engine/.env
                   ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
                   Restart=always
                   TimeoutStartSec=60
@@ -812,6 +813,21 @@ Resources:
                   cp app.py /opt/financial-news-engine/
                   cp requirements.txt /opt/financial-news-engine/
                   cp financial-news.service /etc/systemd/system/
+                  
+                  # Fetch parameters from SSM Parameter Store
+                  echo "Fetching credentials from SSM Parameter Store..."
+                  ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
+                  ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
+                  ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
+                  
+                  # Create .env file with environment variables
+                  cat > /opt/financial-news-engine/.env << EOL
+                  ELASTICSEARCH_URL=$ES_URL
+                  ELASTICSEARCH_API_KEY=$ES_API_KEY
+                  ELASTICSEARCH_INDEX=$ES_INDEX
+                  EOL
+                  chmod 600 /opt/financial-news-engine/.env
+                  echo "Created .env file with credentials from SSM Parameter Store"
                   
                   # Install dependencies
                   cd /opt/financial-news-engine

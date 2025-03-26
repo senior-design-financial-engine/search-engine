@@ -322,6 +322,7 @@ service_definition: |
   Group=ubuntu
   WorkingDirectory=/opt/financial-news-engine
   Environment="PATH=/opt/financial-news-engine/venv/bin"
+  EnvironmentFile=/opt/financial-news-engine/.env
   ExecStart=/opt/financial-news-engine/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 app:app
   Restart=always
   RestartSec=10
