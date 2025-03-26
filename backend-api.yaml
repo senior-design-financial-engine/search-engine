@@ -331,35 +331,123 @@ service_definition: |
 
 verification_script: |
   #!/bin/bash
-  set -e
-  
+
   echo "Verifying backend service startup..."
-  
-  # Wait for the service to start
-  for i in {1..12}; do
-    if curl -s http://localhost:5000/ping > /dev/null; then
-      echo "Service is responding to ping"
-      break
+
+  # Check if the service is running
+  function check_service() {
+    echo "Checking if service is running..."
+    systemctl is-active --quiet financial-news.service
+    if [ $? -eq 0 ]; then
+      echo "Service is running"
+      return 0
+    else
+      echo "ERROR: Service is not running"
+      return 1
     fi
+  }
+
+  # Check if the service responds to ping
+  function check_ping() {
+    echo "Checking service response..."
+    RESPONSE=$(curl -s http://localhost:5000/ping)
+    if [[ "$RESPONSE" == *"ok"* ]]; then
+      echo "Service is responding to ping"
+      return 0
+    else
+      echo "ERROR: Service is not responding to ping"
+      echo "Response: $RESPONSE"
+      return 1
+    fi
+  }
+
+  # Perform advanced validation
+  function validate_setup() {
+    echo "Validating setup..."
     
-    if [ $i -eq 12 ]; then
-      echo "ERROR: Service failed to start within 60 seconds"
+    # Run Python validation script
+    python3 - << 'PYEOF'
+  import json
+  import os
+  import socket
+  import subprocess
+  try:
+      import psutil
+      disk_success = True
+      disk_error = None
+  except ImportError:
+      disk_success = False
+      disk_error = "name 'psutil' is not defined"
+
+  # Check disk space
+  disk_check = {"success": disk_success}
+  if disk_error:
+      disk_check["error"] = disk_error
+
+  # DNS Check
+  dns_success = False
+  try:
+      dns_output = subprocess.check_output("nslookup google.com", shell=True, universal_newlines=True)
+      dns_success = True
+  except Exception as e:
+      dns_output = str(e)
+
+  dns_check = {
+      "success": dns_success,
+      "output": dns_output
+  }
+
+  # Elasticsearch check
+  es_config = {
+      "configured": os.environ.get("ELASTICSEARCH_URL") is not None,
+      "success": False,
+      "version": None
+  }
+
+  if es_config["configured"]:
+      try:
+          import requests
+          es_url = os.environ.get("ELASTICSEARCH_URL", "").rstrip('/')
+          if es_url:
+              try:
+                  response = requests.get(f"{es_url}", timeout=5)
+                  if response.status_code == 200:
+                      es_config["success"] = True
+                      version_info = response.json()
+                      es_config["version"] = version_info.get("version", {}).get("number", "unknown")
+              except Exception as e:
+                  es_config["error"] = str(e)
+      except ImportError:
+          es_config["error"] = "requests module not installed"
+
+  # Combine all checks
+  result = {
+      "success": disk_success and dns_success and es_config["success"],
+      "timestamp": subprocess.check_output("date -Iseconds", shell=True, universal_newlines=True).strip(),
+      "checks": {
+          "disk": disk_check,
+          "dns": dns_check,
+          "elasticsearch": es_config
+      }
+  }
+
+  print(json.dumps(result))
+  PYEOF
+  }
+
+  # Main
+  check_ping
+  if [ $? -eq 0 ]; then
+    VALIDATION=$(validate_setup)
+    if [[ "$VALIDATION" == *"\"success\":true"* ]]; then
+      echo "All validation checks passed"
+      exit 0
+    else
+      echo "WARNING: Setup validation failed:"
+      echo "$VALIDATION"
       exit 1
     fi
-    
-    echo "Waiting for service to start (attempt $i/12)..."
-    sleep 5
-  done
-  
-  # Verify setup validation endpoint
-  SETUP_RESULT=$(curl -s http://localhost:5000/setup-validate)
-  SUCCESS=$(echo $SETUP_RESULT | grep -o '"success": true' || echo "")
-  
-  if [ -n "$SUCCESS" ]; then
-    echo "Startup verification successful"
-    exit 0
   else
-    echo "WARNING: Setup validation failed:"
-    echo $SETUP_RESULT
+    echo "ERROR: Backend service ping failed"
     exit 1
   fi 

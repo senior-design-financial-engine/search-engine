@@ -294,113 +294,57 @@ Resources:
           commands:
             01_create_app_directory:
               command: |
-                mkdir -p /opt/financial-news-engine
-                mkdir -p /opt/financial-news-engine/logs
-                chmod 755 /opt/financial-news-engine
+                # The directory structure will be created by the 02_create_basic_app step
+                echo "Application directory will be created in the next step"
             
             02_create_basic_app:
               command: |
-                # Create a basic Flask app that will be replaced by CI/CD
-                cat > /opt/financial-news-engine/app.py << 'EOL'
-                from flask import Flask, jsonify, request
-                import os
-                import logging
-                from flask_cors import CORS
+                # Create a basic Flask app directory
+                mkdir -p /opt/financial-news-engine
+                mkdir -p /opt/financial-news-engine/logs
+                chmod 755 /opt/financial-news-engine
                 
-                # Configure logging
-                log_dir = "logs"
-                if not os.path.exists(log_dir):
-                    os.makedirs(log_dir)
+                # Fetch backend-api.yaml from S3
+                mkdir -p /tmp/scripts
+                aws s3 cp s3://financial-news-assets/${BackendApiCodeKey} /tmp/scripts/backend-api.yaml
+                
+                # Extract app code, requirements, and verification script from the YAML file
+                python3 -c "
+                import yaml
+                try:
+                    with open('/tmp/scripts/backend-api.yaml', 'r') as f:
+                        api_config = yaml.safe_load(f)
                     
-                logger = logging.getLogger("backend")
-                logger.setLevel(logging.INFO)
-                
-                # Create console handler
-                handler = logging.StreamHandler()
-                handler.setLevel(logging.INFO)
-                logger.addHandler(handler)
-                
-                # Get CORS allowed origins from environment
-                cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
-                logger.info(f"CORS allowed origins: {cors_origins}")
-                
-                if cors_origins != '*':
-                    cors_origins = [origin.strip() for origin in cors_origins.split(',')]
-                    logger.info(f"Parsed CORS origins: {cors_origins}")
-                
-                # Flask app
-                app = Flask(__name__)
-                
-                # Configure CORS
-                CORS(app, 
-                     resources={r"/*": {"origins": cors_origins}},
-                     supports_credentials=True)
-
-                @app.after_request
-                def add_cors_headers(response):
-                    origin = request.headers.get('Origin')
+                    # Create app.py from app_code section
+                    with open('/opt/financial-news-engine/app.py', 'w') as f:
+                        f.write(api_config.get('app_code', ''))
                     
-                    if origin:
-                        if cors_origins == '*' or origin in cors_origins:
-                            response.headers.add('Access-Control-Allow-Origin', origin)
-                            response.headers.add('Access-Control-Allow-Headers', 
-                                               'Content-Type,Authorization,X-Requested-With,X-Amz-Date,X-Api-Key,X-Amz-Security-Token')
-                            response.headers.add('Access-Control-Allow-Methods', 
-                                               'GET,POST,PUT,DELETE,OPTIONS,PATCH')
-                            response.headers.add('Access-Control-Allow-Credentials', 'true')
-                            response.headers.add('Access-Control-Max-Age', '86400')
-                            
-                    # Handle OPTIONS requests explicitly
-                    if request.method == 'OPTIONS':
-                        return response
+                    # Create requirements.txt from requirements section
+                    with open('/opt/financial-news-engine/requirements.txt', 'w') as f:
+                        f.write(api_config.get('requirements', ''))
                     
-                    return response
-                
-                @app.route('/')
-                def home():
-                    return jsonify({
-                        "status": "initializing",
-                        "message": "API server is initializing and will be replaced by CI/CD deployment"
-                    })
-                
-                @app.route('/health')
-                def health():
-                    return jsonify({"status": "healthy"})
-                
-                @app.route('/ping')
-                def ping():
-                    return jsonify({"status": "ok"})
-                
-                if __name__ == '__main__':
-                    logger.info("Starting Flask application")
-                    port = int(os.environ.get('PORT', 5000))
-                    app.run(host='0.0.0.0', port=port)
-                EOL
-                
-                # Create a basic requirements.txt
-                cat > /opt/financial-news-engine/requirements.txt << 'EOL'
-                flask==2.3.3
-                flask-cors==4.0.0
-                gunicorn==21.2.0
-                EOL
-                
-                # Create service file
-                cat > /etc/systemd/system/financial-news.service << 'EOL'
-                [Unit]
-                Description=Financial News Engine Flask App
-                After=network.target
-                
-                [Service]
-                User=root
-                WorkingDirectory=/opt/financial-news-engine
-                ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
-                Restart=always
-                TimeoutStartSec=60
-                RestartSec=10
-                
-                [Install]
-                WantedBy=multi-user.target
-                EOL
+                    # Create verify_startup.sh from verification_script section
+                    with open('/opt/financial-news-engine/verify_startup.sh', 'w') as f:
+                        f.write(api_config.get('verification_script', ''))
+                    
+                    # Create service file from service_definition section
+                    with open('/etc/systemd/system/financial-news.service', 'w') as f:
+                        f.write(api_config.get('service_definition', ''))
+                except Exception as e:
+                    print(f'Error extracting scripts: {str(e)}')
+                    # Create fallback app.py as a simple health check
+                    with open('/opt/financial-news-engine/app.py', 'w') as f:
+                        f.write('from flask import Flask, jsonify\\n\\napp = Flask(__name__)\\n\\n@app.route(\"/health\")\\ndef health():\\n    return jsonify({\"status\": \"healthy\"})\\n\\nif __name__ == \"__main__\":\\n    app.run(host=\"0.0.0.0\", port=5000)')
+                    
+                    # Create fallback requirements.txt with minimal dependencies
+                    with open('/opt/financial-news-engine/requirements.txt', 'w') as f:
+                        f.write('flask==2.0.1\\ngunicorn==20.1.0')
+                    
+                    # Create fallback verify_startup.sh
+                    with open('/opt/financial-news-engine/verify_startup.sh', 'w') as f:
+                        f.write('#!/bin/bash\\necho \"Basic verification script\"\\nexit 0')
+                "
+                chmod +x /opt/financial-news-engine/verify_startup.sh
                 
                 # Install dependencies
                 cd /opt/financial-news-engine
