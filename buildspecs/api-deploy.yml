@@ -12,7 +12,7 @@ phases:
     commands:
       - "echo \"Preparing API code for deployment\""
       - "cd backend || (echo \"Backend directory not found, using project root\"; cd .)"
-      - "mkdir -p api/deploy"
+      - "mkdir -p api/deploy/deploy_scripts"
       - "cp backend.py api/deploy/app.py || cp app.py api/deploy/app.py || echo \"Using fallback app.py\""
       - "cp requirements.txt api/deploy/requirements.txt || echo \"Using fallback requirements.txt\""
       
@@ -21,19 +21,267 @@ phases:
       - "export ASSETS_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue\" --output text)"
       - "echo \"Assets bucket name: $ASSETS_BUCKET_NAME\""
       
-      # Create proper directory structure
-      - "mkdir -p api/deploy/deploy_scripts"
+      # Create deploy.sh script at runtime
+      - "echo \"Creating deployment scripts\""
+      - |
+        cat > api/deploy/deploy.sh << 'EOF'
+        #!/bin/bash
+        # deploy.sh - Script to deploy the application to the EC2 instance
+        
+        set -e
+        set -o pipefail
+        
+        APP_DIR="/opt/financial-news-engine"
+        LOG_DIR="$APP_DIR/logs"
+        DEPLOY_SCRIPTS_DIR="$APP_DIR/deploy_scripts"
+        SERVICE_NAME="financial-news"
+        USER=$(whoami)
+        
+        echo "Starting deployment process as user: $USER"
+        
+        # Create application directory and log directory
+        sudo mkdir -p $APP_DIR
+        sudo mkdir -p $LOG_DIR
+        sudo mkdir -p $DEPLOY_SCRIPTS_DIR
+        
+        # Copy files from temp directory
+        echo "Copying application files to $APP_DIR"
+        sudo cp /tmp/api-deploy/app.py $APP_DIR/app.py
+        sudo cp /tmp/api-deploy/requirements.txt $APP_DIR/requirements.txt
+        
+        # Copy deployment scripts if they exist
+        if [ -d "/tmp/api-deploy/deploy_scripts" ]; then
+            echo "Copying deployment scripts"
+            sudo cp -r /tmp/api-deploy/deploy_scripts/* $DEPLOY_SCRIPTS_DIR/
+        fi
+        
+        # Set correct permissions
+        echo "Setting permissions"
+        sudo chown -R ubuntu:ubuntu $APP_DIR
+        sudo chmod -R 755 $APP_DIR
+        
+        # Install dependencies
+        echo "Installing Python dependencies"
+        sudo pip3 install -r $APP_DIR/requirements.txt
+        
+        # Create systemd service
+        echo "Creating systemd service"
+        sudo bash -c 'cat > /etc/systemd/system/financial-news.service << EOF
+        [Unit]
+        Description=Financial News API Service
+        After=network.target
+        
+        [Service]
+        Type=simple
+        User=ubuntu
+        WorkingDirectory=/opt/financial-news-engine
+        Environment=PYTHONUNBUFFERED=1
+        ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
+        Restart=on-failure
+        RestartSec=5
+        StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
+        StandardError=append:/opt/financial-news-engine/logs/service-error.log
+        SyslogIdentifier=financial-news
+        
+        [Install]
+        WantedBy=multi-user.target
+        EOF'
+        
+        # Reload systemd and restart service
+        echo "Reloading systemd and starting service"
+        sudo systemctl daemon-reload
+        sudo systemctl enable financial-news.service
+        sudo systemctl restart financial-news.service
+        
+        echo "Deployment completed successfully"
+        exit 0
+        EOF
       
-      # Copy deployment scripts
-      - "echo \"Copying deployment scripts\""
-      - "cp buildspecs/api-deploy/scripts/extract_app.py api/deploy/deploy_scripts/ || echo \"extract_app.py not found\""
-      - "cp buildspecs/api-deploy/scripts/deploy.sh api/deploy/ || echo \"deploy.sh not found\""
-      - "cp buildspecs/api-deploy/scripts/verify.sh api/deploy/ || echo \"verify.sh not found\""
+      # Create verify.sh script at runtime
+      - |
+        cat > api/deploy/verify.sh << 'EOF'
+        #!/bin/bash
+        # verify.sh - Verification script for checking if the deployment was successful
+        
+        set -e
+        
+        APP_DIR="/opt/financial-news-engine"
+        SERVICE_NAME="financial-news"
+        MAX_RETRY=10
+        RETRY_INTERVAL=5
+        
+        echo "Starting application verification..."
+        
+        # Check if the service is running
+        check_service() {
+            echo "Checking if $SERVICE_NAME service is running..."
+            
+            if systemctl is-active --quiet $SERVICE_NAME; then
+                echo "✅ Service $SERVICE_NAME is running."
+                return 0
+            else
+                echo "❌ Service $SERVICE_NAME is not running."
+                
+                # Print service status and logs for debugging
+                echo "Service status:"
+                sudo systemctl status $SERVICE_NAME || true
+                
+                echo "Service logs:"
+                sudo journalctl -u $SERVICE_NAME -n 20 || true
+                
+                return 1
+            fi
+        }
+        
+        # Check if the application is responding
+        check_application() {
+            echo "Checking if application is responding to requests..."
+            
+            # Try to access the health endpoint
+            local response=""
+            local retry_count=0
+            local success=false
+            
+            while [ $retry_count -lt $MAX_RETRY ]; do
+                if response=$(curl -s http://localhost:5000/health 2>/dev/null); then
+                    if [[ "$response" == *"healthy"* ]]; then
+                        echo "✅ Application is responding correctly."
+                        success=true
+                        break
+                    fi
+                fi
+                
+                echo "Application not responding yet, retrying in $RETRY_INTERVAL seconds... (attempt $((retry_count + 1))/$MAX_RETRY)"
+                sleep $RETRY_INTERVAL
+                retry_count=$((retry_count + 1))
+            done
+            
+            if [ "$success" = false ]; then
+                echo "❌ Application is not responding properly after $MAX_RETRY attempts."
+                return 1
+            fi
+            
+            return 0
+        }
+        
+        # Check application files
+        check_files() {
+            echo "Checking if required application files exist..."
+            
+            if [ -f "$APP_DIR/app.py" ]; then
+                echo "✅ app.py exists."
+            else
+                echo "❌ app.py is missing."
+                return 1
+            fi
+            
+            if [ -f "$APP_DIR/requirements.txt" ]; then
+                echo "✅ requirements.txt exists."
+            else
+                echo "❌ requirements.txt is missing."
+                return 1
+            fi
+            
+            return 0
+        }
+        
+        # Main verification function
+        main() {
+            local errors=0
+            
+            # Run all checks
+            check_files || errors=$((errors + 1))
+            check_service || errors=$((errors + 1))
+            check_application || errors=$((errors + 1))
+            
+            # Report results
+            if [ $errors -eq 0 ]; then
+                echo "✅ All verification checks passed! Application is running correctly."
+                return 0
+            else
+                echo "❌ $errors verification checks failed. Please check the logs for details."
+                return 1
+            fi
+        }
+        
+        # Run the main function
+        main
+        exit $?
+        EOF
+      
+      # Create extract_app.py script at runtime
+      - |
+        cat > api/deploy/deploy_scripts/extract_app.py << 'EOF'
+        #!/usr/bin/env python3
+        """
+        Extract application code from a source file and create app.py
+        This script analyzes a larger codebase file and extracts the relevant 
+        application code needed for deployment.
+        """
+        
+        import os
+        import re
+        import sys
+        
+        def extract_app_code():
+            """
+            Extract application code from source files and create a standalone app.py
+            """
+            # Define potential source files
+            source_files = [
+                "backend.py",
+                "app.py",
+                "../backend.py",
+                "../app.py"
+            ]
+            
+            # Find the first existing source file
+            source_file = None
+            for file_path in source_files:
+                if os.path.exists(file_path):
+                    source_file = file_path
+                    break
+            
+            if not source_file:
+                print("Error: Could not find any source files")
+                sys.exit(1)
+            
+            print(f"Found source file: {source_file}")
+            
+            # Read the source file
+            with open(source_file, 'r') as file:
+                content = file.read()
+            
+            # Create destination directory if it doesn't exist
+            os.makedirs("api/deploy", exist_ok=True)
+            
+            # Write content to app.py with minimal processing
+            with open("api/deploy/app.py", 'w') as file:
+                file.write(content)
+            
+            print(f"Created app.py from {source_file}")
+            
+            # Check for requirements.txt
+            if not os.path.exists("api/deploy/requirements.txt"):
+                if os.path.exists("requirements.txt"):
+                    with open("requirements.txt", 'r') as src:
+                        with open("api/deploy/requirements.txt", 'w') as dest:
+                            dest.write(src.read())
+                    print("Copied requirements.txt")
+                else:
+                    # Create minimal requirements file
+                    with open("api/deploy/requirements.txt", 'w') as file:
+                        file.write("flask\nelasticsearch\npython-dotenv\n")
+                    print("Created minimal requirements.txt")
+        
+        if __name__ == "__main__":
+            extract_app_code()
+        EOF
       
       # Make scripts executable
-      - "chmod +x api/deploy/deploy_scripts/extract_app.py || echo \"No extract_app.py found\""
-      - "chmod +x api/deploy/deploy.sh || echo \"No deploy.sh found\""
-      - "chmod +x api/deploy/verify.sh || echo \"No verify.sh found\""
+      - "chmod +x api/deploy/deploy_scripts/extract_app.py"
+      - "chmod +x api/deploy/deploy.sh"
+      - "chmod +x api/deploy/verify.sh"
       
       # Execute app extraction if needed
       - "if [ ! -f \"api/deploy/app.py\" ]; then python3 api/deploy/deploy_scripts/extract_app.py; fi"
