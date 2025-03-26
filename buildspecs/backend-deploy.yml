@@ -42,7 +42,7 @@ phases:
       - echo '    value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)' >> scripts/create_env_file.sh
       - echo '    local exit_code=$?' >> scripts/create_env_file.sh
       - echo '    ' >> scripts/create_env_file.sh
-      - echo '    if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then' >> scripts/create_env_file.sh
+      - echo "    if [ \$exit_code -eq 0 ] && [ -n \"\$value\" ] && [ \"\$value\" != \"None\" ]; then" >> scripts/create_env_file.sh
       - echo '        echo "Successfully retrieved parameter: $param_name"' >> scripts/create_env_file.sh
       - echo '        echo "$value"' >> scripts/create_env_file.sh
       - echo '    else' >> scripts/create_env_file.sh
