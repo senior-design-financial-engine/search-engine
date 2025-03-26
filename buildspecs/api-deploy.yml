@@ -26,7 +26,7 @@ with open('backend-api.yaml', 'r') as f:
     config = yaml.safe_load(f)
     with open('api/deploy/app.py', 'w') as app_file:
         app_file.write(config.get('app_code', ''))
-          "
+"
         fi
       
       # Create service file

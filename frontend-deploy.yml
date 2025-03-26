@@ -5,10 +5,16 @@ phases:
       nodejs: 16
     commands:
       - echo "Running frontend deployment..."
+      - echo "Debugging workspace contents:"
+      - ls -la
+      - echo "Checking frontend directory:"
+      - ls -la frontend || echo "No frontend directory found"
   
   pre_build:
     commands:
       - echo "Preparing for deployment..."
+      - find . -name "build" -type d | sort
+      - find . -name "package.json" -type f | sort
       - |
         if [ -d "build" ]; then
           echo "Found build directory at root level"
