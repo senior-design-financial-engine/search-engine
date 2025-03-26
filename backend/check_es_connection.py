@@ -14,6 +14,9 @@ import requests
 from dotenv import load_dotenv
 import logging
 import traceback
+from elasticsearch import Elasticsearch
+import urllib3
+import socket
 
 # Configure logging
 logging.basicConfig(
@@ -23,170 +26,286 @@ logging.basicConfig(
 )
 logger = logging.getLogger("es_connection_checker")
 
-def main():
-    """Main function to test Elasticsearch connectivity."""
-    logger.info("Elasticsearch Connection Tester")
-    logger.info("===============================")
+# Disable insecure HTTPS warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def get_elasticsearch_config():
+    """Get Elasticsearch configuration from environment variables"""
+    config = {
+        'url': os.getenv('ELASTICSEARCH_URL'),
+        'api_key': os.getenv('ELASTICSEARCH_API_KEY'),
+        'index': os.getenv('ELASTICSEARCH_INDEX', 'financial_news')
+    }
     
-    # Load environment variables
-    logger.info("Loading environment variables...")
-    load_dotenv()
+    # Check if required values are present
+    for key, value in config.items():
+        if not value and key != 'api_key':  # API key might be empty for certain configs
+            logger.error(f"ERROR: Missing required environment variable for {key}")
     
-    # Get Elasticsearch configuration
-    es_url = os.getenv('ELASTICSEARCH_URL')
-    es_api_key = os.getenv('ELASTICSEARCH_API_KEY')
-    es_index = os.getenv('ELASTICSEARCH_INDEX')
+    return config
+
+def test_basic_connectivity(url):
+    """Test basic network connectivity to the Elasticsearch endpoint"""
+    logger.info("\n=== Testing basic network connectivity ===")
     
-    # Validate configuration
-    if not es_url:
-        logger.error("ELASTICSEARCH_URL environment variable is not set")
-        logger.info("Please set the ELASTICSEARCH_URL in your .env file")
-        sys.exit(1)
-        
-    if not es_api_key:
-        logger.error("ELASTICSEARCH_API_KEY environment variable is not set")
-        logger.info("Please set the ELASTICSEARCH_API_KEY in your .env file")
-        sys.exit(1)
-        
-    if not es_index:
-        logger.warning("ELASTICSEARCH_INDEX environment variable is not set")
-        logger.info("ELASTICSEARCH_INDEX will default to 'financial_news'")
-        es_index = "financial_news"
+    # Extract host and port from URL
+    if url.startswith('https://'):
+        url = url[8:]  # Remove https://
+    elif url.startswith('http://'):
+        url = url[7:]  # Remove http://
     
-    # Display configuration (redacted for security)
-    logger.info(f"Elasticsearch URL: {es_url}")
-    logger.info(f"API Key: {'*' * 10}...{es_api_key[-5:] if es_api_key else 'None'}")
-    logger.info(f"Index Name: {es_index}")
+    # Extract port if specified
+    host = url
+    port = 443  # Default to HTTPS port
     
-    # Test basic connectivity to Elasticsearch
-    logger.info("\nTesting basic connectivity...")
+    if ':' in url:
+        host, port_str = url.split(':')
+        if '/' in port_str:
+            port_str = port_str.split('/')[0]
+        port = int(port_str)
+    
+    logger.info(f"Testing connection to host: {host} on port: {port}")
+    
     try:
-        logger.info(f"Connecting to {es_url}...")
+        # Try to establish a socket connection
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)  # 5 second timeout
+        result = sock.connect_ex((host, port))
         
-        headers = {
-            "Authorization": f"ApiKey {es_api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        start_time = time.time()
-        response = requests.get(
-            es_url, 
-            headers=headers, 
-            timeout=10
-        )
-        request_time = time.time() - start_time
-        
-        logger.info(f"Connection response time: {request_time:.2f} seconds")
-        logger.info(f"Response status code: {response.status_code}")
-        
-        if response.status_code >= 400:
-            logger.error(f"Connection failed with status {response.status_code}")
-            logger.error(f"Response: {response.text}")
-            if response.status_code == 401 or response.status_code == 403:
-                logger.error("Authentication failed. Please check your API key.")
-            elif response.status_code == 404:
-                logger.error("Elasticsearch URL not found. Please check the URL.")
+        if result == 0:
+            logger.info(f"✅ Socket connection successful to {host}:{port}")
         else:
-            logger.info("Basic connectivity test: SUCCESS")
-            logger.info(f"Response: {response.text[:100]}...")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Connection error: {str(e)}")
+            logger.error(f"❌ Socket connection failed to {host}:{port} with error code: {result}")
+            return False
         
-        # Network analysis
-        if "SSLError" in str(e):
-            logger.error("SSL error detected. This could be due to:")
-            logger.error("  - Invalid certificate")
-            logger.error("  - Incorrect protocol (http vs https)")
-            logger.error("  - Outdated SSL/TLS version")
-        elif "ConnectTimeout" in str(e):
-            logger.error("Connection timeout. This could be due to:")
-            logger.error("  - Elasticsearch service is down")
-            logger.error("  - Network firewall is blocking the connection")
-            logger.error("  - Incorrect hostname or port")
-        elif "ConnectionError" in str(e):
-            logger.error("Connection error. This could be due to:")
-            logger.error("  - Elasticsearch service is not running")
-            logger.error("  - Network connectivity issues")
-            logger.error("  - Invalid URL")
+        sock.close()
+        return True
+    except socket.gaierror:
+        logger.error(f"❌ DNS resolution failed for host: {host}")
+        return False
+    except socket.timeout:
+        logger.error(f"❌ Connection timed out for host: {host}:{port}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Connection error: {str(e)}")
+        return False
+
+def test_http_connectivity(url):
+    """Test HTTP connectivity to Elasticsearch"""
+    logger.info("\n=== Testing HTTP connectivity ===")
     
-    # Test index existence if basic connectivity succeeds
-    if 'response' in locals() and response.status_code < 400:
-        logger.info("\nTesting index existence...")
-        try:
-            index_url = f"{es_url}/{es_index}"
-            response = requests.head(
-                index_url,
-                headers=headers,
-                timeout=10
+    try:
+        # Make a simple GET request to the server (without auth)
+        # We're just checking if we can reach it at all, not if auth works
+        response = requests.get(
+            url,
+            timeout=10,
+            verify=False  # Disable SSL verification for testing
+        )
+        
+        logger.info(f"HTTP Status: {response.status_code}")
+        
+        if response.status_code == 401:
+            logger.info("✅ Elasticsearch server is reachable (got 401 Unauthorized, which is expected without auth)")
+            return True
+        elif 200 <= response.status_code < 300:
+            logger.info("✅ Elasticsearch server is reachable (got successful response)")
+            return True
+        else:
+            logger.warning(f"⚠️ Elasticsearch server returned unexpected status: {response.status_code}")
+            logger.warning(f"Response body: {response.text[:200]}...")
+            return False
+            
+    except requests.exceptions.SSLError as e:
+        logger.error(f"❌ SSL Error connecting to Elasticsearch: {str(e)}")
+        logger.error("Try setting verify=False in your Elasticsearch client or fix SSL certificates")
+        return False
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"❌ Connection Error: {str(e)}")
+        logger.error("This could indicate network connectivity issues or firewall restrictions")
+        return False
+    except requests.exceptions.Timeout:
+        logger.error("❌ Connection Timeout")
+        logger.error("The server took too long to respond. Check network latency or server load")
+        return False
+    except Exception as e:
+        logger.error(f"❌ Error testing HTTP connectivity: {str(e)}")
+        return False
+
+def test_es_client(url, api_key=None):
+    """Test Elasticsearch client connectivity with proper authentication"""
+    logger.info("\n=== Testing Elasticsearch client connection ===")
+    
+    try:
+        # Configure the Elasticsearch client
+        if api_key:
+            es = Elasticsearch(
+                [url],
+                api_key=api_key,
+                verify_certs=False,  # For testing only
+                request_timeout=10
+            )
+        else:
+            es = Elasticsearch(
+                [url],
+                verify_certs=False,  # For testing only
+                request_timeout=10
+            )
+        
+        # Check if the cluster is responding
+        info = es.info()
+        
+        logger.info("✅ Elasticsearch client connection successful!")
+        logger.info(f"Cluster name: {info.get('cluster_name', 'N/A')}")
+        logger.info(f"Elasticsearch version: {info.get('version', {}).get('number', 'N/A')}")
+        
+        # Test cluster health
+        health = es.cluster.health()
+        logger.info(f"Cluster health: {health.get('status', 'unknown')}")
+        
+        return True, es
+    except Exception as e:
+        logger.error(f"❌ Elasticsearch client connection failed: {str(e)}")
+        return False, None
+
+def test_index_operations(es, index_name):
+    """Test basic index operations"""
+    logger.info(f"\n=== Testing operations on index '{index_name}' ===")
+    
+    try:
+        # Check if the index exists
+        index_exists = es.indices.exists(index=index_name)
+        
+        if index_exists:
+            logger.info(f"✅ Index '{index_name}' exists")
+            
+            # Get index stats
+            stats = es.indices.stats(index=index_name)
+            doc_count = stats['indices'][index_name]['total']['docs']['count']
+            
+            logger.info(f"Index stats: {doc_count} documents")
+            
+            # Try a simple search
+            search_result = es.search(
+                index=index_name,
+                body={"query": {"match_all": {}}},
+                size=1
             )
             
-            if response.status_code == 200:
-                logger.info(f"Index '{es_index}' exists: SUCCESS")
+            hits = search_result['hits']['total']['value']
+            logger.info(f"Search test: Found {hits} documents")
+            
+            if hits > 0:
+                logger.info("✅ Search operation successful")
+            else:
+                logger.warning("⚠️ Search returned 0 results (this may be normal for a new index)")
+        else:
+            logger.warning(f"⚠️ Index '{index_name}' does not exist")
+            
+            # Optionally create the index for testing
+            create = input("Would you like to create a test index? (y/n): ")
+            if create.lower() == 'y':
+                es.indices.create(index=index_name)
+                logger.info(f"✅ Created index '{index_name}'")
                 
-                # Get index stats
-                stats_url = f"{es_url}/{es_index}/_stats"
-                stats_response = requests.get(
-                    stats_url,
-                    headers=headers,
-                    timeout=10
+                # Insert a test document
+                test_doc = {
+                    "title": "Test Document",
+                    "content": "This is a test document to verify ES connectivity",
+                    "timestamp": time.time()
+                }
+                
+                es.index(index=index_name, body=test_doc)
+                logger.info("✅ Inserted test document")
+                
+                # Refresh the index
+                es.indices.refresh(index=index_name)
+                
+                # Verify the document was inserted
+                search_result = es.search(
+                    index=index_name,
+                    body={"query": {"match": {"title": "Test Document"}}},
+                    size=1
                 )
                 
-                if stats_response.status_code == 200:
-                    stats = stats_response.json()
-                    doc_count = stats['_all']['primaries']['docs']['count']
-                    store_size = stats['_all']['primaries']['store']['size_in_bytes'] / 1024 / 1024
-                    
-                    logger.info(f"Index contains {doc_count} documents")
-                    logger.info(f"Index size: {store_size:.2f} MB")
+                if search_result['hits']['total']['value'] > 0:
+                    logger.info("✅ Test document search successful")
                 else:
-                    logger.warning(f"Could not get index stats: {stats_response.status_code}")
-            elif response.status_code == 404:
-                logger.warning(f"Index '{es_index}' does not exist")
-                logger.info("This might be normal if you haven't created the index yet")
-            else:
-                logger.error(f"Unexpected status code checking index: {response.status_code}")
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error checking index: {str(e)}")
+                    logger.warning("❌ Test document not found")
+        
+        return True
+    except Exception as e:
+        logger.error(f"❌ Index operations failed: {str(e)}")
+        return False
+
+def main():
+    """Main function to test Elasticsearch connectivity."""
+    logger.info("=== Elasticsearch Connection Checker ===")
     
-    # Try a sample query if the index exists
-    if 'response' in locals() and response.status_code < 400:
-        logger.info("\nTesting a sample search query...")
-        try:
-            query_url = f"{es_url}/{es_index}/_search"
-            query = {
-                "query": {
-                    "match_all": {}
-                },
-                "size": 1
-            }
-            
-            response = requests.get(
-                query_url,
-                headers=headers,
-                data=json.dumps(query),
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                hit_count = result['hits']['total']['value'] if 'hits' in result else 0
-                
-                logger.info(f"Search query successful: {hit_count} total hits")
-                logger.info("Sample query test: SUCCESS")
-                
-                if hit_count > 0:
-                    sample_doc = result['hits']['hits'][0]['_source']
-                    logger.info("Sample document fields:")
-                    for key in sample_doc.keys():
-                        logger.info(f"  - {key}")
-                else:
-                    logger.warning("No documents found in the index")
-            else:
-                logger.error(f"Search query failed with status {response.status_code}")
-                logger.error(f"Response: {response.text}")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error executing search query: {str(e)}")
+    # Get config from environment
+    config = get_elasticsearch_config()
+    
+    if not config['url']:
+        logger.error("❌ ERROR: ELASTICSEARCH_URL is not set. Please configure it in .env file")
+        sys.exit(1)
+    
+    # Test basic network connectivity
+    if not test_basic_connectivity(config['url']):
+        logger.error("\n❌ CRITICAL: Basic network connectivity failed. Please check:")
+        logger.error("  - Network connectivity")
+        logger.error("  - Firewall settings")
+        logger.error("  - DNS resolution")
+        logger.error("  - VPC/network configuration if running on AWS")
+        sys.exit(1)
+    
+    # Test HTTP connectivity
+    if not test_http_connectivity(config['url']):
+        logger.error("\n❌ CRITICAL: HTTP connectivity failed. Please check:")
+        logger.error("  - SSL/TLS configuration")
+        logger.error("  - HTTP proxy settings")
+        logger.error("  - API Gateway/Load Balancer settings if applicable")
+        sys.exit(1)
+    
+    # Test Elasticsearch client
+    success, es_client = test_es_client(config['url'], config['api_key'])
+    if not success:
+        logger.error("\n❌ CRITICAL: Elasticsearch client connection failed. Please check:")
+        logger.error("  - API Key validity")
+        logger.error("  - Elasticsearch service health")
+        logger.error("  - Network ACLs and security groups")
+        sys.exit(1)
+    
+    # Test index operations
+    if not test_index_operations(es_client, config['index']):
+        logger.error("\n⚠️ WARNING: Index operations failed. Please check:")
+        logger.error("  - Index permissions")
+        logger.error("  - Index configuration")
+        logger.error("  - Elasticsearch disk space and quotas")
+        sys.exit(1)
+    
+    logger.info("\n✅ SUCCESS: All Elasticsearch connection tests passed!")
+    
+    # Print diagnostic information
+    logger.info("\n=== Diagnostic Information ===")
+    logger.info(f"Elasticsearch URL: {config['url']}")
+    logger.info(f"Index name: {config['index']}")
+    
+    # Get detailed cluster information
+    try:
+        info = es_client.info()
+        cluster_name = info.get('cluster_name', 'N/A')
+        es_version = info.get('version', {}).get('number', 'N/A')
+        
+        health = es_client.cluster.health()
+        status = health.get('status', 'unknown')
+        nodes = health.get('number_of_nodes', 0)
+        
+        logger.info(f"Cluster name: {cluster_name}")
+        logger.info(f"Elasticsearch version: {es_version}")
+        logger.info(f"Cluster health: {status}")
+        logger.info(f"Number of nodes: {nodes}")
+    except Exception as e:
+        logger.error(f"Error getting cluster information: {str(e)}")
     
     logger.info("\nTroubleshooting Suggestions:")
     logger.info("---------------------------")
