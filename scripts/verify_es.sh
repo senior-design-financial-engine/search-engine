@@ -18,6 +18,41 @@ echo "================================================"
 echo "Elasticsearch Connection Verification Script"
 echo "================================================"
 echo "$(date)"
+
+# First, ensure psutil is installed (required for disk space checks)
+echo "Checking if psutil is installed..."
+if ! python3 -c "import psutil" &>/dev/null; then
+    echo -e "${YELLOW}psutil not found. Installing...${NC}"
+    pip3 install psutil==5.9.5
+    
+    # Verify installation
+    if ! python3 -c "import psutil" &>/dev/null; then
+        echo -e "${YELLOW}Warning: Failed to import psutil after installation. Installing system dependencies and trying again...${NC}"
+        # Try to install system dependencies that might be needed for psutil
+        if command -v apt-get &>/dev/null; then
+            apt-get update -y
+            apt-get install -y python3-dev gcc
+        elif command -v yum &>/dev/null; then
+            yum update -y
+            yum install -y python3-devel gcc
+        fi
+        
+        # Try reinstalling with force
+        pip3 install --no-cache-dir --force-reinstall psutil==5.9.5
+        
+        # Final verification
+        if ! python3 -c "import psutil" &>/dev/null; then
+            echo -e "${YELLOW}Warning: psutil could not be installed. Disk space checks may fail.${NC}"
+        else
+            echo -e "${GREEN}psutil installed successfully on second attempt.${NC}"
+        fi
+    else
+        echo -e "${GREEN}psutil installed successfully.${NC}"
+    fi
+else
+    echo -e "${GREEN}psutil is already installed.${NC}"
+fi
+
 echo "Running check_es_connection.py..."
 
 # Load environment variables

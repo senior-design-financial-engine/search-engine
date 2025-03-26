@@ -66,6 +66,35 @@ cp /opt/search-engine/backend/check_es_connection.py /opt/search-engine/backend/
 chmod +x /opt/search-engine/backend/check_es_connection.py
 echo "Prepared check_es_connection.py script"
 EOF
+      - cat > deploy_scripts/install_dependencies.sh << 'EOF'
+#!/bin/bash
+# Install Python dependencies
+echo "Installing Python dependencies..."
+pip3 install -r /opt/search-engine/backend/requirements.txt
+
+# Ensure psutil is installed (explicit installation to handle system dependencies)
+echo "Ensuring psutil is installed..."
+pip3 install psutil==5.9.5
+
+# Check if psutil is installed correctly
+python3 -c "import psutil; print('psutil version:', psutil.__version__)"
+if [ $? -ne 0 ]; then
+  echo "WARNING: Failed to import psutil. Installing system dependencies and trying again..."
+  # Install system dependencies that might be needed for psutil
+  apt-get update -y || yum update -y
+  apt-get install -y python3-dev gcc || yum install -y python3-devel gcc
+  pip3 install --no-cache-dir --force-reinstall psutil==5.9.5
+  
+  # Verify installation
+  python3 -c "import psutil; print('psutil version:', psutil.__version__)"
+  if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to install psutil after multiple attempts"
+    # Continue anyway - we don't want to fail the deployment for this
+  fi
+fi
+
+echo "Dependencies installation completed"
+EOF
       - cat > deploy_scripts/verify_startup.sh << 'EOF'
 #!/bin/bash
 # Verify backend service startup and test Elasticsearch connectivity
@@ -94,6 +123,7 @@ fi
 EOF
       - chmod +x deploy_scripts/create_env_file.sh
       - chmod +x deploy_scripts/prepare_check_es.sh
+      - chmod +x deploy_scripts/install_dependencies.sh
       - chmod +x deploy_scripts/verify_startup.sh
       - echo Preparing SSM commands...
       - cat > deploy_commands.json << EOF
@@ -105,9 +135,11 @@ EOF
     "unzip -o /tmp/artifacts.zip -d /opt/search-engine/",
     "chmod +x /opt/search-engine/deploy_scripts/create_env_file.sh",
     "chmod +x /opt/search-engine/deploy_scripts/prepare_check_es.sh",
+    "chmod +x /opt/search-engine/deploy_scripts/install_dependencies.sh",
     "chmod +x /opt/search-engine/deploy_scripts/verify_startup.sh",
     "/opt/search-engine/deploy_scripts/create_env_file.sh",
     "/opt/search-engine/deploy_scripts/prepare_check_es.sh",
+    "/opt/search-engine/deploy_scripts/install_dependencies.sh",
     "systemctl restart search-engine-backend",
     "/opt/search-engine/deploy_scripts/verify_startup.sh"
   ]
