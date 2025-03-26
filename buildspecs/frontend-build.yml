@@ -28,6 +28,7 @@ phases:
       - echo "Setting up artifact structure"
       - cd ..  # Return to root directory
       - mkdir -p artifact_output
+      - mkdir -p artifact_output/frontend  # Create the frontend directory inside artifact_output
       - echo "Copying frontend build files"
       - cp -r frontend/build/* artifact_output/frontend/
       - echo "Copying buildspecs directory"
