@@ -14,6 +14,8 @@ import uuid
 import hashlib
 import json
 from functools import lru_cache
+import elasticsearch
+from elasticsearch import Elasticsearch
 
 # Load environment variables first
 load_dotenv()

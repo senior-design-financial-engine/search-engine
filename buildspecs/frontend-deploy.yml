@@ -1,4 +1,5 @@
 version: 0.2
+
 phases:
   install:
     runtime-versions:
@@ -7,13 +8,28 @@ phases:
       - echo "Running frontend deployment..."
       - echo "Current directory: $(pwd)"
       - ls -la
-      # No need to change directory since the build output is directly in the artifact root
   
   pre_build:
     commands:
       - echo "Preparing for deployment..."
-      - echo "Contents of buildspecs directory:"
-      - ls -la buildspecs || echo "buildspecs directory not found"
+      - echo "Checking for build artifacts..."
+      - |
+        if [ ! -d "build" ] && [ ! -d "frontend/build" ]; then
+          echo "No build directory found, attempting to build from source..."
+          if [ -d "frontend" ]; then
+            cd frontend
+            echo "Installing dependencies..."
+            npm install
+            echo "Building frontend..."
+            npm run build
+            cd ..
+            mkdir -p build
+            cp -r frontend/build/* build/
+          else
+            echo "ERROR: No frontend directory or build artifacts found"
+            exit 1
+          fi
+        fi
   
   build:
     commands:
@@ -23,21 +39,42 @@ phases:
   
   post_build:
     commands:
-      - echo "Post-build phase completed"
-      - echo "Deployment artifacts ready"
-      - echo "Retrieving S3 bucket name from CloudFormation stack output..."
-      - export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+      - echo "Retrieving S3 bucket name from CloudFormation stack..."
+      - |
+        BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME \
+          --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+      - |
+        if [ -z "$BUCKET_NAME" ]; then
+          echo "ERROR: Could not retrieve bucket name from CloudFormation stack"
+          exit 1
+        fi
       - echo "Retrieved bucket name: $BUCKET_NAME"
       - echo "Syncing build files to S3 bucket..."
-      - aws s3 sync ./ s3://$BUCKET_NAME/ --delete --exclude "buildspecs/*"
+      - |
+        if [ -d "build" ]; then
+          aws s3 sync build/ s3://$BUCKET_NAME/ --delete
+        elif [ -d "frontend/build" ]; then
+          aws s3 sync frontend/build/ s3://$BUCKET_NAME/ --delete
+        else
+          echo "ERROR: No build directory found"
+          exit 1
+        fi
       - echo "Creating CloudFront invalidation..."
-      - export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
-      - echo "Frontend deployment to S3 completed successfully!"
+      - |
+        CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME \
+          --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
+      - |
+        if [ -n "$CLOUDFRONT_ID" ]; then
+          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+        else
+          echo "WARNING: Could not retrieve CloudFront distribution ID"
+        fi
+      - echo "Frontend deployment completed successfully!"
 
 artifacts:
   files:
     - '**/*'
+  base-directory: build
   discard-paths: no
 
 cache:

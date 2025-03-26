@@ -1,4 +1,5 @@
 version: 0.2
+
 phases:
   install:
     runtime-versions:
@@ -13,20 +14,18 @@ phases:
       - cd backend || (echo "Backend directory not found, using project root"; cd .)
       - echo "Loading API code from source files"
       - mkdir -p api/deploy
-      - cp backend/backend.py api/deploy/app.py || echo "Using fallback app.py"
-      - cp backend/requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
+      - cp backend.py api/deploy/app.py || echo "Using fallback app.py"
+      - cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
       
       # If app.py wasn't found, use the stored version from backend-api.yaml
       - |
         if [ ! -f "api/deploy/app.py" ]; then
           echo "Extracting app.py from backend-api.yaml"
-          python -c "
-          import yaml
-          with open('backend-api.yaml', 'r') as f:
-              config = yaml.safe_load(f)
-              with open('api/deploy/app.py', 'w') as app_file:
-                  app_file.write(config.get('app_code', ''))
-          "
+          python -c "import yaml
+with open('backend-api.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+    with open('api/deploy/app.py', 'w') as app_file:
+        app_file.write(config.get('app_code', ''))"
         fi
       
       # Prepare service file
