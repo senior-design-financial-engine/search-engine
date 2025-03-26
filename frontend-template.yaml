@@ -16,6 +16,14 @@ Parameters:
     Type: String
     Default: "financialnewsengine.com"
   
+  AssociateDomainWithCloudFront:
+    Description: Whether to associate the domain name with CloudFront (set to false if domain is already in use by another distribution)
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+  
   CreateRoute53Records:
     Description: Whether to create Route 53 records (set to false if DomainName is empty)
     Type: String
@@ -39,12 +47,39 @@ Parameters:
     Type: String
     Default: financial-news-cicd
 
+  BackendApiUrl:
+    Description: URL of the backend API (including protocol, e.g., https://api.financialnewsengine.com)
+    Type: String
+    Default: "https://api.financialnewsengine.com"
+
+  UseLambdaEdge:
+    Description: Whether to use Lambda@Edge for CORS instead of Response Headers Policy
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+
 Conditions:
   HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
+  AssociateDomain: !And
+    - !Equals [!Ref AssociateDomainWithCloudFront, "true"]
+    - !Not [!Equals [!Ref DomainName, ""]]
   CreateDNSRecords: !And 
     - !Equals [!Ref CreateRoute53Records, "true"]
     - !Not [!Equals [!Ref DomainName, ""]]
     - !Not [!Equals [!Ref HostedZoneId, ""]]
+  UseLambdaEdgeFunction: !Equals [!Ref UseLambdaEdge, "true"]
+  UseResponseHeadersPolicy: !Equals [!Ref UseLambdaEdge, "false"]
+  # Define complex conditions
+  CreateDNSRecordsWithLambda: !And
+    - !Condition CreateDNSRecords
+    - !Condition UseLambdaEdgeFunction
+    - !Condition AssociateDomain
+  CreateDNSRecordsWithPolicy: !And
+    - !Condition CreateDNSRecords
+    - !Condition UseResponseHeadersPolicy
+    - !Condition AssociateDomain
 
 Mappings:
   EnvironmentConfig:
@@ -106,9 +141,228 @@ Resources:
       CloudFrontOriginAccessIdentityConfig:
         Comment: !Sub "OAI for ${EnvironmentName} Financial News Frontend"
 
-  # CloudFront distribution
-  CloudFrontDistribution:
+  # Lambda@Edge role for CORS handling
+  LambdaEdgeRole:
+    Type: AWS::IAM::Role
+    Condition: UseLambdaEdgeFunction
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-lambda-edge-role"
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Lambda@Edge function for CORS
+  LambdaEdgeFunction:
+    Type: AWS::Lambda::Function
+    Condition: UseLambdaEdgeFunction
+    Properties:
+      FunctionName: !Sub "financial-news-cors-${EnvironmentName}"
+      Runtime: nodejs18.x
+      Role: !GetAtt LambdaEdgeRole.Arn
+      Handler: index.handler
+      Code:
+        ZipFile: |
+          'use strict';
+
+          /**
+           * Lambda@Edge function to add CORS headers to CloudFront responses
+           * 
+           * This function is deployed with CloudFront to ensure proper CORS headers
+           * are added to all responses from the CloudFront distribution.
+           */
+          exports.handler = (event, context, callback) => {
+              // Get the response from the origin
+              const response = event.Records[0].cf.response;
+              const request = event.Records[0].cf.request;
+              
+              // Extract the request origin
+              const requestOrigin = request.headers.origin && request.headers.origin[0].value;
+              
+              // Define allowed origins
+              const allowedOrigins = [
+                  'https://financialnewsengine.com',
+                  'https://www.financialnewsengine.com',
+                  'http://localhost:3000'  // For local development
+              ];
+              
+              // Check if the request origin is allowed
+              const originIsAllowed = requestOrigin && allowedOrigins.includes(requestOrigin);
+              const cors_origin = originIsAllowed ? requestOrigin : allowedOrigins[0];
+              
+              // Add CORS headers to the response
+              response.headers['access-control-allow-origin'] = [{ 
+                  key: 'Access-Control-Allow-Origin', 
+                  value: cors_origin
+              }];
+              
+              response.headers['access-control-allow-methods'] = [{ 
+                  key: 'Access-Control-Allow-Methods', 
+                  value: 'GET, POST, OPTIONS, PUT, PATCH, DELETE' 
+              }];
+              
+              response.headers['access-control-allow-headers'] = [{ 
+                  key: 'Access-Control-Allow-Headers', 
+                  value: 'Content-Type, Authorization, X-Api-Key, X-Amz-Date, X-Amz-Security-Token' 
+              }];
+              
+              // Allow credentials only for specific origins (not with wildcard)
+              if (originIsAllowed) {
+                  response.headers['access-control-allow-credentials'] = [{ 
+                      key: 'Access-Control-Allow-Credentials', 
+                      value: 'true' 
+                  }];
+              }
+              
+              response.headers['access-control-expose-headers'] = [{
+                  key: 'Access-Control-Expose-Headers',
+                  value: 'Content-Length, X-Amz-Date, Content-Type'
+              }];
+              
+              response.headers['access-control-max-age'] = [{
+                  key: 'Access-Control-Max-Age',
+                  value: '3600'
+              }];
+              
+              // Add cache-control headers to prevent caching of CORS responses
+              if (request.method === 'OPTIONS') {
+                  response.headers['cache-control'] = [{
+                      key: 'Cache-Control',
+                      value: 'max-age=3600'
+                  }];
+              } else {
+                  // For non-OPTIONS requests, make sure Cache-Control is set appropriately
+                  // based on backend response or CloudFront settings
+                  if (!response.headers['cache-control']) {
+                      response.headers['cache-control'] = [{
+                          key: 'Cache-Control',
+                          value: 'private, max-age=0, no-cache'
+                      }];
+                  }
+              }
+              
+              // Handle OPTIONS preflight requests specially
+              if (request.method === 'OPTIONS') {
+                  // Override the response status code to 204 (No Content)
+                  response.status = '204';
+                  response.statusDescription = 'No Content';
+                  
+                  // Remove any body content for OPTIONS requests
+                  response.body = '';
+              }
+              
+              // Add security headers
+              response.headers['strict-transport-security'] = [{
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=31536000; includeSubDomains; preload'
+              }];
+              
+              response.headers['x-content-type-options'] = [{
+                  key: 'X-Content-Type-Options',
+                  value: 'nosniff'
+              }];
+              
+              response.headers['x-xss-protection'] = [{
+                  key: 'X-XSS-Protection',
+                  value: '1; mode=block'
+              }];
+              
+              // Diagnostic header to verify Lambda@Edge is working
+              response.headers['x-lambda-edge-cors'] = [{
+                  key: 'X-Lambda-Edge-CORS',
+                  value: 'applied'
+              }];
+              
+              // Return the modified response
+              callback(null, response);
+          };
+      Description: "Lambda@Edge function to handle CORS headers for CloudFront"
+      MemorySize: 128
+      Timeout: 5
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-lambda-edge-cors-function"
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Lambda@Edge Version (required for CloudFront association)
+  LambdaEdgeFunctionVersion:
+    Type: AWS::Lambda::Version
+    Condition: UseLambdaEdgeFunction
+    Properties:
+      FunctionName: !Ref LambdaEdgeFunction
+      Description: "Version for CloudFront association"
+
+  # CloudFront Response Headers Policy for CORS
+  FrontendResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Condition: UseResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "financial-news-frontend-cors-${EnvironmentName}"
+        Comment: "Response headers policy for Financial News Engine frontend with CORS support"
+        CorsConfig:
+          AccessControlAllowCredentials: true
+          AccessControlAllowHeaders:
+            Items:
+              - "*"
+            Quantity: 1
+          AccessControlAllowMethods:
+            Items:
+              - "GET"
+              - "HEAD"
+              - "OPTIONS"
+              - "PUT"
+              - "POST"
+              - "DELETE"
+              - "PATCH"
+            Quantity: 7
+          AccessControlAllowOrigins:
+            Items:
+              - !If [HasDomainName, !Sub "https://${DomainName}", "*"]
+              - !If [HasDomainName, !Sub "https://www.${DomainName}", !Ref "AWS::NoValue"]
+              - !Ref BackendApiUrl
+              - "http://localhost:3000"
+            Quantity: !If [HasDomainName, 4, 2]
+          AccessControlExposeHeaders:
+            Items:
+              - "Content-Length"
+              - "Content-Type"
+              - "Date"
+            Quantity: 3
+          AccessControlMaxAgeSec: 3600
+          OriginOverride: true
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+          ReferrerPolicy:
+            Override: true
+            ReferrerPolicy: "same-origin"
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Override: true
+            Preload: true
+          XSSProtection:
+            ModeBlock: true
+            Override: true
+            Protection: true
+
+  # Create a CloudFront distribution with the Lambda@Edge function
+  CloudFrontDistributionWithLambda:
     Type: AWS::CloudFront::Distribution
+    Condition: UseLambdaEdgeFunction
     Properties:
       DistributionConfig:
         Enabled: true
@@ -117,13 +371,13 @@ Resources:
         HttpVersion: http2
         ViewerCertificate:
           !If
-            - HasDomainName
+            - AssociateDomain
             - AcmCertificateArn: !Ref SSLCertificate
               MinimumProtocolVersion: TLSv1.2_2021
               SslSupportMethod: sni-only
             - CloudFrontDefaultCertificate: true
         Aliases: !If
-          - HasDomainName
+          - AssociateDomain
           - - !Ref DomainName
             - !Sub "www.${DomainName}"
           - !Ref AWS::NoValue
@@ -132,6 +386,16 @@ Resources:
             Id: S3Origin
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOAI}"
+          - DomainName: !Select [1, !Split ["https://", !Ref BackendApiUrl]]
+            Id: ApiOrigin
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+              OriginReadTimeout: 30
+              OriginKeepaliveTimeout: 5
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -151,6 +415,141 @@ Resources:
           MinTTL: 0
           DefaultTTL: 3600
           MaxTTL: 86400
+          LambdaFunctionAssociations:
+          - EventType: origin-response
+            LambdaFunctionARN: !Ref LambdaEdgeFunctionVersion
+            IncludeBody: false
+        CacheBehaviors:
+          - PathPattern: "/api/*"
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Origin
+                - Access-Control-Request-Method
+                - Access-Control-Request-Headers
+                - Authorization
+              Cookies:
+                Forward: all
+            MinTTL: 0
+            DefaultTTL: 0
+            MaxTTL: 0
+            LambdaFunctionAssociations:
+            - EventType: origin-response
+              LambdaFunctionARN: !Ref LambdaEdgeFunctionVersion
+              IncludeBody: false
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-frontend-distribution
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Create a CloudFront distribution with the Response Headers Policy
+  CloudFrontDistributionWithPolicy:
+    Type: AWS::CloudFront::Distribution
+    Condition: UseResponseHeadersPolicy
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+        ViewerCertificate:
+          !If
+            - AssociateDomain
+            - AcmCertificateArn: !Ref SSLCertificate
+              MinimumProtocolVersion: TLSv1.2_2021
+              SslSupportMethod: sni-only
+            - CloudFrontDefaultCertificate: true
+        Aliases: !If
+          - AssociateDomain
+          - - !Ref DomainName
+            - !Sub "www.${DomainName}"
+          - !Ref AWS::NoValue
+        Origins:
+          - DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOAI}"
+          - DomainName: !Select [1, !Split ["https://", !Ref BackendApiUrl]]
+            Id: ApiOrigin
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+              OriginReadTimeout: 30
+              OriginKeepaliveTimeout: 5
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          ResponseHeadersPolicyId: !Ref FrontendResponseHeadersPolicy
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: none
+          MinTTL: 0
+          DefaultTTL: 3600
+          MaxTTL: 86400
+        CacheBehaviors:
+          - PathPattern: "/api/*"
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            ResponseHeadersPolicyId: !Ref FrontendResponseHeadersPolicy
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            ForwardedValues:
+              QueryString: true
+              Headers:
+                - Origin
+                - Access-Control-Request-Method
+                - Access-Control-Request-Headers
+                - Authorization
+              Cookies:
+                Forward: all
+            MinTTL: 0
+            DefaultTTL: 0
+            MaxTTL: 0
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
@@ -167,7 +566,7 @@ Resources:
   # SSL Certificate (only created if domain name is provided)
   SSLCertificate:
     Type: AWS::CertificateManager::Certificate
-    Condition: HasDomainName
+    Condition: AssociateDomain
     Properties:
       DomainName: !Ref DomainName
       SubjectAlternativeNames:
@@ -182,25 +581,49 @@ Resources:
   # Route 53 Record Set (only created if domain name and hosted zone ID are provided)
   DomainRecordSet:
     Type: AWS::Route53::RecordSet
-    Condition: CreateDNSRecords
+    Condition: CreateDNSRecordsWithLambda
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Ref DomainName
       Type: A
       AliasTarget:
-        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        DNSName: !GetAtt CloudFrontDistributionWithLambda.DomainName
         HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (this is fixed)
         EvaluateTargetHealth: false
 
   WwwDomainRecordSet:
     Type: AWS::Route53::RecordSet
-    Condition: CreateDNSRecords
+    Condition: CreateDNSRecordsWithLambda
     Properties:
       HostedZoneId: !Ref HostedZoneId
       Name: !Sub "www.${DomainName}"
       Type: A
       AliasTarget:
-        DNSName: !GetAtt CloudFrontDistribution.DomainName
+        DNSName: !GetAtt CloudFrontDistributionWithLambda.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (this is fixed)
+        EvaluateTargetHealth: false
+        
+  DomainRecordSetPolicy:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDNSRecordsWithPolicy
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistributionWithPolicy.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (this is fixed)
+        EvaluateTargetHealth: false
+
+  WwwDomainRecordSetPolicy:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDNSRecordsWithPolicy
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub "www.${DomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudFrontDistributionWithPolicy.DomainName
         HostedZoneId: Z2FDTNDATAQYW2  # CloudFront hosted zone ID (this is fixed)
         EvaluateTargetHealth: false
 
@@ -227,7 +650,11 @@ Resources:
               - Effect: Allow
                 Action:
                   - 'cloudfront:CreateInvalidation'
-                Resource: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+                Resource: !If [
+                  UseLambdaEdgeFunction, 
+                  !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionWithLambda}", 
+                  !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionWithPolicy}"
+                ]
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-frontend-deployer
@@ -262,22 +689,22 @@ Outputs:
   
   CloudFrontDomainName:
     Description: Domain name of the CloudFront distribution
-    Value: !GetAtt CloudFrontDistribution.DomainName
+    Value: !If [UseLambdaEdgeFunction, !GetAtt CloudFrontDistributionWithLambda.DomainName, !GetAtt CloudFrontDistributionWithPolicy.DomainName]
     Export:
       Name: !Sub "${AWS::StackName}-CloudFrontDomainName"
   
   CloudFrontDistributionId:
     Description: ID of the CloudFront distribution
-    Value: !Ref CloudFrontDistribution
+    Value: !If [UseLambdaEdgeFunction, !Ref CloudFrontDistributionWithLambda, !Ref CloudFrontDistributionWithPolicy]
     Export:
       Name: !Sub "${AWS::StackName}-CloudFrontDistributionId"
   
   WebsiteURL:
     Description: URL for the website
     Value: !If
-      - HasDomainName
+      - AssociateDomain
       - !Sub "https://${DomainName}"
-      - !Sub "https://${CloudFrontDistribution.DomainName}"
+      - !If [UseLambdaEdgeFunction, !Sub "https://${CloudFrontDistributionWithLambda.DomainName}", !Sub "https://${CloudFrontDistributionWithPolicy.DomainName}"]
     Export:
       Name: !Sub "${AWS::StackName}-WebsiteURL"
   
@@ -291,4 +718,11 @@ Outputs:
     Description: Name of the secret containing deployment credentials
     Value: !Ref DeploymentCredentialsSecret
     Export:
-      Name: !Sub "${AWS::StackName}-DeploymentCredentialsSecretName" 
+      Name: !Sub "${AWS::StackName}-DeploymentCredentialsSecretName"
+
+  LambdaEdgeFunctionARN:
+    Description: ARN of the Lambda@Edge function for CORS (if enabled)
+    Condition: UseLambdaEdgeFunction
+    Value: !Ref LambdaEdgeFunctionVersion
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaEdgeFunctionARN" 
