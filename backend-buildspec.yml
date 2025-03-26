@@ -7,6 +7,7 @@ env:
     ELASTICSEARCH_INDEX: "/financial-news/elasticsearch-index"
     ES_NUMBER_OF_SHARDS: "/financial-news/es-number-of-shards"
     ES_NUMBER_OF_REPLICAS: "/financial-news/es-number-of-replicas"
+    ENVIRONMENT: "/financial-news/environment"
 
 phases:
   install:
@@ -42,9 +43,9 @@ phases:
       - docker push $ECR_REPOSITORY_URI:latest
       - docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
       - echo Writing image definitions file...
-      - aws cloudformation describe-stacks --stack-name search-engine-infra --query "Stacks[0].Outputs[?OutputKey=='EcsTaskDefinition'].OutputValue" --output text > taskdef.json
-      - aws cloudformation describe-stacks --stack-name search-engine-infra --query "Stacks[0].Outputs[?OutputKey=='EcsCluster'].OutputValue" --output text > cluster.txt
-      - aws cloudformation describe-stacks --stack-name search-engine-infra --query "Stacks[0].Outputs[?OutputKey=='EcsService'].OutputValue" --output text > service.txt
+      - aws cloudformation describe-stacks --stack-name financial-news-backend --query "Stacks[0].Outputs[?OutputKey=='EcsTaskDefinition'].OutputValue" --output text > taskdef.json
+      - aws cloudformation describe-stacks --stack-name financial-news-backend --query "Stacks[0].Outputs[?OutputKey=='EcsCluster'].OutputValue" --output text > cluster.txt
+      - aws cloudformation describe-stacks --stack-name financial-news-backend --query "Stacks[0].Outputs[?OutputKey=='EcsService'].OutputValue" --output text > service.txt
       - echo Preparing deployment scripts...
       - mkdir -p deploy_scripts
       - cat > deploy_scripts/create_env_file.sh << 'EOF'
@@ -58,33 +59,45 @@ ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key
 ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
 ES_SHARDS=$(aws ssm get-parameter --name "/financial-news/es-number-of-shards" --with-decryption --query "Parameter.Value" --output text)
 ES_REPLICAS=$(aws ssm get-parameter --name "/financial-news/es-number-of-replicas" --with-decryption --query "Parameter.Value" --output text)
+ENV=$(aws ssm get-parameter --name "/financial-news/environment" --with-decryption --query "Parameter.Value" --output text || echo "production")
 
 # Create the .env file
-cat > /opt/search-engine/.env << EOL
+cat > /opt/financial-news-engine/.env << EOL
 ELASTICSEARCH_URL=$ES_URL
 ELASTICSEARCH_API_KEY=$ES_API_KEY
 ELASTICSEARCH_INDEX=$ES_INDEX
 ES_NUMBER_OF_SHARDS=$ES_SHARDS
 ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+ENVIRONMENT=$ENV
+CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
 EOL
 
 # Set secure permissions
-chmod 600 /opt/search-engine/.env
+chmod 600 /opt/financial-news-engine/.env
 echo "Created .env file with environment variables from SSM Parameter Store"
+
+# Create a cron job to update the .env file daily
+cat > /etc/cron.daily/update_env_file << EOL
+#!/bin/bash
+$(cat /opt/financial-news-engine/deploy_scripts/create_env_file.sh)
+systemctl restart financial-news.service
+EOL
+chmod +x /etc/cron.daily/update_env_file
+echo "Created daily cron job to update environment variables"
 EOF
       - cat > deploy_scripts/prepare_check_es.sh << 'EOF'
 #!/bin/bash
 # Make sure check_es_connection.py is in the right place and executable
-mkdir -p /opt/search-engine/backend
-cp /opt/search-engine/backend/check_es_connection.py /opt/search-engine/backend/check_es_connection.py
-chmod +x /opt/search-engine/backend/check_es_connection.py
+mkdir -p /opt/financial-news-engine/backend
+cp /opt/financial-news-engine/backend/check_es_connection.py /opt/financial-news-engine/backend/check_es_connection.py
+chmod +x /opt/financial-news-engine/backend/check_es_connection.py
 echo "Prepared check_es_connection.py script"
 EOF
       - cat > deploy_scripts/install_dependencies.sh << 'EOF'
 #!/bin/bash
 # Install Python dependencies
 echo "Installing Python dependencies..."
-pip3 install -r /opt/search-engine/backend/requirements.txt
+pip3 install -r /opt/financial-news-engine/backend/requirements.txt
 
 # Ensure psutil is installed (explicit installation to handle system dependencies)
 echo "Ensuring psutil is installed..."
@@ -112,15 +125,15 @@ EOF
       - cat > deploy_scripts/create_service_file.sh << 'EOF'
 #!/bin/bash
 # Create systemd service file
-cat > /etc/systemd/system/search-engine-backend.service << EOL
+cat > /etc/systemd/system/financial-news.service << EOL
 [Unit]
-Description=Search Engine Backend Service
+Description=Financial News Backend Service
 After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/opt/search-engine/backend
-EnvironmentFile=/opt/search-engine/.env
+WorkingDirectory=/opt/financial-news-engine
+EnvironmentFile=/opt/financial-news-engine/.env
 Environment="PYTHONUNBUFFERED=1"
 ExecStart=/usr/bin/python3 -m gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
 Restart=always
@@ -129,7 +142,7 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOL
-chmod 644 /etc/systemd/system/search-engine-backend.service
+chmod 644 /etc/systemd/system/financial-news.service
 echo "Created systemd service file"
 EOF
       - cat > deploy_scripts/verify_startup.sh << 'EOF'
@@ -138,53 +151,191 @@ EOF
 echo "Waiting for backend service to start up..."
 sleep 10
 # Check if the service is running
-systemctl is-active --quiet search-engine-backend
+systemctl is-active --quiet financial-news.service
 if [ $? -ne 0 ]; then
-  echo "ERROR: search-engine-backend service is not running"
-  systemctl status search-engine-backend
+  echo "ERROR: financial-news.service is not running"
+  systemctl status financial-news.service
   exit 1
 fi
 echo "Backend service is running"
 
 # Check Elasticsearch connectivity
 echo "Testing Elasticsearch connectivity..."
-mkdir -p /opt/search-engine/scripts
-cp /opt/search-engine/scripts/verify_es.sh /opt/search-engine/scripts/verify_es.sh
-chmod +x /opt/search-engine/scripts/verify_es.sh
-/opt/search-engine/scripts/verify_es.sh
-if [ $? -ne 0 ]; then
-  echo "WARNING: Elasticsearch connectivity check failed"
-  # Don't fail deployment if ES check fails, log it and continue
-  echo "Continuing deployment despite Elasticsearch connectivity issues"
+mkdir -p /opt/financial-news-engine/scripts
+if [ -f "/opt/financial-news-engine/scripts/verify_es.sh" ]; then
+  chmod +x /opt/financial-news-engine/scripts/verify_es.sh
+  /opt/financial-news-engine/scripts/verify_es.sh
+  if [ $? -ne 0 ]; then
+    echo "WARNING: Elasticsearch connectivity check failed"
+    # Don't fail deployment if ES check fails, log it and continue
+    echo "Continuing deployment despite Elasticsearch connectivity issues"
+  fi
+else
+  echo "WARNING: verify_es.sh script not found, skipping ES verification"
 fi
+EOF
+      - cat > deploy_scripts/lifecycle_hook_script.sh << 'EOF'
+#!/bin/bash
+# This script is designed to be run by ASG lifecycle hooks
+
+# Log function
+function log {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /var/log/lifecycle-hooks.log
+}
+
+# Create log directory if it doesn't exist
+mkdir -p $(dirname /var/log/lifecycle-hooks.log)
+
+log "Lifecycle hook script started"
+
+# Update environment variables from SSM Parameter Store
+if [ -f "/opt/financial-news-engine/deploy_scripts/create_env_file.sh" ]; then
+  log "Updating environment variables from SSM Parameter Store"
+  chmod +x /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+  /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+else
+  log "ERROR: create_env_file.sh script not found"
+  
+  # Fallback: Create basic env file update script
+  log "Creating fallback env file update script"
+  mkdir -p /opt/financial-news-engine/deploy_scripts
+  
+  cat > /opt/financial-news-engine/deploy_scripts/create_env_file.sh << 'FALLBACK'
+#!/bin/bash
+# Fallback script to update env file
+echo "Fetching credentials from SSM Parameter Store..."
+
+# Get parameters from SSM Parameter Store
+ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
+ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
+ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
+ES_SHARDS=$(aws ssm get-parameter --name "/financial-news/es-number-of-shards" --with-decryption --query "Parameter.Value" --output text)
+ES_REPLICAS=$(aws ssm get-parameter --name "/financial-news/es-number-of-replicas" --with-decryption --query "Parameter.Value" --output text)
+ENV=$(aws ssm get-parameter --name "/financial-news/environment" --with-decryption --query "Parameter.Value" --output text || echo "production")
+
+# Create the .env file
+cat > /opt/financial-news-engine/.env << EOL
+ELASTICSEARCH_URL=$ES_URL
+ELASTICSEARCH_API_KEY=$ES_API_KEY
+ELASTICSEARCH_INDEX=$ES_INDEX
+ES_NUMBER_OF_SHARDS=$ES_SHARDS
+ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+ENVIRONMENT=$ENV
+CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
+EOL
+
+# Set secure permissions
+chmod 600 /opt/financial-news-engine/.env
+echo "Created .env file with environment variables from SSM Parameter Store"
+FALLBACK
+  
+  chmod +x /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+  /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+fi
+
+# If the service exists and is running, restart it
+if systemctl list-unit-files | grep -q financial-news.service; then
+  log "Restarting financial-news service"
+  systemctl restart financial-news.service
+else
+  log "Service file not found, skipping restart"
+fi
+
+log "Lifecycle hook script completed"
+exit 0
 EOF
       - chmod +x deploy_scripts/create_env_file.sh
       - chmod +x deploy_scripts/prepare_check_es.sh
       - chmod +x deploy_scripts/install_dependencies.sh
       - chmod +x deploy_scripts/create_service_file.sh
       - chmod +x deploy_scripts/verify_startup.sh
+      - chmod +x deploy_scripts/lifecycle_hook_script.sh
       - echo Preparing SSM commands...
       - cat > deploy_commands.json << EOF
 {
   "commands": [
-    "mkdir -p /opt/search-engine/backend",
-    "mkdir -p /opt/search-engine/scripts",
+    "mkdir -p /opt/financial-news-engine/backend",
+    "mkdir -p /opt/financial-news-engine/scripts",
+    "mkdir -p /opt/financial-news-engine/logs",
     "aws s3 cp s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY} /tmp/artifacts.zip",
-    "unzip -o /tmp/artifacts.zip -d /opt/search-engine/",
-    "chmod +x /opt/search-engine/deploy_scripts/create_env_file.sh",
-    "chmod +x /opt/search-engine/deploy_scripts/prepare_check_es.sh",
-    "chmod +x /opt/search-engine/deploy_scripts/install_dependencies.sh",
-    "chmod +x /opt/search-engine/deploy_scripts/create_service_file.sh",
-    "chmod +x /opt/search-engine/deploy_scripts/verify_startup.sh",
-    "/opt/search-engine/deploy_scripts/create_env_file.sh",
-    "/opt/search-engine/deploy_scripts/prepare_check_es.sh",
-    "/opt/search-engine/deploy_scripts/install_dependencies.sh",
-    "/opt/search-engine/deploy_scripts/create_service_file.sh",
-    "systemctl restart search-engine-backend",
-    "/opt/search-engine/deploy_scripts/verify_startup.sh"
+    "unzip -o /tmp/artifacts.zip -d /opt/financial-news-engine/",
+    "chmod +x /opt/financial-news-engine/deploy_scripts/create_env_file.sh",
+    "chmod +x /opt/financial-news-engine/deploy_scripts/prepare_check_es.sh",
+    "chmod +x /opt/financial-news-engine/deploy_scripts/install_dependencies.sh",
+    "chmod +x /opt/financial-news-engine/deploy_scripts/create_service_file.sh",
+    "chmod +x /opt/financial-news-engine/deploy_scripts/verify_startup.sh",
+    "chmod +x /opt/financial-news-engine/deploy_scripts/lifecycle_hook_script.sh",
+    "/opt/financial-news-engine/deploy_scripts/create_env_file.sh",
+    "/opt/financial-news-engine/deploy_scripts/prepare_check_es.sh",
+    "/opt/financial-news-engine/deploy_scripts/install_dependencies.sh",
+    "/opt/financial-news-engine/deploy_scripts/create_service_file.sh",
+    "systemctl daemon-reload",
+    "systemctl restart financial-news.service",
+    "/opt/financial-news-engine/deploy_scripts/verify_startup.sh"
   ]
 }
 EOF
+      - echo Creating Auto Scaling Group lifecycle hook...
+      - |
+        # Get the Auto Scaling Group name from the backend stack
+        BACKEND_STACK_NAME=${BACKEND_STACK_NAME:-financial-news-backend}
+        ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+        
+        if [ -n "$ASG_NAME" ]; then
+          echo "Creating lifecycle hooks for Auto Scaling Group: $ASG_NAME"
+          
+          # Create an SSM document for lifecycle hooks
+          cat > lifecycle_hook_document.json << 'EOL'
+{
+  "schemaVersion": "2.2",
+  "description": "Update environment variables on instance launch",
+  "parameters": {},
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "runShellScript",
+      "inputs": {
+        "runCommand": [
+          "#!/bin/bash",
+          "if [ -f \"/opt/financial-news-engine/deploy_scripts/lifecycle_hook_script.sh\" ]; then",
+          "  /opt/financial-news-engine/deploy_scripts/lifecycle_hook_script.sh",
+          "else",
+          "  echo \"Lifecycle hook script not found\"",
+          "  exit 1",
+          "fi"
+        ]
+      }
+    }
+  ]
+}
+EOL
+          
+          # Create the SSM document
+          aws ssm create-document \
+            --name "FinancialNewsEngineLifecycleHook" \
+            --content file://lifecycle_hook_document.json \
+            --document-type "Command" \
+            --document-format "JSON" || echo "Document may already exist"
+          
+          # Create lifecycle hooks for the Auto Scaling Group
+          aws autoscaling put-lifecycle-hook \
+            --lifecycle-hook-name "UpdateEnvOnLaunch" \
+            --auto-scaling-group-name "$ASG_NAME" \
+            --lifecycle-transition "autoscaling:EC2_INSTANCE_LAUNCHING" \
+            --heartbeat-timeout 300 \
+            --default-result "CONTINUE" || echo "Launch lifecycle hook may already exist"
+          
+          aws autoscaling put-lifecycle-hook \
+            --lifecycle-hook-name "UpdateEnvOnTerminate" \
+            --auto-scaling-group-name "$ASG_NAME" \
+            --lifecycle-transition "autoscaling:EC2_INSTANCE_TERMINATING" \
+            --heartbeat-timeout 300 \
+            --default-result "CONTINUE" || echo "Terminate lifecycle hook may already exist"
+          
+          echo "Auto Scaling Group lifecycle hooks created"
+        else
+          echo "WARNING: Auto Scaling Group name not found, skipping lifecycle hook creation"
+        fi
       - echo Updating service...
       - aws ecs update-service --cluster $(cat cluster.txt) --service $(cat service.txt) --force-new-deployment
       - echo Deployment update initiated...
@@ -199,6 +350,7 @@ artifacts:
     - backend/**/*
     - deploy_scripts/**/*
     - scripts/**/*
+    - lifecycle_hook_document.json
   discard-paths: no
 
 cache:

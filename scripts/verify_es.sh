@@ -56,26 +56,26 @@ fi
 echo "Running check_es_connection.py..."
 
 # Load environment variables
-if [ -f /opt/search-engine/.env ]; then
-    source /opt/search-engine/.env
+if [ -f /opt/financial-news-engine/.env ]; then
+    source /opt/financial-news-engine/.env
     echo "Loaded environment variables from .env file"
 else
     echo -e "${YELLOW}Warning: .env file not found, using system environment variables${NC}"
 fi
 
 # Check if the script exists
-if [ ! -f /opt/search-engine/backend/check_es_connection.py ]; then
+if [ ! -f /opt/financial-news-engine/backend/check_es_connection.py ]; then
     echo -e "${RED}Error: check_es_connection.py script not found${NC}"
-    echo "Looked for script at: /opt/search-engine/backend/check_es_connection.py"
+    echo "Looked for script at: /opt/financial-news-engine/backend/check_es_connection.py"
     echo "Script not found. Deployment may be incomplete."
     exit 1
 fi
 
 # Make sure script is executable
-chmod +x /opt/search-engine/backend/check_es_connection.py
+chmod +x /opt/financial-news-engine/backend/check_es_connection.py
 
 # Run the connection check script with no-prompt option for CI/CD environments
-/usr/bin/python3 /opt/search-engine/backend/check_es_connection.py --no-prompt | tee -a ${LOG_FILE}
+/usr/bin/python3 /opt/financial-news-engine/backend/check_es_connection.py --no-prompt | tee -a ${LOG_FILE}
 
 # Capture the exit code
 EXIT_CODE=$?

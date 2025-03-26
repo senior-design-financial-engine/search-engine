@@ -73,7 +73,7 @@ def register_diagnostic_endpoints(app: Flask) -> Blueprint:
         status = {
             "status": "ok",
             "timestamp": datetime.utcnow().isoformat(),
-            "service": os.getenv('SERVICE_NAME', 'search-engine-backend'),
+            "service": os.getenv('SERVICE_NAME', 'financial-news-engine'),
             "version": os.getenv('SERVICE_VERSION', '1.0'),
             "environment": os.getenv('FLASK_ENV', 'development'),
             "services": {

@@ -18,7 +18,7 @@ LOG_FORMAT = os.getenv('LOG_FORMAT', 'json')  # 'json' or 'text'
 ENABLE_REQUEST_LOGGING = os.getenv('ENABLE_REQUEST_LOGGING', 'true').lower() == 'true'
 ENABLE_PERFORMANCE_LOGGING = os.getenv('ENABLE_PERFORMANCE_LOGGING', 'true').lower() == 'true'
 LOG_DIR = os.getenv('LOG_DIR', 'logs')
-SERVICE_NAME = os.getenv('SERVICE_NAME', 'search-engine-backend')
+SERVICE_NAME = os.getenv('SERVICE_NAME', 'financial-news-engine')
 
 # Create logs directory if it doesn't exist
 if not os.path.exists(LOG_DIR):
