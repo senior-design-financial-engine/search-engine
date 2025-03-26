@@ -25,6 +25,8 @@ phases:
           echo "build"
         elif [ -d "frontend/build" ]; then
           echo "frontend/build"
+        elif [ -d "frontend" ] && [ -f "frontend/index.html" ] && [ -d "frontend/static" ]; then
+          echo "frontend"
         elif [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
           cd frontend
           npm install
