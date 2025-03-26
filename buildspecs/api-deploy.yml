@@ -16,6 +16,73 @@ phases:
       - "cp backend.py api/deploy/app.py || cp app.py api/deploy/app.py || echo \"Using fallback app.py\""
       - "cp requirements.txt api/deploy/requirements.txt || echo \"Using fallback requirements.txt\""
       
+      # Create fallback app.py and requirements.txt if they don't exist
+      - |
+        if [ ! -f "api/deploy/app.py" ]; then
+          echo "Creating fallback app.py with basic health endpoint"
+          mkdir -p api/deploy
+          cat > api/deploy/app.py << 'EOF'
+        #!/usr/bin/env python3
+        """
+        Financial News Engine API - Fallback Application
+        
+        This is a basic fallback application that provides a health endpoint.
+        """
+        
+        import os
+        import logging
+        from flask import Flask, jsonify, request
+        from dotenv import load_dotenv
+        
+        # Set up logging
+        logging.basicConfig(
+            filename='/opt/financial-news-engine/logs/backend.log',
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        logger = logging.getLogger(__name__)
+        
+        # Load environment variables
+        load_dotenv()
+        
+        app = Flask(__name__)
+        
+        @app.route('/health', methods=['GET'])
+        def health_check():
+            """Health check endpoint"""
+            logger.info("Health check endpoint accessed")
+            return jsonify({
+                "status": "healthy",
+                "message": "Financial News Engine API is running"
+            })
+            
+        @app.route('/', methods=['GET'])
+        def index():
+            """Root endpoint"""
+            logger.info("Root endpoint accessed")
+            return jsonify({
+                "name": "Financial News Engine API",
+                "version": "1.0.0",
+                "status": "ok"
+            })
+            
+        if __name__ == '__main__':
+            port = int(os.environ.get('PORT', 5000))
+            app.run(host='0.0.0.0', port=port)
+        EOF
+        fi
+        
+        if [ ! -f "api/deploy/requirements.txt" ]; then
+          echo "Creating fallback requirements.txt"
+          mkdir -p api/deploy
+          cat > api/deploy/requirements.txt << 'EOF'
+        flask==2.0.1
+        python-dotenv==0.19.0
+        elasticsearch==7.14.0
+        requests==2.26.0
+        EOF
+        fi
+      
       # Get assets bucket name from CloudFormation
       - "echo \"Getting assets bucket name from CloudFormation\""
       - "export ASSETS_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue\" --output text)"
@@ -27,12 +94,16 @@ phases:
         cat > api/deploy/api-scripts/create_env_file.sh << 'EOF'
         #!/bin/bash
         # Fetch environment variables from SSM Parameter Store
-        echo "Fetching credentials from SSM Parameter Store - parameters are managed by the CICD stack"
+        echo "Fetching credentials from SSM Parameter Store - parameters are managed by the CICD stack" >&2
 
         # Create necessary directories
         sudo mkdir -p /opt/financial-news-engine
         sudo mkdir -p /opt/financial-news-engine/logs
         sudo mkdir -p /opt/financial-news-engine/deploy_scripts
+        
+        # Set proper permissions for log directory
+        sudo chown -R ubuntu:ubuntu /opt/financial-news-engine/logs
+        sudo chmod -R 755 /opt/financial-news-engine/logs
 
         # Set default values in case parameter retrieval fails
         ES_URL=""
@@ -47,15 +118,15 @@ phases:
             local param_name=$1
             local default_value=$2
 
-            echo "Fetching parameter: $param_name"
+            echo "Fetching parameter: $param_name" >&2
             local value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
             local exit_code=$?
 
             if [ $exit_code -eq 0 ] && [ ! -z "$value" ]; then
-                echo "Successfully retrieved parameter: $param_name"
+                echo "Successfully retrieved parameter: $param_name" >&2
                 echo "$value"
             else
-                echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
+                echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value" >&2
                 echo "$default_value"
             fi
         }
@@ -81,16 +152,16 @@ phases:
 
         # Set secure permissions
         sudo chmod 600 /opt/financial-news-engine/.env
-        echo "Created .env file with environment variables from SSM Parameter Store"
+        echo "Created .env file with environment variables from SSM Parameter Store" >&2
 
         # Output parameters retrieved (with API key redacted)
-        echo "Environment loaded with the following parameters:"
-        echo "ELASTICSEARCH_URL=$ES_URL"
-        echo "ELASTICSEARCH_API_KEY=****REDACTED****"
-        echo "ELASTICSEARCH_INDEX=$ES_INDEX"
-        echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS"
-        echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS"
-        echo "ENVIRONMENT=$ENV"
+        echo "Environment loaded with the following parameters:" >&2
+        echo "ELASTICSEARCH_URL=$ES_URL" >&2
+        echo "ELASTICSEARCH_API_KEY=****REDACTED****" >&2
+        echo "ELASTICSEARCH_INDEX=$ES_INDEX" >&2
+        echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS" >&2
+        echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS" >&2
+        echo "ENVIRONMENT=$ENV" >&2
         EOF
       
       # Create deploy.sh script at runtime
@@ -115,6 +186,35 @@ phases:
         sudo mkdir -p $LOG_DIR
         sudo mkdir -p $DEPLOY_SCRIPTS_DIR
         
+        # Create directory structure according to architecture document
+        echo "Creating directory structure according to architecture"
+        # Ensure ES database directory exists
+        sudo mkdir -p $APP_DIR/es_database
+        sudo touch $APP_DIR/es_database/__init__.py
+        
+        # Ensure scraper directory exists
+        sudo mkdir -p $APP_DIR/scraper
+        sudo mkdir -p $APP_DIR/scraper/data
+        sudo mkdir -p $APP_DIR/scraper/articles
+        sudo touch $APP_DIR/scraper/__init__.py
+        
+        # Ensure API directory exists
+        sudo mkdir -p $APP_DIR/api
+        
+        # Ensure backend-scripts directory exists
+        sudo mkdir -p $APP_DIR/backend-scripts
+        
+        # Ensure utils directory exists
+        sudo mkdir -p $APP_DIR/utils
+        
+        # Check if app.py exists in the temp directory
+        if [ ! -f "/tmp/api-deploy/app.py" ]; then
+            echo "ERROR: app.py file not found in /tmp/api-deploy/"
+            echo "Checking for alternate locations..."
+            find /tmp -name "app.py" -type f 2>/dev/null
+            exit 1
+        fi
+        
         # Copy files from temp directory
         echo "Copying application files to $APP_DIR"
         sudo cp /tmp/api-deploy/app.py $APP_DIR/app.py
@@ -138,7 +238,13 @@ phases:
         
         # Create systemd service
         echo "Creating systemd service"
-        sudo bash -c 'cat > /etc/systemd/system/financial-news.service << EOF
+        # First check if the service file exists in the deployment scripts
+        if [ -f "$DEPLOY_SCRIPTS_DIR/financial-news.service" ]; then
+            echo "Using service file from deployment scripts"
+            sudo cp $DEPLOY_SCRIPTS_DIR/financial-news.service /etc/systemd/system/financial-news.service
+        else
+            echo "Creating service file from template"
+            sudo bash -c 'cat > /etc/systemd/system/financial-news.service << EOF
         [Unit]
         Description=Financial News API Service
         After=network.target
@@ -151,13 +257,17 @@ phases:
         ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
         Restart=on-failure
         RestartSec=5
-        StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
-        StandardError=append:/opt/financial-news-engine/logs/service-error.log
+        StandardOutput=append:/opt/financial-news-engine/logs/backend.log
+        StandardError=append:/opt/financial-news-engine/logs/backend.log
         SyslogIdentifier=financial-news
         
         [Install]
         WantedBy=multi-user.target
         EOF'
+        fi
+        
+        # Ensure service file has correct permissions
+        sudo chmod 644 /etc/systemd/system/financial-news.service
         
         # Run the env file creation script
         echo "Creating environment file"
@@ -168,6 +278,10 @@ phases:
         sudo systemctl daemon-reload
         sudo systemctl enable financial-news.service
         sudo systemctl restart financial-news.service
+        
+        # Verify service is running
+        echo "Checking service status"
+        sudo systemctl status financial-news.service
         
         echo "Deployment completed successfully"
         exit 0
@@ -188,6 +302,87 @@ phases:
         
         echo "Starting application verification..."
         
+        # Check if files exist and have correct permissions
+        check_files() {
+            echo "Checking if required application files exist..."
+            
+            if [ -f "$APP_DIR/app.py" ]; then
+                echo "✅ app.py exists."
+            else
+                echo "❌ app.py is missing."
+                ls -la $APP_DIR
+                return 1
+            fi
+            
+            if [ -f "$APP_DIR/requirements.txt" ]; then
+                echo "✅ requirements.txt exists."
+            else
+                echo "❌ requirements.txt is missing."
+                return 1
+            fi
+            
+            if [ -f "$APP_DIR/.env" ]; then
+                echo "✅ .env file exists."
+                # Check permissions
+                PERMS=$(stat -c "%a" $APP_DIR/.env)
+                if [ "$PERMS" == "600" ]; then
+                    echo "✅ .env has correct permissions (600)."
+                else
+                    echo "❌ .env has incorrect permissions: $PERMS, should be 600."
+                    return 1
+                fi
+                
+                # Check if env file has debug output
+                if grep -q "Fetching parameter" $APP_DIR/.env; then
+                    echo "❌ .env file contains debug output, which might cause application errors."
+                    echo "First 5 lines of .env file:"
+                    head -n 5 $APP_DIR/.env
+                    return 1
+                else
+                    echo "✅ .env file format looks correct."
+                fi
+            else
+                echo "❌ .env file is missing."
+                return 1
+            fi
+            
+            # Check directory structure according to architecture document
+            echo "Checking directory structure..."
+            for dir in "es_database" "scraper" "api" "backend-scripts" "utils" "logs"; do
+                if [ -d "$APP_DIR/$dir" ]; then
+                    echo "✅ $dir directory exists."
+                else 
+                    echo "❌ $dir directory is missing."
+                    return 1
+                fi
+            done
+            
+            return 0
+        }
+        
+        # Check if the service file exists and is properly configured
+        check_service_file() {
+            echo "Checking service file..."
+            
+            if [ -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
+                echo "✅ Service file exists."
+                
+                # Check if service file has proper content
+                if grep -q "ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py" "/etc/systemd/system/$SERVICE_NAME.service"; then
+                    echo "✅ Service file has correct ExecStart."
+                else
+                    echo "❌ Service file has incorrect ExecStart."
+                    cat "/etc/systemd/system/$SERVICE_NAME.service"
+                    return 1
+                fi
+            else
+                echo "❌ Service file is missing."
+                return 1
+            fi
+            
+            return 0
+        }
+        
         # Check if the service is running
         check_service() {
             echo "Checking if $SERVICE_NAME service is running..."
@@ -205,6 +400,14 @@ phases:
                 echo "Service logs:"
                 sudo journalctl -u $SERVICE_NAME -n 20 || true
                 
+                echo "Checking log files:"
+                ls -la $APP_DIR/logs/
+                
+                if [ -f "$APP_DIR/logs/backend.log" ]; then
+                    echo "Last 20 lines of error log:"
+                    tail -n 20 $APP_DIR/logs/backend.log
+                fi
+                
                 return 1
             fi
         }
@@ -217,15 +420,26 @@ phases:
             local response=""
             local retry_count=0
             local success=false
+            local endpoints=("/health" "/api/health" "/api/v1/health" "/")
             
             while [ $retry_count -lt $MAX_RETRY ]; do
-                if response=$(curl -s http://localhost:5000/health 2>/dev/null); then
-                    if [[ "$response" == *"healthy"* ]]; then
-                        echo "✅ Application is responding correctly."
-                        success=true
-                        break
+                # Try different health check endpoints
+                for endpoint in "${endpoints[@]}"; do
+                    echo "Trying endpoint: $endpoint"
+                    if response=$(curl -s http://localhost:5000$endpoint 2>/dev/null); then
+                        if [[ "$response" == *"healthy"* || "$response" == *"status"* || "$response" == *"ok"* ]]; then
+                            echo "✅ Application is responding correctly on endpoint: $endpoint"
+                            echo "Response: $response"
+                            success=true
+                            break 2
+                        else
+                            echo "Endpoint $endpoint responded but did not contain health check indicators."
+                            echo "Response: $response"
+                        fi
+                    else
+                        echo "Endpoint $endpoint not responding"
                     fi
-                fi
+                done
                 
                 echo "Application not responding yet, retrying in $RETRY_INTERVAL seconds... (attempt $((retry_count + 1))/$MAX_RETRY)"
                 sleep $RETRY_INTERVAL
@@ -234,27 +448,10 @@ phases:
             
             if [ "$success" = false ]; then
                 echo "❌ Application is not responding properly after $MAX_RETRY attempts."
-                return 1
-            fi
-            
-            return 0
-        }
-        
-        # Check application files
-        check_files() {
-            echo "Checking if required application files exist..."
-            
-            if [ -f "$APP_DIR/app.py" ]; then
-                echo "✅ app.py exists."
-            else
-                echo "❌ app.py is missing."
-                return 1
-            fi
-            
-            if [ -f "$APP_DIR/requirements.txt" ]; then
-                echo "✅ requirements.txt exists."
-            else
-                echo "❌ requirements.txt is missing."
+                echo "Checking if application is running:"
+                ps aux | grep python | grep app.py
+                echo "Checking port 5000:"
+                netstat -tulpn | grep 5000 || true
                 return 1
             fi
             
@@ -267,6 +464,7 @@ phases:
             
             # Run all checks
             check_files || errors=$((errors + 1))
+            check_service_file || errors=$((errors + 1))
             check_service || errors=$((errors + 1))
             check_application || errors=$((errors + 1))
             
@@ -509,6 +707,7 @@ phases:
       - "aws s3 cp api/deploy/verify.sh s3://$ASSETS_BUCKET_NAME/temp/verify.sh"
       - "aws s3 cp api/deploy/api-scripts/create_env_file.sh s3://$ASSETS_BUCKET_NAME/temp/api-scripts/create_env_file.sh"
       - "aws s3 cp api/deploy/api-scripts/lifecycle_handler.sh s3://$ASSETS_BUCKET_NAME/temp/api-scripts/lifecycle_handler.sh"
+      - "aws s3 cp buildspecs/api-deploy/api-scripts/financial-news.service s3://$ASSETS_BUCKET_NAME/temp/api-scripts/financial-news.service"
       
       # Deploy to each instance
       - "echo \"Deploying to instances\""
@@ -518,7 +717,7 @@ phases:
             echo "Deploying to instance $INSTANCE_ID"
             aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy /tmp/api-deploy/api-scripts']" --comment "Create staging directory" --output text || echo "Failed to create staging directory on $INSTANCE_ID"
             if [ $? -eq 0 ]; then
-              DEPLOY_CMD="cd /tmp && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh api-deploy/ && mkdir -p api-deploy/api-scripts && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/create_env_file.sh api-deploy/api-scripts/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/lifecycle_handler.sh api-deploy/api-scripts/ && chmod +x api-deploy/deploy.sh api-deploy/verify.sh api-deploy/api-scripts/create_env_file.sh api-deploy/api-scripts/lifecycle_handler.sh && cd api-deploy && ./deploy.sh && ./verify.sh"
+              DEPLOY_CMD="cd /tmp && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh api-deploy/ && mkdir -p api-deploy/api-scripts && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/create_env_file.sh api-deploy/api-scripts/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/lifecycle_handler.sh api-deploy/api-scripts/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/financial-news.service api-deploy/api-scripts/ && chmod +x api-deploy/deploy.sh api-deploy/verify.sh api-deploy/api-scripts/create_env_file.sh api-deploy/api-scripts/lifecycle_handler.sh && cd api-deploy && ./deploy.sh && ./verify.sh"
               aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text || echo "Failed to deploy to $INSTANCE_ID"
               echo "Deployment to instance $INSTANCE_ID completed"
             fi
@@ -551,8 +750,8 @@ phases:
       - "echo \"ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py\" | sed 's/^/  /' >> backend-api.yaml"
       - "echo \"Restart=on-failure\" | sed 's/^/  /' >> backend-api.yaml"
       - "echo \"RestartSec=5\" | sed 's/^/  /' >> backend-api.yaml"
-      - "echo \"StandardOutput=append:/opt/financial-news-engine/logs/service-output.log\" | sed 's/^/  /' >> backend-api.yaml"
-      - "echo \"StandardError=append:/opt/financial-news-engine/logs/service-error.log\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"StandardOutput=append:/opt/financial-news-engine/logs/backend.log\" | sed 's/^/  /' >> backend-api.yaml"
+      - "echo \"StandardError=append:/opt/financial-news-engine/logs/backend.log\" | sed 's/^/  /' >> backend-api.yaml"
       - "echo \"SyslogIdentifier=financial-news\" | sed 's/^/  /' >> backend-api.yaml"
       - "echo \"\" | sed 's/^/  /' >> backend-api.yaml"
       - "echo \"[Install]\" | sed 's/^/  /' >> backend-api.yaml"

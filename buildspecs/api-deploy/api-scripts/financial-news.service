@@ -10,8 +10,8 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
 Restart=on-failure
 RestartSec=5
-StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
-StandardError=append:/opt/financial-news-engine/logs/service-error.log
+StandardOutput=append:/opt/financial-news-engine/logs/backend.log
+StandardError=append:/opt/financial-news-engine/logs/backend.log
 SyslogIdentifier=financial-news
 
 [Install]
