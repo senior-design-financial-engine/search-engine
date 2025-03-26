@@ -5,82 +5,82 @@ phases:
     runtime-versions:
       python: 3.9
     commands:
-      - echo "Installing required tools"
-      - pip install pyyaml boto3 awscli jq
+      - "echo \"Installing required tools\""
+      - "pip install pyyaml boto3 awscli jq"
   
   pre_build:
     commands:
-      - echo "Preparing API code for deployment"
-      - cd backend || (echo "Backend directory not found, using project root"; cd .)
-      - mkdir -p api/deploy
-      - cp backend.py api/deploy/app.py || echo "Using fallback app.py"
-      - cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
+      - "echo \"Preparing API code for deployment\""
+      - "cd backend || (echo \"Backend directory not found, using project root\"; cd .)"
+      - "mkdir -p api/deploy"
+      - "cp backend.py api/deploy/app.py || echo \"Using fallback app.py\""
+      - "cp requirements.txt api/deploy/requirements.txt || echo \"Using fallback requirements.txt\""
       
       # Copy deployment scripts
-      - echo "Copying deployment scripts"
-      - cp buildspecs/api-deploy/scripts/extract_app.py scripts/
-      - cp buildspecs/api-deploy/scripts/deploy.sh api/deploy/
-      - cp buildspecs/api-deploy/scripts/verify.sh api/deploy/
-      - cp buildspecs/api-deploy/scripts/financial-news.service api/deploy/
+      - "echo \"Copying deployment scripts\""
+      - "cp buildspecs/api-deploy/scripts/extract_app.py scripts/"
+      - "cp buildspecs/api-deploy/scripts/deploy.sh api/deploy/"
+      - "cp buildspecs/api-deploy/scripts/verify.sh api/deploy/"
+      - "cp buildspecs/api-deploy/scripts/financial-news.service api/deploy/"
       
       # Make scripts executable
-      - chmod +x scripts/extract_app.py
-      - chmod +x api/deploy/deploy.sh
-      - chmod +x api/deploy/verify.sh
+      - "chmod +x scripts/extract_app.py"
+      - "chmod +x api/deploy/deploy.sh"
+      - "chmod +x api/deploy/verify.sh"
       
       # Execute app extraction if needed
-      - if [ ! -f "api/deploy/app.py" ]; then python3 scripts/extract_app.py; fi
+      - "if [ ! -f \"api/deploy/app.py\" ]; then python3 scripts/extract_app.py; fi"
   
   build:
     commands:
-      - echo "Getting backend instances from Auto Scaling Group"
-      - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-      - echo "Auto Scaling Group $ASG_NAME"
-      - INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
-      - echo "Instance IDs $INSTANCE_IDS"
-      - if [ -z "$INSTANCE_IDS" ]; then echo "No running instances found in Auto Scaling Group"; exit 0; fi
+      - "echo \"Getting backend instances from Auto Scaling Group\""
+      - "ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue\" --output text)"
+      - "echo \"Auto Scaling Group $ASG_NAME\""
+      - "INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query \"AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId\" --output text)"
+      - "echo \"Instance IDs $INSTANCE_IDS\""
+      - "if [ -z \"$INSTANCE_IDS\" ]; then echo \"No running instances found in Auto Scaling Group\"; exit 0; fi"
       
       # Upload files to S3 for transfer
-      - echo "Uploading deployment files to S3"
-      - aws s3 cp api/deploy/app.py s3://financial-news-assets/temp/app.py
-      - aws s3 cp api/deploy/requirements.txt s3://financial-news-assets/temp/requirements.txt
-      - aws s3 cp api/deploy/financial-news.service s3://financial-news-assets/temp/financial-news.service
-      - aws s3 cp api/deploy/deploy.sh s3://financial-news-assets/temp/deploy.sh
-      - aws s3 cp api/deploy/verify.sh s3://financial-news-assets/temp/verify.sh
+      - "echo \"Uploading deployment files to S3\""
+      - "aws s3 cp api/deploy/app.py s3://financial-news-assets/temp/app.py"
+      - "aws s3 cp api/deploy/requirements.txt s3://financial-news-assets/temp/requirements.txt"
+      - "aws s3 cp api/deploy/financial-news.service s3://financial-news-assets/temp/financial-news.service"
+      - "aws s3 cp api/deploy/deploy.sh s3://financial-news-assets/temp/deploy.sh"
+      - "aws s3 cp api/deploy/verify.sh s3://financial-news-assets/temp/verify.sh"
       
       # Deploy to each instance
-      - echo "Deploying to instances"
-      - |-
+      - "echo \"Deploying to instances\""
+      - |
         for INSTANCE_ID in $INSTANCE_IDS; do 
-          echo "Deploying to instance $INSTANCE_ID";
-          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text;
-          DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://financial-news-assets/temp/app.py . && aws s3 cp s3://financial-news-assets/temp/requirements.txt . && aws s3 cp s3://financial-news-assets/temp/financial-news.service . && aws s3 cp s3://financial-news-assets/temp/deploy.sh . && aws s3 cp s3://financial-news-assets/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh";
-          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text;
-          echo "Deployment to instance $INSTANCE_ID completed";
+          echo "Deploying to instance $INSTANCE_ID"
+          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text
+          DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://financial-news-assets/temp/app.py . && aws s3 cp s3://financial-news-assets/temp/requirements.txt . && aws s3 cp s3://financial-news-assets/temp/financial-news.service . && aws s3 cp s3://financial-news-assets/temp/deploy.sh . && aws s3 cp s3://financial-news-assets/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
+          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text
+          echo "Deployment to instance $INSTANCE_ID completed"
         done
   
   post_build:
     commands:
-      - echo "Creating API configuration YAML"
-      - echo "---" > backend-api.yaml
-      - echo "# Financial News Engine API Configuration" >> backend-api.yaml
-      - echo "app_code: |" >> backend-api.yaml
-      - sed 's/^/  /' api/deploy/app.py >> backend-api.yaml
-      - echo "" >> backend-api.yaml
-      - echo "requirements: |" >> backend-api.yaml
-      - sed 's/^/  /' api/deploy/requirements.txt >> backend-api.yaml
-      - echo "" >> backend-api.yaml
-      - echo "service_definition: |" >> backend-api.yaml
-      - sed 's/^/  /' api/deploy/financial-news.service >> backend-api.yaml
-      - echo "" >> backend-api.yaml
-      - echo "verification_script: |" >> backend-api.yaml
-      - sed 's/^/  /' api/deploy/verify.sh >> backend-api.yaml
+      - "echo \"Creating API configuration YAML\""
+      - "echo \"---\" > backend-api.yaml"
+      - "echo \"# Financial News Engine API Configuration\" >> backend-api.yaml"
+      - "echo \"app_code: |\" >> backend-api.yaml"
+      - "sed 's/^/  /' api/deploy/app.py >> backend-api.yaml"
+      - "echo \"\" >> backend-api.yaml"
+      - "echo \"requirements: |\" >> backend-api.yaml"
+      - "sed 's/^/  /' api/deploy/requirements.txt >> backend-api.yaml"
+      - "echo \"\" >> backend-api.yaml"
+      - "echo \"service_definition: |\" >> backend-api.yaml"
+      - "sed 's/^/  /' api/deploy/financial-news.service >> backend-api.yaml"
+      - "echo \"\" >> backend-api.yaml"
+      - "echo \"verification_script: |\" >> backend-api.yaml"
+      - "sed 's/^/  /' api/deploy/verify.sh >> backend-api.yaml"
       
-      - echo "Uploading API code to S3"
-      - aws s3 cp backend-api.yaml s3://financial-news-assets/api/backend-api.yaml
+      - "echo \"Uploading API code to S3\""
+      - "aws s3 cp backend-api.yaml s3://financial-news-assets/api/backend-api.yaml"
       
-      - echo "Starting ASG instance refresh"
-      - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+      - "echo \"Starting ASG instance refresh\""
+      - "ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue\" --output text)"
       - |
         if [ -n "$ASG_NAME" ]; then 
           echo "Found ASG $ASG_NAME"
@@ -94,9 +94,9 @@ phases:
           echo "WARNING Could not find Auto Scaling Group name"
         fi
       
-      - echo "API deployment completed"
+      - "echo \"API deployment completed\""
 
 artifacts:
   files:
-    - api/deploy/**/*
-    - scripts/**/* 
+    - "api/deploy/**/*"
+    - "scripts/**/*" 
