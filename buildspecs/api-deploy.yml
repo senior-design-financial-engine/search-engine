@@ -17,11 +17,15 @@ phases:
       - cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
       
       # If app.py wasn't found, try to extract from backend-api.yaml
+      - echo "Checking for app.py in api/deploy directory"
+      - if [ ! -f "api/deploy/app.py" ]; then echo "App.py not found, creating extract_app.py script"; fi
       - |
         if [ ! -f "api/deploy/app.py" ]; then
-          echo "Extracting app.py from backend-api.yaml"
-          python3 - << EOL
+          cat > extract_app.py << 'EOF'
+#!/usr/bin/env python3
 import yaml
+import sys
+
 try:
     with open('backend-api.yaml', 'r') as f:
         config = yaml.safe_load(f)
@@ -30,7 +34,10 @@ try:
     print("Successfully extracted app.py from backend-api.yaml")
 except Exception as e:
     print(f"Error extracting app.py: {e}")
-EOL
+    sys.exit(1)
+EOF
+          chmod +x extract_app.py
+          python3 extract_app.py
         fi
       
       # Create service file
