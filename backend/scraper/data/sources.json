@@ -66,5 +66,49 @@
             "div.openweb-comment-counter",
             "div.bizdev-lending-tree"
         ]
+    },
+    "cnbc": {
+        "rss_feed": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=19854910",
+        "base_url": "https://www.cnbc.com",
+        "article_selector": "item",
+        "headline_selector": "title",
+        "content_selector": "description",
+        "timestamp_selector": "pubDate",
+        "timestamp_format": "%a, %d %b %Y %H:%M:%S %z",
+        "exclude_selectors": [
+            "script",
+            "style",
+            "iframe",
+            "nav",
+            "header",
+            "footer",
+            "aside",
+            ".advertisement",
+            ".social-share",
+            ".related-articles",
+            ".newsletter-signup",
+            ".comments-section"
+        ],
+        "additional_feeds": [
+            "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+            "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258",
+            "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839135"
+        ],
+        "article_page": {
+            "headline": {"tag": "h1", "class": "ArticleHeader-headline"},
+            "timestamp": {"tag": "time", "attrs": {"data-testid": "published-timestamp"}},
+            "content": {
+                "container": {"tag": "div", "class": "group", "parent": {"tag": "div", "class": "ArticleBody-articleBody"}},
+                "paragraphs": {"tag": "p"}
+            },
+            "cleanup": [
+                {"tag": "div", "class": "BoxInline-container"},
+                {"tag": "div", "class": "MidResponsive-midResponsiveContainer"},
+                {"tag": "span", "class": "QuoteInBody-quoteNameContainer"},
+                {"tag": "span", "class": "transition-fade-appear-done"},
+                {"tag": "span", "class": "transition-fade-enter-done"},
+                {"tag": "div", "class": "RelatedContent-relatedContent"}
+            ]
+        }
     }
 }

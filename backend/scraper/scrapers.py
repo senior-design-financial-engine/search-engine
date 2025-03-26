@@ -37,7 +37,7 @@ TOPICS = {
 # Load sources configuration
 with open("data/sources.json") as f:
     NEWS_SOURCES = json.load(f)
-    
+
 class WebScraper:
     def __init__(self, url: str, source: str):
         """Initialize with the URL and news source type."""
@@ -82,8 +82,29 @@ class WebScraper:
         if not source_rules:
             raise ValueError(f"No parsing rules defined for source: {self.source}")
 
+        # Get headline
+        headline = ""
+        if "article_page" in source_rules:
+            headline_rules = source_rules["article_page"].get("headline", {})
+            kwargs = self.build_find_kwargs(headline_rules)
+            headline_tag = soup.find(headline_rules.get("tag"), **kwargs)
+            headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
+        else:
+            headline_rules = source_rules.get("headline", {})
+            kwargs = self.build_find_kwargs(headline_rules)
+            headline_tag = soup.find(headline_rules.get("tag"), **kwargs)
+            headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
+
+        # Get content
+        content = ""
+        if "article_page" in source_rules:
+            content_rules = source_rules["article_page"].get("content", {})
+            cleanup_rules = source_rules["article_page"].get("cleanup", [])
+        else:
+            content_rules = source_rules.get("content", {})
+            cleanup_rules = source_rules.get("cleanup", [])
+
         # Clean up unwanted elements first
-        cleanup_rules = source_rules.get("cleanup", [])
         for rule in cleanup_rules:
             kwargs = self.build_find_kwargs(rule)
             for tag in soup.find_all(rule.get("tag"), **kwargs):
@@ -92,49 +113,34 @@ class WebScraper:
         # Remove common unwanted elements
         for unwanted in soup.find_all(['script', 'style', 'iframe', 'nav', 'header', 'footer', 'aside']):
             unwanted.decompose()
-        
-        # Remove social media buttons and share options
-        for social in soup.find_all(class_=['ActionBar', 'Page-actions', 'Page-actions-menu', 'ActionLink']):
-            social.decompose()
-        
-        # Remove ads
-        for ad in soup.find_all(class_=['LeaderBoardAd', 'Ad', 'Advertisement']):
-            ad.decompose()
 
-        # Get headline
-        headline_rules = source_rules.get("headline", {})
-        kwargs = self.build_find_kwargs(headline_rules)
-        headline_tag = soup.find(headline_rules.get("tag"), **kwargs)
-        headline = headline_tag.get_text(strip=True) if headline_tag else "No headline found"
-
-        # Get content
-        content = ""
-        content_rules = source_rules.get("content", {})
-
-        # For AP News, specifically target the main story content
-        if self.source == "ap_news":
-            story_body = soup.find('div', class_='RichTextStoryBody')
-            if story_body:
-                paragraphs = story_body.find_all('p')
+        # Get content based on rules
+        if "container" in content_rules:
+            container_rules = content_rules["container"]
+            kwargs = self.build_find_kwargs(container_rules)
+            
+            # Handle parent container if specified
+            if "parent" in container_rules:
+                parent_kwargs = self.build_find_kwargs(container_rules["parent"])
+                parent = soup.find(container_rules["parent"].get("tag"), **parent_kwargs)
+                if parent:
+                    container = parent.find(container_rules.get("tag"), **kwargs)
+                else:
+                    container = None
+            else:
+                container = soup.find(container_rules.get("tag"), **kwargs)
+                
+            if container:
+                kwargs = self.build_find_kwargs(content_rules["paragraphs"])
+                paragraphs = container.find_all(content_rules["paragraphs"].get("tag"), **kwargs)
                 content = " ".join(p.get_text(strip=True) for p in paragraphs)
-        else:
-            # Handle other sources using their specific rules
-            containers = []
-            if 'containers' in content_rules:
-                kwargs = self.build_find_kwargs(content_rules['containers'])
-                containers = soup.find_all(content_rules['containers'].get("tag"), **kwargs)
-            elif 'container' in content_rules:
-                kwargs = self.build_find_kwargs(content_rules['container'])
-                container = soup.find(content_rules['container'].get("tag"), **kwargs)
-                if container:
-                    containers = [container]
-
+        elif "containers" in content_rules:
+            kwargs = self.build_find_kwargs(content_rules["containers"])
+            containers = soup.find_all(content_rules["containers"].get("tag"), **kwargs)
             for container in containers:
-                if container:
-                    kwargs = self.build_find_kwargs(content_rules['paragraphs'])
-                    paragraphs = container.find_all(content_rules['paragraphs'].get("tag"), **kwargs)
-                    for paragraph in paragraphs:
-                        content += paragraph.get_text(" ", strip=True) + " "
+                kwargs = self.build_find_kwargs(content_rules["paragraphs"])
+                paragraphs = container.find_all(content_rules["paragraphs"].get("tag"), **kwargs)
+                content += " ".join(p.get_text(strip=True) for p in paragraphs) + " "
 
         if not content.strip():
             content = "No content found"
@@ -233,7 +239,7 @@ class OptimizedRSSFeedScraper:
             
         self.processed_urls_file = processed_urls_file
         self.processed_urls = self.load_processed_urls()
-        self.articles_data = []
+        self.articles_data = []  
 
     def load_processed_urls(self):
         if os.path.exists(self.processed_urls_file):
@@ -285,14 +291,14 @@ class OptimizedRSSFeedScraper:
         for url, title, headline_tags, timestamp in new_articles:
             scraper = WebScraper(url, self.source)
             try:
-                article_data = scraper.scrape()
+                article_data = scraper.scrape()  
                 if article_data:
                     # Add the headline tags and timestamp to help track which articles were caught by headline
                     article_data['headline_tags'] = headline_tags
                     article_data['timestamp'] = timestamp or article_data['timestamp']  # Use RSS timestamp if available
-                    self.articles_data.append(article_data)
+                    self.articles_data.append(article_data)  
                     print(f"Scraped article: {title} (Tags: {article_data['tags']})")
-                time.sleep(5)
+                time.sleep(5)  
             except Exception as e:
                 print(f"Error scraping {url}: {e}")
 
@@ -382,7 +388,7 @@ class OptimizedAPNewsScraper:
             print(f"Scraping articles from: {hub_url}")
             article_urls = self.scrape_article_urls(hub_url)
             print(f"Found {len(article_urls)} new relevant articles.")
-            time.sleep(2)
+            time.sleep(2)  
 
             for url, title, headline_tags in article_urls:
                 print(f"Scraping article: {url}")
@@ -395,7 +401,7 @@ class OptimizedAPNewsScraper:
                     print(f"Scraped article: {title} (Tags: {article_data['tags']})")
                 else:
                     print(f"Failed to scrape article at {url}")
-                time.sleep(5)
+                time.sleep(5)  
 
         self.save_processed_urls()
         self.save_articles_data()
@@ -413,7 +419,7 @@ class OptimizedAPNewsScraper:
             combined_data = existing_data + new_articles
         else:
             combined_data = self.articles_data
-            new_articles = self.articles_data
+            new_articles = self.articles_data  
 
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(combined_data, f, ensure_ascii=False, indent=4)
@@ -537,6 +543,10 @@ class CNNScraper:
                 if url in self.processed_urls or url in seen_urls:
                     continue
                 
+                # Skip video content
+                if '/video/' in url:
+                    continue
+                
                 # Get headline text
                 headline = link.get_text(strip=True)
                 if not headline:
@@ -558,7 +568,7 @@ class CNNScraper:
         except Exception as e:
             print(f"Error scraping article URLs: {str(e)}")
             return []
-            
+
     def scrape(self):
         """Main scraping method for CNN articles."""
         print(f"\nScraping CNN articles...")

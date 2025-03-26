@@ -21,8 +21,8 @@ def main():
         # Create data directory if it doesn't exist
         os.makedirs('data', exist_ok=True)
         
-        # Run RSS feed scrapers (BBC, NPR)
-        rss_sources = ["bbc", "npr"]
+        # Run RSS feed scrapers (BBC, NPR, CNBC TV18)
+        rss_sources = ["bbc", "npr", "cnbc"]
         for source in rss_sources:
             try:
                 scraper = OptimizedRSSFeedScraper(source)
