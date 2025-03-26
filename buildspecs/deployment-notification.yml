@@ -6,6 +6,8 @@ phases:
     commands:
       - echo "Installing dependencies for deployment notifications"
       - pip install boto3 awscli jq
+      - echo "Converting line endings to Unix format"
+      - tr -d '\r' < /codebuild/output/tmp/script.sh > /codebuild/output/tmp/script.unix.sh && mv /codebuild/output/tmp/script.unix.sh /codebuild/output/tmp/script.sh
   
   build:
     commands:
