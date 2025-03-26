@@ -16,26 +16,27 @@ phases:
       - echo "Preparing for deployment..."
       - find . -name "build" -type d | sort
       - find . -name "package.json" -type f | sort
-      - "cat > detect_build.sh << 'EOF'
-#!/bin/bash
-if [ -f \"index.html\" ] && [ -d \"static\" ]; then
-  echo \".\"
-elif [ -d \"build\" ]; then
-  echo \"build\"
-elif [ -d \"frontend/build\" ]; then
-  echo \"frontend/build\"
-elif [ -d \"frontend\" ]; then
-  cd frontend
-  npm install
-  npm run build
-  cd ..
-  mkdir -p build
-  cp -r frontend/build/* build/
-  echo \"build\"
-else
-  echo \"\"
-fi
-EOF"
+      - |
+        cat > detect_build.sh << 'EOF'
+        #!/bin/bash
+        if [ -f "index.html" ] && [ -d "static" ]; then
+          echo "."
+        elif [ -d "build" ]; then
+          echo "build"
+        elif [ -d "frontend/build" ]; then
+          echo "frontend/build"
+        elif [ -d "frontend" ]; then
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+          mkdir -p build
+          cp -r frontend/build/* build/
+          echo "build"
+        else
+          echo ""
+        fi
+        EOF
       - chmod +x detect_build.sh
       - BUILD_DIR=$(./detect_build.sh)
       - if [ -z "$BUILD_DIR" ]; then echo "No frontend directory or build artifacts found"; exit 1; fi
@@ -64,7 +65,7 @@ EOF"
 artifacts:
   files:
     - '**/*'
-  base-directory: $BUILD_DIR
+  base-directory: "$BUILD_DIR"
   discard-paths: no
 
 cache:
