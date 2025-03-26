@@ -452,6 +452,22 @@ phases:
                 ps aux | grep python | grep app.py
                 echo "Checking port 5000:"
                 netstat -tulpn | grep 5000 || true
+                
+                echo "Checking for common errors in logs:"
+                if [ -f "$APP_DIR/logs/backend.log" ]; then
+                    echo "Checking for errors in backend.log:"
+                    grep -i "error\|exception\|failed" $APP_DIR/logs/backend.log | tail -n 20 || true
+                fi
+                
+                echo "Checking for Python import errors:"
+                if [ -f "$APP_DIR/app.py" ]; then
+                    echo "Running Python syntax check on app.py:"
+                    python3 -m py_compile $APP_DIR/app.py || true
+                fi
+                
+                echo "Checking system logs for application errors:"
+                sudo grep -i "financial-news\|python\|error" /var/log/syslog | tail -n 20 || true
+                
                 return 1
             fi
             
@@ -674,6 +690,33 @@ phases:
       # Make lifecycle handler executable
       - "chmod +x api/deploy/api-scripts/lifecycle_handler.sh"
       
+      # Copy service file to api-scripts deployment directory
+      - |
+        if [ -f "buildspecs/api-deploy/api-scripts/financial-news.service" ]; then
+          cp buildspecs/api-deploy/api-scripts/financial-news.service api/deploy/api-scripts/
+        else
+          cat > api/deploy/api-scripts/financial-news.service << 'EOF'
+        [Unit]
+        Description=Financial News API Service
+        After=network.target
+
+        [Service]
+        Type=simple
+        User=ubuntu
+        WorkingDirectory=/opt/financial-news-engine
+        Environment=PYTHONUNBUFFERED=1
+        ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
+        Restart=on-failure
+        RestartSec=5
+        StandardOutput=append:/opt/financial-news-engine/logs/backend.log
+        StandardError=append:/opt/financial-news-engine/logs/backend.log
+        SyslogIdentifier=financial-news
+
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        fi
+      
       # Execute app extraction if needed
       - "if [ ! -f \"api/deploy/app.py\" ]; then python3 api/deploy/api-scripts/extract_app.py; fi"
   
@@ -707,7 +750,7 @@ phases:
       - "aws s3 cp api/deploy/verify.sh s3://$ASSETS_BUCKET_NAME/temp/verify.sh"
       - "aws s3 cp api/deploy/api-scripts/create_env_file.sh s3://$ASSETS_BUCKET_NAME/temp/api-scripts/create_env_file.sh"
       - "aws s3 cp api/deploy/api-scripts/lifecycle_handler.sh s3://$ASSETS_BUCKET_NAME/temp/api-scripts/lifecycle_handler.sh"
-      - "aws s3 cp buildspecs/api-deploy/api-scripts/financial-news.service s3://$ASSETS_BUCKET_NAME/temp/api-scripts/financial-news.service"
+      - "aws s3 cp api/deploy/api-scripts/financial-news.service s3://$ASSETS_BUCKET_NAME/temp/api-scripts/financial-news.service"
       
       # Deploy to each instance
       - "echo \"Deploying to instances\""
