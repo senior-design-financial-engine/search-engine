@@ -16,8 +16,29 @@ phases:
       - echo "Preparing for deployment..."
       - find . -name "build" -type d | sort
       - find . -name "package.json" -type f | sort
-      - echo "Checking for build artifacts..."
-      - if [ -f "index.html" ] && [ -d "static" ]; then echo "Found build artifacts directly in root directory"; BUILD_DIR="."; elif [ -d "build" ]; then echo "Found build directory at root level"; BUILD_DIR="build"; elif [ -d "frontend/build" ]; then echo "Found build directory in frontend folder"; BUILD_DIR="frontend/build"; elif [ ! -d "build" ] && [ ! -d "frontend/build" ]; then echo "No build directory found, attempting to build from source..."; if [ -d "frontend" ]; then cd frontend; echo "Installing dependencies..."; npm install; echo "Building frontend..."; npm run build; cd ..; mkdir -p build; cp -r frontend/build/* build/; BUILD_DIR="build"; else echo "ERROR: No frontend directory or build artifacts found"; exit 1; fi; fi
+      - echo "Creating build directory detection script"
+      - echo '#!/bin/bash
+if [ -f "index.html" ] && [ -d "static" ]; then
+  echo "."
+elif [ -d "build" ]; then
+  echo "build"
+elif [ -d "frontend/build" ]; then
+  echo "frontend/build"
+elif [ -d "frontend" ]; then
+  cd frontend
+  npm install
+  npm run build
+  cd ..
+  mkdir -p build
+  cp -r frontend/build/* build/
+  echo "build"
+else
+  echo ""
+fi' > detect_build.sh
+      - chmod +x detect_build.sh
+      - BUILD_DIR=$(./detect_build.sh)
+      - if [ -z "$BUILD_DIR" ]; then echo "ERROR: No frontend directory or build artifacts found"; exit 1; fi
+      - echo "Using build directory: $BUILD_DIR"
   
   build:
     commands:
