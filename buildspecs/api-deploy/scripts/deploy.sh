@@ -1,44 +1,45 @@
 #!/bin/bash
+# deploy.sh - Script to deploy the application to the EC2 instance
 
 set -e
+set -o pipefail
 
-echo "Starting API deployment"
-
-# Define constants - standardized path
 APP_DIR="/opt/financial-news-engine"
+LOG_DIR="$APP_DIR/logs"
+DEPLOY_SCRIPTS_DIR="$APP_DIR/deploy_scripts"
 SERVICE_NAME="financial-news"
-DEPLOY_SCRIPTS_DIR="/deploy_scripts"
-LOGS_DIR="/logs"
+USER=$(whoami)
 
-# Create directories if they don't exist
-echo "Creating application directories"
-sudo mkdir -p 
-sudo mkdir -p 
-sudo mkdir -p 
+echo "Starting deployment process as user: $USER"
+
+# Create application directory and log directory
+sudo mkdir -p $APP_DIR
+sudo mkdir -p $LOG_DIR
+sudo mkdir -p $DEPLOY_SCRIPTS_DIR
+
+# Copy files from temp directory
+echo "Copying application files to $APP_DIR"
+sudo cp /tmp/api-deploy/app.py $APP_DIR/app.py
+sudo cp /tmp/api-deploy/requirements.txt $APP_DIR/requirements.txt
+
+# Copy deployment scripts if they exist
+if [ -d "/tmp/api-deploy/deploy_scripts" ]; then
+    echo "Copying deployment scripts"
+    sudo cp -r /tmp/api-deploy/deploy_scripts/* $DEPLOY_SCRIPTS_DIR/
+fi
+
+# Set correct permissions
+echo "Setting permissions"
+sudo chown -R ubuntu:ubuntu $APP_DIR
+sudo chmod -R 755 $APP_DIR
 
 # Install dependencies
-echo "Installing dependencies"
-sudo apt-get update -y || sudo yum update -y
-sudo apt-get install -y python3-pip jq unzip || sudo yum install -y python3-pip jq unzip
+echo "Installing Python dependencies"
+sudo pip3 install -r $APP_DIR/requirements.txt
 
-# Run environment file creation script
-echo "Creating environment file"
-sudo cp create_env_file.sh /
-sudo chmod +x /create_env_file.sh
-sudo /create_env_file.sh
-
-# Copy application files
-echo "Copying application files"
-sudo cp app.py /
-sudo cp requirements.txt /
-
-# Install Python requirements
-echo "Installing Python requirements"
-sudo pip3 install -r /requirements.txt
-
-# Set up service file
-echo "Setting up systemd service"
-cat > /etc/systemd/system/financial-news.service << EOL
+# Create systemd service
+echo "Creating systemd service"
+sudo bash -c 'cat > /etc/systemd/system/financial-news.service << EOF
 [Unit]
 Description=Financial News API Service
 After=network.target
@@ -46,28 +47,24 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=
+WorkingDirectory=/opt/financial-news-engine
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /app.py
+ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
 Restart=on-failure
 RestartSec=5
-StandardOutput=append:/service-output.log
-StandardError=append:/service-error.log
+StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
+StandardError=append:/opt/financial-news-engine/logs/service-error.log
 SyslogIdentifier=financial-news
 
 [Install]
 WantedBy=multi-user.target
-EOL
+EOF'
 
-# Reload and restart service
-echo "Restarting service"
+# Reload systemd and restart service
+echo "Reloading systemd and starting service"
 sudo systemctl daemon-reload
-sudo systemctl enable 
+sudo systemctl enable financial-news.service
+sudo systemctl restart financial-news.service
 
-if [ -f "/app.py" ]; then
-    sudo systemctl restart 
-    echo "API deployment completed successfully"
-else
-    echo "ERROR: app.py not found! Service not started."
-    exit 1
-fi
+echo "Deployment completed successfully"
+exit 0

@@ -15,88 +15,103 @@ echo "================================================"
 echo "$(date)"
 echo "Fetching credentials from SSM Parameter Store..."
 
-# Function to get parameters from SSM with proper error handling
-function get_parameter() {
+APP_DIR="/opt/financial-news-engine"
+ENV_FILE="$APP_DIR/.env"
+PARAM_PATH="/financial-news"
+REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region || echo "us-east-1")
+
+echo "Starting environment file creation..."
+echo "Target .env file: $ENV_FILE"
+echo "Parameter path: $PARAM_PATH"
+echo "AWS Region: $REGION"
+
+# First check if AWS CLI is installed
+if ! command -v aws &> /dev/null; then
+    echo "AWS CLI not found. Installing..."
+    
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update -y
+        sudo apt-get install -y awscli
+    elif command -v yum &> /dev/null; then
+        sudo yum update -y
+        sudo yum install -y awscli
+    else
+        echo "ERROR: Package manager not found. Cannot install AWS CLI."
+        exit 1
+    fi
+fi
+
+# Create empty .env file
+sudo mkdir -p $APP_DIR
+sudo touch $ENV_FILE
+sudo chmod 666 $ENV_FILE
+echo "# Financial News Engine Environment File" > $ENV_FILE
+echo "# Generated at $(date)" >> $ENV_FILE
+echo "" >> $ENV_FILE
+
+# Function to get parameter with error handling
+get_parameter() {
     local param_name=$1
     local default_value=$2
-    
-    echo "Fetching parameter: $param_name"
-    
-    # Check if AWS CLI is installed
-    if ! command -v aws &> /dev/null; then
-        echo -e "${RED}ERROR: AWS CLI is not installed. Cannot fetch parameters.${NC}"
-        echo "Using default value: $default_value"
-        echo "$default_value"
+    local value
+
+    # Try to get parameter directly first
+    value=$(aws ssm get-parameter --name "$PARAM_PATH/$param_name" --with-decryption --region $REGION --query "Parameter.Value" --output text 2>/dev/null || echo "")
+
+    # If parameter not found, check if default value provided
+    if [ -z "$value" ] && [ ! -z "$default_value" ]; then
+        echo "Parameter $param_name not found. Using default value."
+        value=$default_value
+    elif [ -z "$value" ]; then
+        echo "WARNING: Parameter $param_name not found and no default provided."
         return 1
     fi
-    
-    # Try to get the parameter with exponential backoff retry
-    local max_attempts=3
-    local attempt=1
-    local value=""
-    local exit_code=1
-    
-    while [ $attempt -le $max_attempts ]; do
-        # Capture both the value and any error messages
-        value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>&1)
-        exit_code=$?
-        
-        if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then
-            echo -e "${GREEN}Successfully retrieved parameter: $param_name (Attempt $attempt)${NC}"
-            echo "$value"
-            return 0
-        else
-            if [ $attempt -lt $max_attempts ]; then
-                local sleep_time=$((2 ** (attempt - 1) * 3))
-                echo -e "${YELLOW}Attempt $attempt failed. Retrying in $sleep_time seconds...${NC}"
-                sleep $sleep_time
-            else
-                echo -e "${RED}WARNING: Failed to retrieve parameter after $max_attempts attempts: $param_name${NC}"
-                echo -e "${YELLOW}Error message: $value${NC}"
-                echo -e "${YELLOW}Using default value: $default_value${NC}"
-                echo "$default_value"
-                return 1
-            fi
-        fi
-        
-        attempt=$((attempt + 1))
-    done
+
+    # Add parameter to .env file
+    echo "$param_name=$value" >> $ENV_FILE
+    echo "Added $param_name to environment file."
+    return 0
 }
 
-# Create the target directory if it doesn't exist
-mkdir -p /opt/financial-news-engine
+# Try getting all parameters by path first (more efficient)
+echo "Attempting to get all parameters by path..."
+param_json=$(aws ssm get-parameters-by-path --path "$PARAM_PATH" --with-decryption --region $REGION --output json 2>/dev/null || echo "")
 
-# Get parameters with default fallbacks
-ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
-ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
-ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
-ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
-ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
-ENV=$(get_parameter "/financial-news/environment" "development")
+if [ ! -z "$param_json" ]; then
+    # Extract parameters from JSON if successful
+    echo "Got parameters by path. Extracting..."
+    
+    # Parse the parameters and add to .env file
+    echo "$param_json" | jq -r '.Parameters[] | .Name + "=" + .Value' | while read -r line; do
+        # Extract just the parameter name without the path
+        param_name=$(echo "$line" | cut -d'/' -f3 | cut -d'=' -f1)
+        param_value=$(echo "$line" | cut -d'=' -f2-)
+        
+        echo "${param_name}=${param_value}" >> $ENV_FILE
+        echo "Added $param_name to environment file."
+    done
+else
+    echo "Could not get parameters by path. Falling back to individual parameter retrieval."
+    
+    # Fallback to individual parameter retrieval
+    get_parameter "elasticsearch-url" "http://localhost:9200"
+    get_parameter "elasticsearch-api-key" "placeholder-api-key"
+    get_parameter "elasticsearch-index" "financial-news"
+    get_parameter "es-number-of-shards" "1"
+    get_parameter "es-number-of-replicas" "0"
+    get_parameter "environment" "development"
+    
+    # Add additional parameters as needed
+    get_parameter "api-port" "5000"
+    get_parameter "log-level" "INFO"
+fi
 
-# Create the .env file
-cat > /opt/financial-news-engine/.env << EOL
-ELASTICSEARCH_URL=$ES_URL
-ELASTICSEARCH_API_KEY=$ES_API_KEY
-ELASTICSEARCH_INDEX=$ES_INDEX
-ES_NUMBER_OF_SHARDS=$ES_SHARDS
-ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
-ENVIRONMENT=$ENV
-CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
-EOL
+# Set correct permissions on .env file
+sudo chmod 644 $ENV_FILE
+sudo chown ubuntu:ubuntu $ENV_FILE
 
-# Set secure permissions
-chmod 600 /opt/financial-news-engine/.env
-echo -e "${GREEN}Created .env file with environment variables from SSM Parameter Store${NC}"
-
-# Output parameters retrieved (with API key redacted)
-echo -e "${GREEN}Environment loaded with the following parameters:${NC}"
-echo "ELASTICSEARCH_URL=$ES_URL"
-echo "ELASTICSEARCH_API_KEY=****REDACTED****"
-echo "ELASTICSEARCH_INDEX=$ES_INDEX"
-echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS"
-echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS"
-echo "ENVIRONMENT=$ENV"
+echo "Environment file created successfully at $ENV_FILE"
+exit 0
 
 # Create a cron job to update the .env file daily if script is run on a server
 if [ -d "/etc/cron.daily" ]; then
