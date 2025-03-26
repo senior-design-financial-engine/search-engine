@@ -200,8 +200,13 @@ Resources:
                     ec2:AuthorizedService: codebuild.amazonaws.com
               - Effect: Allow
                 Action:
+                  - 'ssm:GetParameter'
                   - 'ssm:GetParameters'
-                Resource: '*'
+                  - 'ssm:GetParametersByPath'
+                  - 'ssm:PutParameter'
+                  - 'ssm:DeleteParameter'
+                  - 'ssm:DescribeParameters'
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/financial-news/*'
               - Effect: Allow
                 Action:
                   - 'secretsmanager:GetSecretValue'
@@ -212,6 +217,14 @@ Resources:
                   - 'cloudformation:DescribeStacks'
                   - 'cloudformation:ListStackResources'
                   - 'cloudformation:ListStacks'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:StartInstanceRefresh'
+                  - 'autoscaling:DescribeInstanceRefreshes'
+                  - 'autoscaling:CancelInstanceRefresh'
+                  - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
 
   # Frontend CodeBuild Project
@@ -236,42 +249,7 @@ Resources:
             Value: !Ref EnvironmentName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              runtime-versions:
-                nodejs: 16
-              commands:
-                - "echo \"Installing frontend dependencies...\""
-                - "pwd"
-                - "echo \"Checking directory structure\""
-                - "if [ -d \"frontend\" ]; then cd frontend; elif [ -d \"../frontend\" ]; then cd ../frontend; fi"
-                - "npm install"
-            
-            pre_build:
-              commands:
-                - "echo \"Running tests...\""
-                - "npm test -- --watchAll=false --testEnvironment=jsdom || echo \"Some tests failed, but continuing with build...\""
-            
-            build:
-              commands:
-                - "echo \"Building the frontend...\""
-                - "npm run build"
-                - "echo \"Build completed on $(date)\""
-            
-            post_build:
-              commands:
-                - "echo \"Post-build phase completed successfully\""
-          
-          artifacts:
-            base-directory: frontend/build
-            files:
-              - '**/*'
-          
-          cache:
-            paths:
-              - 'frontend/node_modules/**/*'
+        BuildSpec: buildspecs/frontend-build.yml
       TimeoutInMinutes: 15
       Cache:
         Type: LOCAL
@@ -300,46 +278,7 @@ Resources:
         PrivilegedMode: true
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              runtime-versions:
-                python: 3.9
-              commands:
-                - "echo \"Installing dependencies...\""
-                - "cd backend"
-                - "python -m pip install --upgrade pip"
-                - "pip install pytest pytest-cov flake8"
-                - "pip install -r requirements.txt"
-            
-            pre_build:
-              commands:
-                - "echo \"Running tests and linting...\""
-                - "flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || echo \"Linting issues found, but continuing...\""
-                - "pytest --cov=./ --cov-report=xml || echo \"Some tests failed, but continuing...\""
-            
-            build:
-              commands:
-                - "echo \"Building the backend deployment package...\""
-                - "mkdir -p dist"
-                - "zip -r dist/backend.zip ."
-                - "echo \"Build completed on $(date)\""
-            
-            post_build:
-              commands:
-                - "echo \"Backend post-build phase completed\""
-          
-          artifacts:
-            files:
-              - "backend/dist/backend.zip"
-              - "appspec.yml"
-              - "backend/scripts/**/*"
-            discard-paths: no
-          
-          cache:
-            paths:
-              - '/root/.cache/pip'
+        BuildSpec: buildspecs/backend-build.yml
       TimeoutInMinutes: 15
       Tags:
         - Key: Name
@@ -368,58 +307,7 @@ Resources:
             Value: !Ref FrontendStackName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              runtime-versions:
-                nodejs: 16
-              commands:
-                - echo "Running frontend deployment..."
-                - "echo \"Current directory: $(pwd)\""
-                - "ls -la"
-                - "echo \"Checking if we're dealing with source code or built assets\""
-                - "if [ -d \"frontend\" ] && [ ! -f \"package.json\" ]; then echo \"Changing directory to frontend/\"; cd frontend; fi"
-                - "if [ -f \"package.json\" ]; then echo \"Found package.json, this is source code - will build\"; npm install; HAS_SOURCE=true; else HAS_SOURCE=false; fi"
-                - "if [ ! -d \"frontend\" ] && [ ! -f \"package.json\" ] && [ \"$HAS_SOURCE\" != \"true\" ]; then echo \"No package.json found, assuming these are pre-built assets - skipping build\"; mkdir -p build; cp -r * build/ 2>/dev/null || true; fi"
-            
-            pre_build:
-              commands:
-                - "if [ \"$HAS_SOURCE\" = \"true\" ]; then echo \"Running tests...\"; npm test -- --watchAll=false --testEnvironment=jsdom || echo \"Some tests failed, but continuing with build...\"; else echo \"Skipping tests for pre-built assets\"; fi"
-            
-            build:
-              commands:
-                - "if [ \"$HAS_SOURCE\" = \"true\" ]; then echo \"Building the frontend...\"; npm run build; echo \"Build completed on $(date)\"; else echo \"Using pre-built assets, skipping build step\"; fi"
-                - "echo \"Checking for appspec.yml\""
-                - "if [ -f \"../appspec.yml\" ]; then echo \"Copying appspec.yml from parent directory to build/\"; cp ../appspec.yml build/; elif [ -f \"appspec.yml\" ]; then echo \"Copying appspec.yml to build/\"; cp appspec.yml build/; else echo \"WARNING: appspec.yml not found, deployment may fail\"; fi"
-                - "echo \"Checking for scripts directory\""
-                - "if [ -d \"../scripts\" ]; then echo \"Copying scripts/ from parent directory to build/\"; mkdir -p build/scripts; cp -r ../scripts/* build/scripts/; elif [ -d \"scripts\" ]; then echo \"Copying scripts/ to build/\"; mkdir -p build/scripts; cp -r scripts/* build/scripts/; else echo \"WARNING: scripts directory not found, deployment may fail\"; fi"
-            
-            post_build:
-              commands:
-                - "echo \"Post-build phase completed\""
-                - "echo \"Listing contents of build directory:\""
-                - "ls -la build"
-                - "echo \"Deployment artifacts ready in build/\""
-                - "echo \"Retrieving S3 bucket name from CloudFormation stack output...\""
-                - "export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue\" --output text)"
-                - "echo \"Retrieved bucket name: $BUCKET_NAME\""
-                - "echo \"Syncing build files to S3 bucket...\""
-                - "aws s3 sync build/ s3://$BUCKET_NAME/ --delete"
-                - "echo \"Creating CloudFront invalidation...\""
-                - "export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue\" --output text)"
-                - "aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths \"/*\""
-                - "echo \"Frontend deployment to S3 completed successfully!\""
-          
-          artifacts:
-            base-directory: build
-            files:
-              - '**/*'
-            discard-paths: no
-          
-          cache:
-            paths:
-              - 'node_modules/**/*'
+        BuildSpec: buildspecs/frontend-deploy.yml
       TimeoutInMinutes: 15
       Tags:
         - Key: Name
@@ -448,72 +336,7 @@ Resources:
             Value: !Ref BackendStackName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              runtime-versions:
-                python: 3.9
-              commands:
-                - "echo 'Starting backend deployment process'"
-                - "pip install --upgrade awscli"
-                - "pip install boto3"
-                - "aws --version"
-            pre_build:
-              commands:
-                - "echo 'Environment variables:'"
-                - "echo ENVIRONMENT=$ENVIRONMENT"
-                - "echo BACKEND_STACK_NAME=$BACKEND_STACK_NAME"
-                - "echo 'Current directory:' $(pwd)"
-                - "ls -la"
-                - "cd backend || echo 'Backend directory not found, proceeding anyway'"
-                - "mkdir -p scripts"
-                - "echo 'Creating deployment scripts...'"
-                - "echo '#!/bin/bash' > scripts/deploy.sh"
-                - "echo 'cd /opt/financial-news-engine' >> scripts/deploy.sh"
-                - "echo 'unzip -o /tmp/backend.zip -d .' >> scripts/deploy.sh"
-                - "echo 'pip3 install -r requirements.txt' >> scripts/deploy.sh"
-                - "echo 'systemctl daemon-reload' >> scripts/deploy.sh"
-                - "echo 'systemctl start financial-news.service' >> scripts/deploy.sh"
-                - "chmod +x scripts/deploy.sh"
-                - "echo '#!/bin/bash' > scripts/before_install.sh"
-                - "echo 'mkdir -p /opt/financial-news-engine' >> scripts/before_install.sh"
-                - "chmod +x scripts/before_install.sh"
-                - "echo 'version: 0.0' > appspec.yml"
-                - "echo 'os: linux' >> appspec.yml"
-                - "echo 'files:' >> appspec.yml"
-                - "echo '  - source: dist/backend.zip' >> appspec.yml"
-                - "echo '    destination: /tmp/' >> appspec.yml"
-                - "echo 'hooks:' >> appspec.yml"
-                - "echo '  BeforeInstall:' >> appspec.yml"
-                - "echo '    - location: scripts/before_install.sh' >> appspec.yml"
-                - "echo '      timeout: 300' >> appspec.yml"
-                - "echo '      runas: root' >> appspec.yml"
-                - "echo '  AfterInstall:' >> appspec.yml"
-                - "echo '    - location: scripts/deploy.sh' >> appspec.yml"
-                - "echo '      timeout: 300' >> appspec.yml"
-                - "echo '      runas: root' >> appspec.yml"
-            build:
-              commands:
-                - "echo 'Checking AWS CLI configuration:'"
-                - "aws sts get-caller-identity || echo 'AWS credentials issue - continuing anyway'"
-                - "echo 'Checking for backend stack:'"
-                - "aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME || echo 'Stack not found or permission issue - continuing deployment anyway'"
-                - "echo 'Listing available stacks:'"
-                - "aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE || echo 'Unable to list stacks - continuing anyway'"
-                - "echo 'Proceeding with simple deployment without AWS CLI dependencies'"
-                - "echo 'Deployment preparation complete'"
-            post_build:
-              commands:
-                - "echo 'Verifying deployment artifacts:'"
-                - "ls -la"
-                - "echo 'Backend deployment completed successfully'"
-          artifacts:
-            files:
-              - "backend/appspec.yml"
-              - "backend/scripts/**/*"
-              - "backend/dist/backend.zip"
-            discard-paths: no
+        BuildSpec: buildspecs/backend-deploy.yml
       TimeoutInMinutes: 30
       Tags:
         - Key: Name
@@ -542,466 +365,49 @@ Resources:
             Value: !Ref BackendStackName
       Source:
         Type: CODEPIPELINE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              runtime-versions:
-                python: 3.9
-              commands:
-                - echo "Installing required tools"
-                - pip install pyyaml boto3 awscli
-          
-            pre_build:
-              commands:
-                - echo "Preparing API code for deployment"
-                - cd backend || (echo "Backend directory not found, using project root"; cd .)
-                - echo "Extracting API code for direct deployment"
-                - mkdir -p api
-                
-                # Create API app.py file directly with shell commands
-                - |
-                  mkdir -p api/deploy
-                  cat > api/deploy/app.py << 'EOF'
-                  # Default Flask app
-                  from flask import Flask, jsonify, request, Blueprint
-                  from flask_cors import CORS
-                  import os
-                  import logging
-                  import sys
-                  import time
-                  import json
-                  from datetime import datetime
-                  import platform
-                  import socket
-                  import psutil
-                  
-                  # Configure logging
-                  log_dir = "logs"
-                  if not os.path.exists(log_dir):
-                      os.makedirs(log_dir)
-                      
-                  logger = logging.getLogger("backend")
-                  logger.setLevel(logging.INFO)
-                  
-                  # Create console handler
-                  ch = logging.StreamHandler(sys.stdout)
-                  ch.setLevel(logging.INFO)
-                  logger.addHandler(ch)
-                  
-                  # Create file handler
-                  fh = logging.FileHandler(os.path.join(log_dir, "backend.log"))
-                  fh.setLevel(logging.INFO)
-                  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-                  fh.setFormatter(formatter)
-                  ch.setFormatter(formatter)
-                  logger.addHandler(fh)
-                  
-                  # Create Flask app
-                  app = Flask(__name__)
-                  
-                  # Create diagnostic blueprint
-                  diagnostics_bp = Blueprint('diagnostics', __name__, url_prefix='/diagnostic')
-                  
-                  # Get CORS allowed origins from environment or use defaults
-                  cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "https://financialnewsengine.com,https://www.financialnewsengine.com")
-                  
-                  # Parse origins into a list
-                  if cors_origins == "*":
-                      origins = ["*"]
-                  else:
-                      origins = [origin.strip() for origin in cors_origins.split(",")]
-                  
-                  logger.info(f"Configuring CORS with origins: {origins}")
-                  
-                  # Configure CORS
-                  CORS(app, resources={r"/*": {"origins": "*" if origins == ["*"] else origins}}, 
-                       supports_credentials=True if origins != ["*"] else False)
-                  
-                  # Setup CORS headers middleware to ensure all responses have proper headers
-                  @app.after_request
-                  def add_cors_headers(response):
-                      origin = request.headers.get('Origin', '')
-                      
-                      # If wildcard is allowed or origin is in our list
-                      if origins == ["*"]:
-                          response.headers['Access-Control-Allow-Origin'] = '*'
-                      elif origin in origins:
-                          response.headers['Access-Control-Allow-Origin'] = origin
-                          response.headers['Access-Control-Allow-Credentials'] = 'true'
-                      
-                      response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-                      response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-                      
-                      if request.method == 'OPTIONS':
-                          response.headers['Access-Control-Max-Age'] = '3600'
-                      
-                      return response
-                  
-                  # Global OPTIONS handler for preflight requests
-                  @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
-                  @app.route('/<path:path>', methods=['OPTIONS'])
-                  def handle_options(path):
-                      response = app.make_default_options_response()
-                      return response
-                  
-                  # Basic routes
-                  @app.route("/")
-                  def hello():
-                      return jsonify({"status": "ok", "message": "API is running"})
-                  
-                  @app.route("/ping")
-                  def ping():
-                      return jsonify({"status": "ok"})
-                  
-                  @app.route("/health")
-                  def health():
-                      return jsonify({
-                          "status": "healthy", 
-                          "environment": os.environ.get("ENVIRONMENT", "development"),
-                          "timestamp": datetime.now().isoformat()
-                      })
-                  
-                  # Query endpoint
-                  @app.route("/query")
-                  def query():
-                      """Basic query endpoint to handle search requests."""
-                      query_text = request.args.get("query", "")
-                      logger.info(f"Received search query: {query_text}")
-                      
-                      # Placeholder implementation
-                      return jsonify({
-                          "status": "ok",
-                          "query": query_text,
-                          "results": [
-                              {
-                                  "id": "1",
-                                  "title": f"Sample result for '{query_text}'",
-                                  "content": "This is a placeholder result until the Elasticsearch integration is complete.",
-                                  "source": "Placeholder",
-                                  "published_date": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                                  "score": 0.95
-                              }
-                          ],
-                          "total": 1,
-                          "timestamp": time.time()
-                      })
-                  
-                  # Diagnostic endpoints
-                  @diagnostics_bp.route("/health")
-                  def diagnostic_health():
-                      return health()
-                  
-                  @diagnostics_bp.route("/report")
-                  def diagnostic_report():
-                      """Generate a comprehensive diagnostic report."""
-                      system_info = {
-                          "hostname": socket.gethostname(),
-                          "platform": platform.system(),
-                          "version": platform.version(),
-                          "python": platform.python_version(),
-                          "memory": {
-                              "total": psutil.virtual_memory().total,
-                              "available": psutil.virtual_memory().available,
-                              "percent": psutil.virtual_memory().percent
-                          },
-                          "cpu": {
-                              "cores": psutil.cpu_count(),
-                              "usage": psutil.cpu_percent(interval=0.1)
-                          },
-                          "disk": {
-                              "total": psutil.disk_usage('/').total,
-                              "free": psutil.disk_usage('/').free,
-                              "percent": psutil.disk_usage('/').percent
-                          }
-                      }
-                      
-                      return jsonify({
-                          "status": "ok",
-                          "timestamp": datetime.now().isoformat(),
-                          "environment": os.environ.get("ENVIRONMENT", "development"),
-                          "cors_config": {
-                              "origins": origins
-                          },
-                          "system": system_info,
-                          "diagnostics": {
-                              "api_status": "operational"
-                          }
-                      })
-                  
-                  @diagnostics_bp.route("/cors-test")
-                  def cors_test():
-                      """Test endpoint for CORS configuration."""
-                      origin = request.headers.get("Origin", "Unknown")
-                      return jsonify({
-                          "status": "ok",
-                          "message": "CORS test successful",
-                          "request_origin": origin,
-                          "allowed_origins": origins,
-                          "timestamp": time.time()
-                      })
-                  
-                  # Register the diagnostic blueprint
-                  app.register_blueprint(diagnostics_bp)
-                  
-                  # Error handlers
-                  @app.errorhandler(404)
-                  def not_found(error):
-                      return jsonify({
-                          "error": "Not found",
-                          "message": "The requested resource could not be found."
-                      }), 404
-                  
-                  @app.errorhandler(500)
-                  def server_error(error):
-                      return jsonify({
-                          "error": "Internal server error",
-                          "message": "An unexpected error occurred."
-                      }), 500
-                  
-                  # Main entry point
-                  if __name__ == "__main__":
-                      logger.info("Starting Flask application")
-                      port = int(os.environ.get("PORT", 5000))
-                      app.run(host="0.0.0.0", port=port)
-                  EOF
-
-                # Create requirements.txt file
-                - |
-                  cat > api/deploy/requirements.txt << 'EOF'
-                  flask==2.3.3
-                  flask-cors==4.0.0
-                  gunicorn==21.2.0
-                  psutil==5.9.5
-                  python-dotenv==1.0.0
-                  EOF
-
-                # Create systemd service file
-                - |
-                  cat > api/deploy/financial-news.service << 'EOF'
-                  [Unit]
-                  Description=Financial News Engine Flask App
-                  After=network.target
-                  
-                  [Service]
-                  User=root
-                  WorkingDirectory=/opt/financial-news-engine
-                  Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
-                  Environment="FLASK_ENV=production"
-                  Environment="PYTHONUNBUFFERED=1"
-                  EnvironmentFile=/opt/financial-news-engine/.env
-                  ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
-                  Restart=always
-                  TimeoutStartSec=60
-                  RestartSec=10
-                  
-                  [Install]
-                  WantedBy=multi-user.target
-                  EOF
-
-                # Create deployment script
-                - |
-                  cat > api/deploy/deploy.sh << 'EOF'
-                  #!/bin/bash
-                  set -e
-                  
-                  # Create directory if it doesn't exist
-                  mkdir -p /opt/financial-news-engine
-                  mkdir -p /opt/financial-news-engine/logs
-                  
-                  # Copy files
-                  cp app.py /opt/financial-news-engine/
-                  cp requirements.txt /opt/financial-news-engine/
-                  cp financial-news.service /etc/systemd/system/
-                  
-                  # Fetch parameters from SSM Parameter Store
-                  echo "Fetching credentials from SSM Parameter Store..."
-                  ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
-                  ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
-                  ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
-                  
-                  # Create .env file with environment variables
-                  cat > /opt/financial-news-engine/.env << EOL
-                  ELASTICSEARCH_URL=$ES_URL
-                  ELASTICSEARCH_API_KEY=$ES_API_KEY
-                  ELASTICSEARCH_INDEX=$ES_INDEX
-                  EOL
-                  chmod 600 /opt/financial-news-engine/.env
-                  echo "Created .env file with credentials from SSM Parameter Store"
-                  
-                  # Install dependencies
-                  cd /opt/financial-news-engine
-                  pip3 install -r requirements.txt
-                  
-                  # Set permissions
-                  chmod 755 /opt/financial-news-engine
-                  
-                  # Reload and start service
-                  systemctl daemon-reload
-                  systemctl enable financial-news.service
-                  systemctl restart financial-news.service
-                  
-                  echo "API deployment completed"
-                  EOF
-                  chmod +x api/deploy/deploy.sh
-
-                # Create verification script
-                - |
-                  cat > api/deploy/verify.sh << 'EOF'
-                  #!/bin/bash
-                  set -e
-                  
-                  echo "Verifying backend service startup..."
-                  
-                  # Wait for the service to start
-                  for i in {1..12}; do
-                    if curl -s http://localhost:5000/ping > /dev/null; then
-                      echo "Service is responding to ping"
-                      break
-                    fi
-                    
-                    if [ $i -eq 12 ]; then
-                      echo "ERROR: Service failed to start within 60 seconds"
-                      exit 1
-                    fi
-                    
-                    echo "Waiting for service to start (attempt $i/12)..."
-                    sleep 5
-                  done
-                  
-                  echo "Testing CORS configuration..."
-                  # Test CORS with Origin header
-                  CORS_TEST=$(curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/cors-test)
-                  echo "CORS test response: $CORS_TEST"
-                  
-                  # Check for CORS headers
-                  CORS_HEADERS=$(curl -s -I -H "Origin: https://financialnewsengine.com" http://localhost:5000/health | grep -i "Access-Control-Allow")
-                  if [ -z "$CORS_HEADERS" ]; then
-                    echo "WARNING: CORS headers not found in response"
-                  else
-                    echo "CORS headers found:"
-                    echo "$CORS_HEADERS"
-                  fi
-                  
-                  # Test OPTIONS request (preflight)
-                  OPTIONS_RESPONSE=$(curl -s -I -X OPTIONS -H "Origin: https://financialnewsengine.com" -H "Access-Control-Request-Method: GET" http://localhost:5000/query | grep -i "Access-Control-Allow")
-                  if [ -z "$OPTIONS_RESPONSE" ]; then
-                    echo "WARNING: OPTIONS request did not return CORS headers"
-                  else
-                    echo "OPTIONS request CORS headers:"
-                    echo "$OPTIONS_RESPONSE"
-                  fi
-                  
-                  echo "Checking diagnostic report endpoint..."
-                  curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/report | grep -q "status" && echo "Diagnostic report endpoint is working" || echo "WARNING: Diagnostic report endpoint is not responding properly"
-                  
-                  echo "Checking query endpoint..."
-                  curl -s -H "Origin: https://financialnewsengine.com" "http://localhost:5000/query?query=test" | grep -q "results" && echo "Query endpoint is working" || echo "WARNING: Query endpoint is not responding properly"
-                  
-                  echo "Startup verification successful"
-                  EOF
-                  chmod +x api/deploy/verify.sh
-            
-            build:
-              commands:
-                - echo "Getting backend instances from Auto Scaling Group"
-                - |
-                  # Get the Auto Scaling Group name from the backend stack
-                  ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-                  echo "Auto Scaling Group: $ASG_NAME"
-                  
-                  # Get the instance IDs from the Auto Scaling Group
-                  INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
-                  echo "Instance IDs: $INSTANCE_IDS"
-                  
-                  if [ -z "$INSTANCE_IDS" ]; then
-                    echo "No running instances found in Auto Scaling Group"
-                    exit 0
-                  fi
-                  
-                  # Deploy to each instance using SSM Run Command
-                  for INSTANCE_ID in $INSTANCE_IDS; do
-                    echo "Deploying to instance $INSTANCE_ID"
-                    
-                    # Create a staging directory on the instance
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["mkdir -p /tmp/api-deploy"] \
-                      --comment "Create staging directory for API deployment" \
-                      --output text
-                    
-                    # Upload each deployment file
-                    echo "Uploading app.py"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cat > /tmp/api-deploy/app.py << 'EOL'\n$(cat api/deploy/app.py)\nEOL"] \
-                      --comment "Upload app.py" \
-                      --output text
-                    
-                    echo "Uploading requirements.txt"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cat > /tmp/api-deploy/requirements.txt << 'EOL'\n$(cat api/deploy/requirements.txt)\nEOL"] \
-                      --comment "Upload requirements.txt" \
-                      --output text
-                    
-                    echo "Uploading service file"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cat > /tmp/api-deploy/financial-news.service << 'EOL'\n$(cat api/deploy/financial-news.service)\nEOL"] \
-                      --comment "Upload service file" \
-                      --output text
-                    
-                    echo "Uploading deployment script"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cat > /tmp/api-deploy/deploy.sh << 'EOL'\n$(cat api/deploy/deploy.sh)\nEOL\nchmod +x /tmp/api-deploy/deploy.sh"] \
-                      --comment "Upload deployment script" \
-                      --output text
-                    
-                    echo "Uploading verification script"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"] \
-                      --comment "Run API deployment" \
-                      --output text
-                    
-                    # Execute deployment
-                    echo "Executing deployment on instance $INSTANCE_ID"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"] \
-                      --comment "Run API deployment" \
-                      --output text
-                    
-                    # Execute verification
-                    echo "Verifying deployment on instance $INSTANCE_ID"
-                    aws ssm send-command \
-                      --instance-ids $INSTANCE_ID \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters commands=["cd /tmp/api-deploy && ./verify.sh"] \
-                      --comment "Verify API deployment" \
-                      --output text
-                  done
-            
-            post_build:
-              commands:
-                - echo "API code deployment to instances completed successfully"
-          
-          artifacts:
-            files:
-              - api/deploy/**/*
+        BuildSpec: buildspecs/api-deploy.yml
       TimeoutInMinutes: 30
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-financial-news-api-deploy
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # SNS Topic for deployment notifications
+  DeploymentNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${EnvironmentName}-financial-news-deployment-notifications
+      TopicName: !Sub ${EnvironmentName}-financial-news-deployment-notifications
+
+  # Deployment notification project to report on instance refresh
+  DeployNotificationProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${EnvironmentName}-financial-news-deploy-notifications
+      Description: 'Report deployment status and instance refresh results'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - Name: ENVIRONMENT
+            Value: !Ref EnvironmentName
+          - Name: BACKEND_STACK_NAME
+            Value: !Ref BackendStackName
+          - Name: SNS_TOPIC_ARN
+            Value: !Ref DeploymentNotificationTopic
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspecs/deployment-notification.yml
+      TimeoutInMinutes: 15
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-financial-news-deploy-notifications
         - Key: Environment
           Value: !Ref EnvironmentName
 
@@ -1099,6 +505,20 @@ Resources:
               InputArtifacts:
                 - Name: BackendBuildOutput
               RunOrder: 2
+                
+        - Name: PostDeploy
+          Actions:
+            - Name: NotifyDeploymentStatus
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref DeployNotificationProject
+              InputArtifacts:
+                - Name: SourceCode
+              RunOrder: 1
       
       Tags:
         - Key: Name
@@ -1166,6 +586,15 @@ Resources:
       Value: !Ref EsNumberOfReplicas
       Description: Number of replicas for Elasticsearch index
       Tier: Standard
+      
+  EnvironmentParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/environment
+      Type: String
+      Value: !Ref EnvironmentName
+      Description: Environment name (development, staging, production)
+      Tier: Standard
 
 Outputs:
   PipelineURL:
@@ -1176,4 +605,10 @@ Outputs:
     Description: Name of the S3 bucket storing artifacts
     Value: !Ref ArtifactBucket
     Export:
-      Name: !Sub "${AWS::StackName}-ArtifactBucketName" 
+      Name: !Sub "${AWS::StackName}-ArtifactBucketName"
+  
+  DeploymentNotificationTopicArn:
+    Description: ARN of the SNS topic for deployment notifications
+    Value: !Ref DeploymentNotificationTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-DeploymentNotificationTopicArn" 

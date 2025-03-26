@@ -493,7 +493,7 @@ Resources:
             
             # Update system packages
             log "Updating system packages"
-            apt-get update && apt-get install -y python3-pip
+            apt-get update && apt-get install -y python3-pip awscli
             
             # Install AWS CloudFormation helpers
             log "Installing AWS CloudFormation helpers"
@@ -502,6 +502,158 @@ Resources:
             # Create app directory
             log "Creating application directory"
             mkdir -p /opt/financial-news-engine
+            mkdir -p /opt/financial-news-engine/logs
+            mkdir -p /opt/financial-news-engine/deploy_scripts
+            
+            # Create lifecyle hook handler script
+            log "Creating lifecycle hook handler script"
+            cat > /opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh << 'EOF'
+            #!/bin/bash
+            
+            LOG_FILE="/var/log/lifecycle-hooks.log"
+            
+            function log {
+              echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a $LOG_FILE
+            }
+            
+            # Get instance ID
+            INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+            REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+            
+            # Process hook types
+            if [ "$1" == "launching" ]; then
+              log "Processing instance launching lifecycle hook for $INSTANCE_ID"
+              
+              # Run environment file creator script
+              log "Updating environment variables on launch"
+              /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+              
+              # Complete the lifecycle action
+              log "Completing lifecycle action"
+              aws autoscaling complete-lifecycle-action \
+                --lifecycle-hook-name UpdateEnvOnLaunch \
+                --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances --instance-ids $INSTANCE_ID --region $REGION --query "AutoScalingInstances[0].AutoScalingGroupName" --output text) \
+                --lifecycle-action-result CONTINUE \
+                --instance-id $INSTANCE_ID \
+                --region $REGION
+                
+            elif [ "$1" == "terminating" ]; then
+              log "Processing instance terminating lifecycle hook for $INSTANCE_ID"
+              
+              # Perform any cleanup actions here
+              
+              # Complete the lifecycle action
+              log "Completing lifecycle action" 
+              aws autoscaling complete-lifecycle-action \
+                --lifecycle-hook-name UpdateEnvOnTerminate \
+                --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances --instance-ids $INSTANCE_ID --region $REGION --query "AutoScalingInstances[0].AutoScalingGroupName" --output text) \
+                --lifecycle-action-result CONTINUE \
+                --instance-id $INSTANCE_ID \
+                --region $REGION
+            else
+              log "Unknown lifecycle hook type: $1"
+              exit 1
+            fi
+            
+            log "Lifecycle hook handler completed successfully"
+            EOF
+            
+            chmod +x /opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh
+            
+            # Create environment file update script
+            log "Creating environment file update script - parameters are managed by the CICD stack"
+            cat > /opt/financial-news-engine/deploy_scripts/create_env_file.sh << 'EOF'
+            #!/bin/bash
+            # Fetch environment variables from SSM Parameter Store
+            echo "Fetching credentials from SSM Parameter Store - parameters are managed by the CICD stack"
+            
+            # Set default values in case parameter retrieval fails
+            ES_URL=""
+            ES_API_KEY=""
+            ES_INDEX="financial_news"
+            ES_SHARDS="3"
+            ES_REPLICAS="2"
+            ENV="production"
+            
+            # Get parameters from SSM Parameter Store with error handling and verbosity
+            function get_parameter() {
+                local param_name=$1
+                local default_value=$2
+                
+                echo "Fetching parameter: $param_name"
+                local value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
+                local exit_code=$?
+                
+                if [ $exit_code -eq 0 ] && [ ! -z "$value" ]; then
+                    echo "Successfully retrieved parameter: $param_name"
+                    echo "$value"
+                else
+                    echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
+                    echo "$default_value"
+                fi
+            }
+            
+            # Get parameters with default fallbacks
+            ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
+            ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
+            ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
+            ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
+            ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
+            ENV=$(get_parameter "/financial-news/environment" "${EnvironmentName}")
+            
+            # Create the .env file
+            cat > /opt/financial-news-engine/.env << EOL
+            ELASTICSEARCH_URL=$ES_URL
+            ELASTICSEARCH_API_KEY=$ES_API_KEY
+            ELASTICSEARCH_INDEX=$ES_INDEX
+            ES_NUMBER_OF_SHARDS=$ES_SHARDS
+            ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+            ENVIRONMENT=$ENV
+            CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
+            EOL
+            
+            # Set secure permissions
+            chmod 600 /opt/financial-news-engine/.env
+            echo "Created .env file with environment variables from SSM Parameter Store"
+            
+            # Output parameters retrieved (with API key redacted)
+            echo "Environment loaded with the following parameters:"
+            echo "ELASTICSEARCH_URL=$ES_URL"
+            echo "ELASTICSEARCH_API_KEY=****REDACTED****"
+            echo "ELASTICSEARCH_INDEX=$ES_INDEX"
+            echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS"
+            echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS"
+            echo "ENVIRONMENT=$ENV"
+            EOF
+            
+            # Make the script executable
+            chmod +x /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+            
+            # Run the script to create initial env file
+            log "Creating initial environment file from SSM Parameters (managed by CICD stack)"
+            # Retry 3 times with a backoff delay to allow for eventual consistency
+            MAX_RETRIES=3
+            for i in $(seq 1 $MAX_RETRIES); do
+              log "Attempt $i of $MAX_RETRIES to create environment file"
+              /opt/financial-news-engine/deploy_scripts/create_env_file.sh && break
+              if [ $i -eq $MAX_RETRIES ]; then
+                log "WARNING: All attempts to create environment file failed. Using default values."
+              else
+                log "Waiting 10 seconds before retrying..."
+                sleep 10
+              fi
+            done
+            
+            # Set up daily cron job to update environment variables
+            log "Setting up daily cron job to update environment variables"
+            cat > /etc/cron.daily/update_env_file << 'EOF'
+            #!/bin/bash
+            /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+            if systemctl is-active --quiet financial-news.service; then
+              systemctl restart financial-news.service
+            fi
+            EOF
+            chmod +x /etc/cron.daily/update_env_file
             
             # Configure the instance
             log "Configuring the instance using cfn-init"
@@ -518,7 +670,7 @@ Resources:
             log "Signaling completion to CloudFormation"
             /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource BackendAutoScalingGroup --region ${AWS::Region}
 
-  # Auto Scaling Group for Backend Servers
+  # Backend Auto Scaling Group
   BackendAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn: HTTPSListener
@@ -544,6 +696,15 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentName
           PropagateAtLaunch: true
+      LifecycleHookSpecificationList:
+        - DefaultResult: CONTINUE
+          HeartbeatTimeout: 300
+          LifecycleHookName: UpdateEnvOnLaunch
+          LifecycleTransition: autoscaling:EC2_INSTANCE_LAUNCHING
+        - DefaultResult: CONTINUE
+          HeartbeatTimeout: 180
+          LifecycleHookName: UpdateEnvOnTerminate
+          LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
 
   # Application Load Balancer
   ApplicationLoadBalancer:
@@ -894,6 +1055,63 @@ Resources:
         DNSName: !GetAtt CloudFrontDistribution.DomainName
         HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID (this is fixed)
         EvaluateTargetHealth: false
+
+  # Configure lifecycle hooks
+  ASGLifecycleLaunchingRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AWS::StackName}-asg-lifecycle-launching"
+      Description: "Rule to process instance launching lifecycle hooks for backend ASG"
+      EventPattern:
+        source:
+          - "aws.autoscaling"
+        detail-type:
+          - "EC2 Instance-launch Lifecycle Action"
+        detail:
+          AutoScalingGroupName:
+            - !Ref BackendAutoScalingGroup
+      State: ENABLED
+      Targets:
+        - Arn: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/AWS-RunShellScript"
+          Id: "LifecycleLaunchingTarget"
+          RoleArn: !GetAtt BackendInstanceRole.Arn
+          RunCommandParameters:
+            RunCommandTargets:
+              - Key: InstanceIds
+                Values:
+                  - ${!detail.EC2InstanceId}
+          Input: !Sub |
+            {
+              "commands": ["/opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh launching"]
+            }
+
+  ASGLifecycleTerminatingRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AWS::StackName}-asg-lifecycle-terminating"
+      Description: "Rule to process instance terminating lifecycle hooks for backend ASG"
+      EventPattern:
+        source:
+          - "aws.autoscaling"
+        detail-type:
+          - "EC2 Instance-terminate Lifecycle Action"
+        detail:
+          AutoScalingGroupName:
+            - !Ref BackendAutoScalingGroup
+      State: ENABLED
+      Targets:
+        - Arn: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/AWS-RunShellScript"
+          Id: "LifecycleTerminatingTarget"
+          RoleArn: !GetAtt BackendInstanceRole.Arn
+          RunCommandParameters:
+            RunCommandTargets:
+              - Key: InstanceIds
+                Values:
+                  - ${!detail.EC2InstanceId}
+          Input: !Sub |
+            {
+              "commands": ["/opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh terminating"]
+            }
 
 Outputs:
   BackendALBDNSName:
