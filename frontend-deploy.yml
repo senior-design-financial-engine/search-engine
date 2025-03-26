@@ -4,55 +4,151 @@ phases:
     runtime-versions:
       nodejs: 16
     commands:
+      - echo "=== Starting Frontend Deployment ==="
+      - echo "Timestamp: $(date)"
       - echo "Running frontend deployment..."
       - echo "Debugging workspace contents"
+      - echo "Current directory: $(pwd)"
+      - echo "Environment variables:"
+      - env | sort
+      - echo "Directory structure:"
+      - find . -maxdepth 2 -type d
+      - echo "All files:"
       - ls -la
       - echo "Checking frontend directory"
       - ls -la frontend || echo "No frontend directory found"
+      - echo "Checking for build artifacts:"
+      - echo "1. Looking for index.html:"
+      - ls -l index.html 2>/dev/null || echo "index.html not found"
+      - echo "2. Looking for static directory:"
+      - ls -l static 2>/dev/null || echo "static directory not found"
+      - echo "3. Looking for build directory:"
+      - ls -l build 2>/dev/null || echo "build directory not found"
   
   pre_build:
     commands:
+      - echo "=== Starting Pre-Build Phase ==="
+      - echo "Timestamp: $(date)"
       - echo "Preparing for deployment..."
+      - echo "Current directory: $(pwd)"
+      - echo "Looking for build directories:"
       - find . -name "build" -type d | sort
+      - echo "Looking for package.json files:"
       - find . -name "package.json" -type f | sort
-      - "cat > detect_build.sh << 'EOF'
-#!/bin/bash
-if [ -f \"index.html\" ] && [ -d \"static\" ]; then
-  echo \".\"
-elif [ -d \"build\" ]; then
-  echo \"build\"
-elif [ -d \"frontend/build\" ]; then
-  echo \"frontend/build\"
-elif [ -f \"frontend/package.json\" ]; then
-  cd frontend && npm install && npm run build && cd ..
-  echo \"frontend/build\"
-elif [ -f \"package.json\" ]; then
-  npm install && npm run build
-  echo \"build\"
-else
-  echo \"\"
-fi
-EOF"
+      - echo "Checking for build artifacts in root:"
+      - ls -la *.html *.json *.ico 2>/dev/null || echo "No HTML/JSON/ICO files found in root"
+      - >-
+        cat > detect_build.sh << 'EOF'
+        #!/bin/bash
+        echo "=== Running Build Detection Script ==="
+        echo "Timestamp: $(date)"
+        echo "Checking workspace structure..."
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
+        ls -la
+        
+        echo "Checking for pre-built files..."
+        if [ -f "index.html" ] && [ -d "static" ]; then
+          echo "Found pre-built files in root directory"
+          echo "Contents of index.html:"
+          head -n 5 index.html
+          echo "Contents of static directory:"
+          ls -la static
+          echo "."
+        elif [ -d "build" ]; then
+          echo "Found build directory in root"
+          echo "Contents of build directory:"
+          ls -la build
+          echo "build"
+        elif [ -d "frontend/build" ]; then
+          echo "Found frontend/build directory"
+          echo "Contents of frontend/build directory:"
+          ls -la frontend/build
+          echo "frontend/build"
+        elif [ -f "frontend/package.json" ]; then
+          echo "Found frontend/package.json, building frontend..."
+          cd frontend && npm install && npm run build && cd ..
+          echo "frontend/build"
+        elif [ -f "package.json" ]; then
+          echo "Found package.json in root, building..."
+          npm install && npm run build
+          echo "build"
+        else
+          echo "No build directory or source files found"
+          echo "Directory structure:"
+          find . -maxdepth 2 -type d
+          echo "File types present:"
+          find . -maxdepth 1 -type f -exec file {} \;
+          echo ""
+        fi
+        EOF
       - chmod +x detect_build.sh
       - BUILD_DIR=$(./detect_build.sh)
       - if [ -z "$BUILD_DIR" ]; then echo "No build directory or source files found"; exit 1; fi
       - echo "Using build directory $BUILD_DIR"
+      - echo "Contents of build directory:"
+      - ls -la $BUILD_DIR
+      - echo "File sizes in build directory:"
+      - du -sh $BUILD_DIR/*
   
   build:
     commands:
+      - echo "=== Starting Build Phase ==="
+      - echo "Timestamp: $(date)"
+      - echo "Current directory: $(pwd)"
+      - echo "Build directory: $BUILD_DIR"
+      - echo "Contents of build directory:"
+      - ls -la $BUILD_DIR
       - echo "Retrieving S3 bucket name from CloudFormation stack"
+      - echo "Stack name: $FRONTEND_STACK_NAME"
       - BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
-      - if [ -z "$BUCKET_NAME" ]; then echo "Could not retrieve bucket name from CloudFormation stack"; aws s3 ls | grep frontend; exit 1; fi
+      - echo "Retrieved bucket name: $BUCKET_NAME"
+      - if [ -z "$BUCKET_NAME" ]; then 
+          echo "Could not retrieve bucket name from CloudFormation stack"
+          echo "Available S3 buckets:"
+          aws s3 ls | grep frontend
+          echo "Stack outputs:"
+          aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs" --output table
+          exit 1
+        fi
       - echo "Syncing files to S3 bucket $BUCKET_NAME"
       - echo "Using build directory $BUILD_DIR"
+      - echo "Files to be synced:"
+      - ls -la $BUILD_DIR
+      - echo "Starting S3 sync..."
+      - aws s3 sync $BUILD_DIR/ s3://$BUCKET_NAME/ --delete --dryrun
+      - echo "Dry run completed. Proceeding with actual sync..."
       - aws s3 sync $BUILD_DIR/ s3://$BUCKET_NAME/ --delete
+      - echo "Verifying S3 contents after sync:"
+      - aws s3 ls s3://$BUCKET_NAME/ --recursive
   
   post_build:
     commands:
+      - echo "=== Starting Post-Build Phase ==="
+      - echo "Timestamp: $(date)"
       - echo "Creating CloudFront invalidation"
+      - echo "Stack name: $FRONTEND_STACK_NAME"
       - CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-      - if [ -n "$CLOUDFRONT_ID" ]; then aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"; else echo "Could not retrieve CloudFront distribution ID"; fi
-      - echo "Frontend deployment completed"
+      - echo "Retrieved CloudFront ID: $CLOUDFRONT_ID"
+      - if [ -n "$CLOUDFRONT_ID" ]; then 
+          echo "Creating CloudFront invalidation for distribution $CLOUDFRONT_ID"
+          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+          echo "Waiting for invalidation to complete..."
+          aws cloudfront wait invalidation-completed --distribution-id $CLOUDFRONT_ID --id $(aws cloudfront list-invalidations --distribution-id $CLOUDFRONT_ID --query "InvalidationList.Items[0].Id" --output text)
+          echo "Invalidation completed successfully"
+        else 
+          echo "Could not retrieve CloudFront distribution ID"
+          echo "Stack outputs:"
+          aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs" --output table
+        fi
+      - echo "=== Frontend Deployment Completed ==="
+      - echo "Timestamp: $(date)"
+      - echo "Final deployment status:"
+      - echo "1. Build directory: $BUILD_DIR"
+      - echo "2. S3 bucket: $BUCKET_NAME"
+      - echo "3. CloudFront distribution: $CLOUDFRONT_ID"
+      - echo "4. Files deployed:"
+      - aws s3 ls s3://$BUCKET_NAME/ --recursive
 
 artifacts:
   files:
