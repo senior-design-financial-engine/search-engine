@@ -15,4 +15,4 @@ StandardError=append:/opt/financial-news-engine/logs/service-error.log
 SyslogIdentifier=financial-news
 
 [Install]
-WantedBy=multi-user.target 
+WantedBy=multi-user.target
