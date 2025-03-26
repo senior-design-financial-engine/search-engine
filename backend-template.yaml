@@ -17,9 +17,9 @@ Parameters:
     Default: ""
   
   CorsAllowedOrigins:
-    Description: Comma-separated list of domains allowed to access the API (e.g., https://financialnewsengine.com,https://www.financialnewsengine.com)
+    Description: Comma-separated list of domains allowed to access the API (e.g., https://financialnewsengine.com). Must include all frontend domains, CloudFront domains, and localhost if used for development.
     Type: String
-    Default: "https://financialnewsengine.com,https://www.financialnewsengine.com,https://api.financialnewsengine.com"
+    Default: "https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
   
   VpcStackName:
     Description: Name of the VPC CloudFormation stack
@@ -302,9 +302,10 @@ Resources:
               command: |
                 # Create a basic Flask app that will be replaced by CI/CD
                 cat > /opt/financial-news-engine/app.py << 'EOL'
-                from flask import Flask, jsonify
+                from flask import Flask, jsonify, request
                 import os
                 import logging
+                from flask_cors import CORS
                 
                 # Configure logging
                 log_dir = "logs"
@@ -319,8 +320,41 @@ Resources:
                 handler.setLevel(logging.INFO)
                 logger.addHandler(handler)
                 
+                # Get CORS allowed origins from environment
+                cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
+                logger.info(f"CORS allowed origins: {cors_origins}")
+                
+                if cors_origins != '*':
+                    cors_origins = [origin.strip() for origin in cors_origins.split(',')]
+                    logger.info(f"Parsed CORS origins: {cors_origins}")
+                
                 # Flask app
                 app = Flask(__name__)
+                
+                # Configure CORS
+                CORS(app, 
+                     resources={r"/*": {"origins": cors_origins}},
+                     supports_credentials=True)
+
+                @app.after_request
+                def add_cors_headers(response):
+                    origin = request.headers.get('Origin')
+                    
+                    if origin:
+                        if cors_origins == '*' or origin in cors_origins:
+                            response.headers.add('Access-Control-Allow-Origin', origin)
+                            response.headers.add('Access-Control-Allow-Headers', 
+                                               'Content-Type,Authorization,X-Requested-With,X-Amz-Date,X-Api-Key,X-Amz-Security-Token')
+                            response.headers.add('Access-Control-Allow-Methods', 
+                                               'GET,POST,PUT,DELETE,OPTIONS,PATCH')
+                            response.headers.add('Access-Control-Allow-Credentials', 'true')
+                            response.headers.add('Access-Control-Max-Age', '86400')
+                            
+                    # Handle OPTIONS requests explicitly
+                    if request.method == 'OPTIONS':
+                        return response
+                    
+                    return response
                 
                 @app.route('/')
                 def home():
@@ -346,6 +380,7 @@ Resources:
                 # Create a basic requirements.txt
                 cat > /opt/financial-news-engine/requirements.txt << 'EOL'
                 flask==2.3.3
+                flask-cors==4.0.0
                 gunicorn==21.2.0
                 EOL
                 
@@ -733,15 +768,43 @@ Resources:
             const response = event.Records[0].cf.response;
             const headers = response.headers;
             
-            // Extract the domain from the request
+            // Extract the origin from the request headers
             const requestHeaders = request.headers;
             const origin = requestHeaders.origin && requestHeaders.origin[0] ? requestHeaders.origin[0].value : '*';
             
+            // List of allowed origins from environment or default set
+            // The actual origins should match those in CORS_ALLOWED_ORIGINS parameter
+            const allowedOrigins = [
+              'https://financialnewsengine.com',
+              'https://www.financialnewsengine.com',
+              'http://localhost:3000',
+              'https://d3dw79zwd8sn9g.cloudfront.net'  // CloudFront domain (replace with actual)
+            ];
+            
+            // Determine if the origin should be allowed
+            let corsOrigin = '*';
+            if (origin !== '*') {
+              // If specific origin, check if it's allowed
+              if (allowedOrigins.includes(origin)) {
+                corsOrigin = origin;
+              } else {
+                // Default to the first allowed origin if the requesting origin isn't allowed
+                corsOrigin = allowedOrigins[0];
+              }
+            }
+            
+            // For debugging (this will be visible in CloudWatch Logs)
+            console.log('Request URI:', request.uri);
+            console.log('Request method:', request.method);
+            console.log('Request origin:', origin);
+            console.log('Allowed CORS origin:', corsOrigin);
+            
             // Define CORS headers
-            headers['access-control-allow-origin'] = [{ key: 'Access-Control-Allow-Origin', value: origin }];
+            headers['access-control-allow-origin'] = [{ key: 'Access-Control-Allow-Origin', value: corsOrigin }];
             headers['access-control-allow-methods'] = [{ key: 'Access-Control-Allow-Methods', value: 'GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS' }];
             headers['access-control-allow-headers'] = [{ key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization,X-Requested-With,X-Amz-Date,X-Api-Key,X-Amz-Security-Token' }];
             headers['access-control-allow-credentials'] = [{ key: 'Access-Control-Allow-Credentials', value: 'true' }];
+            headers['access-control-max-age'] = [{ key: 'Access-Control-Max-Age', value: '86400' }];
             
             // For OPTIONS request, return directly with CORS headers
             if (request.method === 'OPTIONS') {
@@ -751,7 +814,7 @@ Resources:
               return;
             }
             
-            // Otherwise just add CORS headers to the normal response
+            // For all other requests, add the CORS headers to the response
             callback(null, response);
           };
       Handler: index.handler
@@ -806,6 +869,8 @@ Resources:
           LambdaFunctionAssociations:
             - EventType: origin-response
               LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
+            - EventType: viewer-response
+              LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
           Compress: true
         CacheBehaviors:
           - PathPattern: /health
@@ -827,6 +892,8 @@ Resources:
                 Forward: none
             LambdaFunctionAssociations:
               - EventType: origin-response
+                LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
+              - EventType: viewer-response
                 LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
             MinTTL: 0
             DefaultTTL: 30
