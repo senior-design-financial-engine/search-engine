@@ -5,11 +5,11 @@ phases:
     runtime-versions:
       nodejs: 16
     commands:
-      - echo "Running frontend deployment from buildspecs..."
-      - echo "Debugging workspace contents"
-      - ls -la
-      - echo "Checking frontend directory"
-      - ls -la frontend || echo "No frontend directory found"
+      - "echo \"Running frontend deployment from buildspecs...\""
+      - "echo \"Debugging workspace contents\""
+      - "ls -la"
+      - "echo \"Checking frontend directory\""
+      - "ls -la frontend || echo \"No frontend directory found\""
   
   pre_build:
     commands:

@@ -50,7 +50,8 @@ phases:
       
       # Deploy to each instance
       - echo "Deploying to instances"
-      - for INSTANCE_ID in $INSTANCE_IDS; do 
+      - |
+        for INSTANCE_ID in $INSTANCE_IDS; do 
           echo "Deploying to instance $INSTANCE_ID"
           aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text
           DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://financial-news-assets/temp/app.py . && aws s3 cp s3://financial-news-assets/temp/requirements.txt . && aws s3 cp s3://financial-news-assets/temp/financial-news.service . && aws s3 cp s3://financial-news-assets/temp/deploy.sh . && aws s3 cp s3://financial-news-assets/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
