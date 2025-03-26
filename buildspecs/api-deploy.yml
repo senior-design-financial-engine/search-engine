@@ -146,70 +146,70 @@ with open('backend-api.yaml', 'r') as f:
           echo "Deploying to instance $INSTANCE_ID";
           
           # Create a staging directory on the instance
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["mkdir -p /tmp/api-deploy"]
-            --comment "Create staging directory for API deployment"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["mkdir -p /tmp/api-deploy"] \
+            --comment "Create staging directory for API deployment" \
             --output text;
           
           # Upload each deployment file
           echo "Uploading app.py";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cat > /tmp/api-deploy/app.py << 'EOL'\n$(cat api/deploy/app.py)\nEOL"]
-            --comment "Upload app.py"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cat > /tmp/api-deploy/app.py << 'EOL'\n$(cat api/deploy/app.py)\nEOL"] \
+            --comment "Upload app.py" \
             --output text;
           
           echo "Uploading requirements.txt";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cat > /tmp/api-deploy/requirements.txt << 'EOL'\n$(cat api/deploy/requirements.txt)\nEOL"]
-            --comment "Upload requirements.txt"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cat > /tmp/api-deploy/requirements.txt << 'EOL'\n$(cat api/deploy/requirements.txt)\nEOL"] \
+            --comment "Upload requirements.txt" \
             --output text;
           
           echo "Uploading service file";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cat > /tmp/api-deploy/financial-news.service << 'EOL'\n$(cat api/deploy/financial-news.service)\nEOL"]
-            --comment "Upload service file"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cat > /tmp/api-deploy/financial-news.service << 'EOL'\n$(cat api/deploy/financial-news.service)\nEOL"] \
+            --comment "Upload service file" \
             --output text;
           
           echo "Uploading deployment script";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cat > /tmp/api-deploy/deploy.sh << 'EOL'\n$(cat api/deploy/deploy.sh)\nEOL\nchmod +x /tmp/api-deploy/deploy.sh"]
-            --comment "Upload deployment script"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cat > /tmp/api-deploy/deploy.sh << 'EOL'\n$(cat api/deploy/deploy.sh)\nEOL\nchmod +x /tmp/api-deploy/deploy.sh"] \
+            --comment "Upload deployment script" \
             --output text;
           
           echo "Uploading verification script";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cat > /tmp/api-deploy/verify.sh << 'EOL'\n$(cat api/deploy/verify.sh)\nEOL\nchmod +x /tmp/api-deploy/verify.sh"]
-            --comment "Upload verification script"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cat > /tmp/api-deploy/verify.sh << 'EOL'\n$(cat api/deploy/verify.sh)\nEOL\nchmod +x /tmp/api-deploy/verify.sh"] \
+            --comment "Upload verification script" \
             --output text;
           
           # Execute deployment
           echo "Executing deployment on instance $INSTANCE_ID";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"]
-            --comment "Run API deployment"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"] \
+            --comment "Run API deployment" \
             --output text;
           
           # Execute verification
           echo "Verifying deployment on instance $INSTANCE_ID";
-          aws ssm send-command
-            --instance-ids $INSTANCE_ID
-            --document-name "AWS-RunShellScript"
-            --parameters commands=["cd /tmp/api-deploy && ./verify.sh"]
-            --comment "Verify API deployment"
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["cd /tmp/api-deploy && ./verify.sh"] \
+            --comment "Verify API deployment" \
             --output text;
         done
   

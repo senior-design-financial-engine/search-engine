@@ -80,6 +80,17 @@ phases:
           echo "WARNING: Could not retrieve CloudFront distribution ID";
         fi
       - echo "Frontend deployment to S3 completed successfully!"
+      # Deploy to each instance using SSM Run Command
+      - for INSTANCE_ID in $INSTANCE_IDS; do
+          echo "Deploying to instance $INSTANCE_ID";
+          
+          # Create a staging directory on the instance
+          aws ssm send-command \
+            --instance-ids $INSTANCE_ID \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=["mkdir -p /tmp/api-deploy"] \
+            --comment "Create staging directory for API deployment" \
+            --output text;
 
 artifacts:
   files:
