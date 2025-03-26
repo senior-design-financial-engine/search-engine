@@ -313,6 +313,8 @@ Resources:
               curl: []
               jq: []
               python3-yaml: []
+              xfsprogs: []  # For volume formatting
+              nvme-cli: []  # For NVMe device management
           commands:
             01_install_cloudwatch_agent:
               command: |
@@ -322,13 +324,33 @@ Resources:
                 else
                   echo "CloudWatch agent already installed"
                 fi
+            02_check_directory_structure:
+              command: |
+                # Verify all required directories exist and have correct permissions
+                mkdir -p /opt/financial-news-engine
+                mkdir -p /opt/financial-news-engine/logs
+                mkdir -p /opt/financial-news-engine/deploy_scripts
+                chmod 755 /opt/financial-news-engine
+                chmod 755 /opt/financial-news-engine/logs
+                chmod 755 /opt/financial-news-engine/deploy_scripts
+                echo "Directory structure verified at $(date)" > /opt/financial-news-engine/directory_check.log
         
         setup_basic_app:
           commands:
-            01_create_app_directory:
+            01_verify_mount:
               command: |
-                # The directory structure will be created by the 02_create_basic_app step
-                echo "Application directory will be created in the next step"
+                # Verify the mount point is properly configured
+                if ! mountpoint -q /opt/financial-news-engine; then
+                  echo "WARNING: /opt/financial-news-engine is not a mountpoint, falling back to root volume" > /var/log/mount-check.log
+                fi
+                
+                # Ensure the directory has correct ownership
+                mkdir -p /opt/financial-news-engine
+                chown root:root /opt/financial-news-engine
+                chmod 755 /opt/financial-news-engine
+                
+                # Check available disk space
+                df -h /opt/financial-news-engine | tee -a /var/log/disk-space.log
             
             02_create_basic_app:
               command: |
@@ -498,6 +520,19 @@ Resources:
           - Fn::ImportValue: !Sub "${VpcStackName}-AppServerSG"
         IamInstanceProfile:
           Name: !Ref BackendInstanceProfile
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda  # Root volume
+            Ebs:
+              VolumeSize: 30  # Increased from default to ensure enough space
+              VolumeType: gp3
+              DeleteOnTermination: true
+              Encrypted: true
+          - DeviceName: /dev/sdf  # Dedicated volume for financial-news-engine
+            Ebs:
+              VolumeSize: 20
+              VolumeType: gp3
+              DeleteOnTermination: true
+              Encrypted: true
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
@@ -516,16 +551,61 @@ Resources:
             # Update system packages
             log "Updating system packages"
             apt-get update && apt-get install -y python3-pip awscli
+
+            # Format and mount the dedicated volume for financial-news-engine
+            log "Setting up dedicated volume for /opt/financial-news-engine"
+            
+            # Wait for the device to be available
+            DEVICE_NAME="/dev/nvme1n1"  # AWS NVMe naming for /dev/sdf
+            MAX_RETRIES=10
+            COUNTER=0
+            while [ ! -e $DEVICE_NAME ] && [ $COUNTER -lt $MAX_RETRIES ]; do
+              log "Waiting for device $DEVICE_NAME to be available..."
+              sleep 5
+              COUNTER=$((COUNTER+1))
+              # Try alternate device name formats
+              if [ ! -e $DEVICE_NAME ] && [ -e "/dev/xvdf" ]; then
+                DEVICE_NAME="/dev/xvdf"
+                break
+              fi
+            done
+            
+            if [ ! -e $DEVICE_NAME ]; then
+              log "WARNING: Device $DEVICE_NAME not found after $MAX_RETRIES retries. Falling back to root volume."
+            else
+              # Format the volume
+              log "Formatting $DEVICE_NAME as ext4"
+              mkfs -t ext4 $DEVICE_NAME
+              
+              # Create mount point
+              log "Creating mount point /opt/financial-news-engine"
+              mkdir -p /opt/financial-news-engine
+              
+              # Add to fstab for persistent mounting
+              log "Adding to fstab for persistent mounting"
+              echo "$DEVICE_NAME /opt/financial-news-engine ext4 defaults,nofail 0 2" >> /etc/fstab
+              
+              # Mount the volume
+              log "Mounting the volume"
+              mount /opt/financial-news-engine
+              
+              # Set proper ownership and permissions
+              log "Setting ownership and permissions"
+              chmod 755 /opt/financial-news-engine
+            fi
+            
+            # Create necessary subdirectories with proper permissions
+            log "Creating application subdirectories"
+            mkdir -p /opt/financial-news-engine/logs
+            mkdir -p /opt/financial-news-engine/deploy_scripts
+            
+            # Set proper permissions
+            chmod 755 /opt/financial-news-engine/logs
+            chmod 755 /opt/financial-news-engine/deploy_scripts
             
             # Install AWS CloudFormation helpers
             log "Installing AWS CloudFormation helpers"
             pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
-            
-            # Create app directory
-            log "Creating application directory"
-            mkdir -p /opt/financial-news-engine
-            mkdir -p /opt/financial-news-engine/logs
-            mkdir -p /opt/financial-news-engine/deploy_scripts
             
             # Create lifecyle hook handler script
             log "Creating lifecycle hook handler script"
@@ -833,6 +913,69 @@ Resources:
       Dimensions:
         - Name: AutoScalingGroupName
           Value: !Ref BackendAutoScalingGroup
+      ComparisonOperator: GreaterThanThreshold
+      
+  # Disk Space Alarm for root volume
+  RootDiskSpaceAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm if root disk space usage exceeds 80% for more than 5 minutes
+      MetricName: disk_used_percent
+      Namespace: CWAgent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      AlarmActions:
+        - !Ref BackendSNSTopic
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref BackendAutoScalingGroup
+        - Name: device
+          Value: xvda1
+        - Name: fstype
+          Value: ext4
+        - Name: path
+          Value: /
+      ComparisonOperator: GreaterThanThreshold
+
+  # Disk Space Alarm for financial-news-engine volume
+  AppDiskSpaceAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm if financial-news-engine disk space usage exceeds 80% for more than 5 minutes
+      MetricName: disk_used_percent
+      Namespace: CWAgent
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      AlarmActions:
+        - !Ref BackendSNSTopic
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref BackendAutoScalingGroup
+        - Name: device
+          Value: xvdf
+        - Name: fstype
+          Value: ext4
+        - Name: path
+          Value: /opt/financial-news-engine
+      ComparisonOperator: GreaterThanThreshold
+      
+  # Metric for custom disk space monitoring
+  LowDiskSpaceMetricAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Alarm triggered when a script reports low disk space
+      MetricName: LowDiskSpace
+      Namespace: FinancialNewsEngine
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      AlarmActions:
+        - !Ref BackendSNSTopic
       ComparisonOperator: GreaterThanThreshold
 
   # SNS Topic for Alarms

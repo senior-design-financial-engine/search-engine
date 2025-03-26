@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 LOG_FILE="/var/log/asg-lifecycle.log"
 APP_NAME="financial-news"
 LIFECYCLE_STATE_FILE="/var/run/financial-news-lifecycle-hook-state"
+APP_DIR="/opt/financial-news-engine"
 
 function log_message() {
     local message="$1"
@@ -49,6 +50,48 @@ if [ -z "$ASG_NAME" ] || [ "$ASG_NAME" == "None" ]; then
 fi
 log_message "Auto Scaling Group: $ASG_NAME"
 
+# Verify application directory exists and has correct permissions
+function verify_app_directory() {
+    log_message "Verifying application directory structure"
+    
+    # Check if the main application directory exists
+    if [ ! -d "$APP_DIR" ]; then
+        log_message "${YELLOW}WARNING: Application directory $APP_DIR does not exist. Creating it now...${NC}"
+        mkdir -p "$APP_DIR"
+        chmod 755 "$APP_DIR"
+    fi
+    
+    # Check for nested directories
+    for dir in logs deploy_scripts; do
+        if [ ! -d "$APP_DIR/$dir" ]; then
+            log_message "${YELLOW}Creating $APP_DIR/$dir directory${NC}"
+            mkdir -p "$APP_DIR/$dir"
+            chmod 755 "$APP_DIR/$dir"
+        fi
+    done
+    
+    # Check disk space
+    log_message "Checking disk space for $APP_DIR"
+    df -h "$APP_DIR" | tee -a "$LOG_FILE"
+    
+    # Verify disk space is sufficient (at least 1GB free)
+    AVAILABLE_SPACE=$(df -m "$APP_DIR" | awk 'NR==2 {print $4}')
+    if [ "$AVAILABLE_SPACE" -lt 1024 ]; then
+        log_message "${RED}WARNING: Less than 1GB of free space available in $APP_DIR ($AVAILABLE_SPACE MB)${NC}"
+        # Log to CloudWatch for monitoring
+        if command -v aws &> /dev/null; then
+            aws cloudwatch put-metric-data \
+                --namespace "FinancialNewsEngine" \
+                --metric-name "LowDiskSpace" \
+                --dimensions "InstanceId=$INSTANCE_ID" \
+                --value 1 \
+                --unit "Count"
+        fi
+    else
+        log_message "${GREEN}Disk space check passed: $AVAILABLE_SPACE MB available${NC}"
+    fi
+}
+
 function handle_pending_termination() {
     log_message "${YELLOW}Received termination notification for instance $INSTANCE_ID${NC}"
     
@@ -83,7 +126,25 @@ function handle_pending_termination() {
 function register_with_load_balancer() {
     log_message "Registering instance with load balancer"
     
-    # Usually automatic, but you can add custom logic here if needed
+    # First, verify the application directory is properly set up
+    verify_app_directory
+    
+    # Ensure environment file exists
+    if [ ! -f "$APP_DIR/.env" ]; then
+        log_message "${YELLOW}Environment file not found. Attempting to create it...${NC}"
+        if [ -f "$APP_DIR/deploy_scripts/create_env_file.sh" ]; then
+            "$APP_DIR/deploy_scripts/create_env_file.sh"
+        else
+            log_message "${RED}Cannot create environment file: create_env_file.sh not found${NC}"
+            # Copy the script if possible
+            if [ -f "/deployment-scripts/create_env_file.sh" ]; then
+                mkdir -p "$APP_DIR/deploy_scripts"
+                cp "/deployment-scripts/create_env_file.sh" "$APP_DIR/deploy_scripts/"
+                chmod +x "$APP_DIR/deploy_scripts/create_env_file.sh"
+                "$APP_DIR/deploy_scripts/create_env_file.sh"
+            fi
+        fi
+    fi
     
     # Start the application service
     if [ -f "/etc/systemd/system/$APP_NAME.service" ]; then

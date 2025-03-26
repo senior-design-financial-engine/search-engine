@@ -31,7 +31,7 @@ function get_parameter() {
     fi
     
     # Try to get the parameter with exponential backoff retry
-    local max_attempts=3
+    local max_attempts=5 # Increased from 3
     local attempt=1
     local value=""
     local exit_code=1
@@ -63,8 +63,33 @@ function get_parameter() {
     done
 }
 
-# Create the target directory if it doesn't exist
-mkdir -p /opt/financial-news-engine
+# Ensure the target directory exists
+echo "Verifying application directories exist..."
+# Check if directory exists and create if needed
+if [ ! -d "/opt/financial-news-engine" ]; then
+    echo -e "${YELLOW}WARNING: /opt/financial-news-engine doesn't exist. Creating it now.${NC}"
+    mkdir -p /opt/financial-news-engine
+    chmod 755 /opt/financial-news-engine
+else
+    echo -e "${GREEN}/opt/financial-news-engine directory exists${NC}"
+fi
+
+# Check for logs directory
+if [ ! -d "/opt/financial-news-engine/logs" ]; then
+    echo -e "${YELLOW}Creating logs directory${NC}"
+    mkdir -p /opt/financial-news-engine/logs
+    chmod 755 /opt/financial-news-engine/logs
+fi
+
+# Check for deploy_scripts directory
+if [ ! -d "/opt/financial-news-engine/deploy_scripts" ]; then
+    echo -e "${YELLOW}Creating deploy_scripts directory${NC}"
+    mkdir -p /opt/financial-news-engine/deploy_scripts
+    chmod 755 /opt/financial-news-engine/deploy_scripts
+fi
+
+# Check available disk space and log it
+df -h /opt/financial-news-engine | tee -a /var/log/disk-space.log
 
 # Get parameters with default fallbacks
 ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
