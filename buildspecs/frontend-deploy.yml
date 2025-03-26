@@ -40,34 +40,27 @@ phases:
   post_build:
     commands:
       - echo "Retrieving S3 bucket name from CloudFormation stack..."
-      - |
-        BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME \
-          --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
-      - |
-        if [ -z "$BUCKET_NAME" ]; then
-          echo "ERROR: Could not retrieve bucket name from CloudFormation stack"
-          exit 1
+      - BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+      - if [ -z "$BUCKET_NAME" ]; then
+          echo "ERROR: Could not retrieve bucket name from CloudFormation stack";
+          exit 1;
         fi
       - echo "Retrieved bucket name: $BUCKET_NAME"
       - echo "Syncing build files to S3 bucket..."
-      - |
-        if [ -d "build" ]; then
-          aws s3 sync build/ s3://$BUCKET_NAME/ --delete
+      - if [ -d "build" ]; then
+          aws s3 sync build/ s3://$BUCKET_NAME/ --delete;
         elif [ -d "frontend/build" ]; then
-          aws s3 sync frontend/build/ s3://$BUCKET_NAME/ --delete
+          aws s3 sync frontend/build/ s3://$BUCKET_NAME/ --delete;
         else
-          echo "ERROR: No build directory found"
-          exit 1
+          echo "ERROR: No build directory found";
+          exit 1;
         fi
       - echo "Creating CloudFront invalidation..."
-      - |
-        CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME \
-          --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-      - |
-        if [ -n "$CLOUDFRONT_ID" ]; then
-          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+      - CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
+      - if [ -n "$CLOUDFRONT_ID" ]; then
+          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*";
         else
-          echo "WARNING: Could not retrieve CloudFront distribution ID"
+          echo "WARNING: Could not retrieve CloudFront distribution ID";
         fi
       - echo "Frontend deployment completed successfully!"
 
