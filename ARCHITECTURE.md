@@ -21,7 +21,7 @@ search-engine/
 │   │   ├── run_scrapers.py
 │   │   ├── data/
 │   │   └── articles/
-│   ├── scripts/
+│   ├── backend-scripts/
 │   │   ├── before_install.sh
 │   │   └── deploy.sh
 │   ├── utils/
@@ -43,9 +43,11 @@ search-engine/
 │   └── update_processed_urls.py
 ├── buildspecs/
 │   ├── api-deploy/
-│   │   ├── scripts/
+│   │   ├── api-scripts/
 │   │   │   ├── deploy.sh
 │   │   │   ├── extract_app.py
+│   │   │   ├── create_env_file.sh
+│   │   │   ├── lifecycle_handler.sh
 │   │   │   ├── financial-news.service
 │   │   │   └── verify.sh
 │   ├── api-deploy.yml
@@ -74,11 +76,12 @@ search-engine/
 │   ├── package-lock.json
 │   ├── package.json
 │   └── README.md
-├── scripts/
+├── deployment-scripts/
 │   ├── after_install.sh
 │   ├── before_install.sh
 │   ├── cleanup.sh
 │   ├── create_env_file.sh
+│   ├── lifecycle_handler.sh
 │   └── verify_es.sh
 ├── .env
 ├── .env.example
@@ -115,13 +118,20 @@ The deployment creates the following structure on EC2 instances:
 │       ├── .env                           # Environment configuration
 │       ├── requirements.txt               # Python dependencies
 │       ├── deploy_scripts/                # Deployment scripts
-│       │   └── create_env_file.sh         # Script to fetch parameters
+│       │   ├── create_env_file.sh         # Script to fetch parameters
+│       │   └── lifecycle_handler.sh       # ASG lifecycle management script
 │       └── logs/                          # Application logs
 │           ├── backend.log                # Application logs
 │           ├── service-output.log         # Service standard output
 │           └── service-error.log          # Service error output
+├── var/
+│   ├── log/
+│   │   └── asg-lifecycle.log              # Lifecycle hook logs
+│   └── run/
+│       └── financial-news-lifecycle-hook-state  # Lifecycle state file
 └── tmp/                                   # Temporary files
     ├── api-deploy/                        # Deployment staging
+    │   └── api-scripts/                   # API deployment scripts staging
     ├── backend.zip                        # Application archive
     └── backend-api.yaml                   # API configuration
 ```
@@ -131,10 +141,37 @@ The deployment creates the following structure on EC2 instances:
 1. CI/CD pipeline triggers on git push
 2. Code is built and packaged in CodeBuild
 3. CloudFormation deploys infrastructure if needed
-4. Application code is deployed to EC2 instances via SSM or CodeDeploy
-5. Configuration parameters are retrieved from SSM Parameter Store
+4. Application code is deployed to EC2 instances via one of two paths:
+   - **Direct SSM Deployment**: Uses AWS SSM Run Command to deploy app code directly to instances
+   - **Instance Refresh**: Uploads config to S3 and triggers an ASG instance refresh
+5. Configuration parameters are retrieved from SSM Parameter Store with fallback options:
+   - Primary: Using `get-parameters-by-path` to fetch all parameters at once
+   - Fallback: Individual parameter retrieval with exponential backoff retry
 6. Systemd service is configured and started
 7. Application is verified via health checks
+8. Auto Scaling Group lifecycle hooks manage graceful application startup and shutdown
+
+## CI/CD Pipeline Components
+
+```
+ ┌─────────────┐     ┌───────────────┐     ┌──────────────────┐
+ │ Source Code │────▶│ CodePipeline  │────▶│ Build & Test     │
+ │ (GitHub)    │     │               │     │ (CodeBuild)      │
+ └─────────────┘     └───────────────┘     └──────────────────┘
+                                                    │
+                                                    ▼
+ ┌─────────────┐     ┌───────────────┐     ┌──────────────────┐
+ │ Deployment  │◀────│ SSM Parameter │◀────│ API & Frontend   │
+ │ Notification│     │ Store         │     │ Deployment       │
+ │ (SNS)       │     │               │     │ (CodeBuild)      │
+ └─────────────┘     └───────────────┘     └──────────────────┘
+                             ▲                      │
+                             │                      ▼
+                      ┌──────┴───────┐     ┌──────────────────┐
+                      │ EC2 Instances│◀────│ ASG Instance     │
+                      │ with App Code│     │ Refresh          │
+                      └──────────────┘     └──────────────────┘
+```
 
 ## Parameter Store Structure
 
@@ -150,7 +187,26 @@ Parameters are stored in AWS Systems Manager Parameter Store under this hierarch
 └── environment
 ```
 
-These parameters are fetched using the `get-parameters-by-path` API call with fallback to individual parameter retrieval.
+These parameters are fetched using a robust retrieval strategy:
+1. First attempt: `get-parameters-by-path` API call to fetch all parameters at once
+2. Fallback: Individual parameter retrieval with exponential backoff retry
+3. Default values: If parameter retrieval fails, predefined defaults are used
+
+## Auto Scaling Group Lifecycle Management
+
+The application implements lifecycle hooks for graceful handling of EC2 instance events:
+
+1. **Instance Launch**: 
+   - Registers with load balancer
+   - Verifies application deployment
+   - Starts the application service
+
+2. **Instance Termination**:
+   - Gracefully stops the application service
+   - Performs cleanup operations
+   - Signals completion to Auto Scaling Group
+
+This ensures zero-downtime deployments and proper application lifecycle management.
 
 ## Microservices Diagram
 ```mermaid

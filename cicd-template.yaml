@@ -232,6 +232,26 @@ Resources:
                   - 'ssm:DescribeInstanceInformation'
                   - 'ssm:GetCommandInvocation'
                   - 'ssm:CancelCommand'
+                  - 'ssm:ListCommands'
+                  - 'ssm:ListCommandInvocations'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource: 
+                  - !Ref DeploymentNotificationTopic
+                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:*-financial-news-*'
+              - Effect: Allow
+                Action:
+                  - 'logs:PutLogEvents'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:DescribeLogStreams'
                 Resource: '*'
 
   # Frontend CodeBuild Project

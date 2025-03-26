@@ -1,4 +1,5 @@
 version: 0.2
+
 phases:
   install:
     runtime-versions:
@@ -8,6 +9,7 @@ phases:
       - pip install --upgrade awscli
       - pip install boto3
       - aws --version
+  
   pre_build:
     commands:
       - echo 'Environment variables:'
@@ -18,24 +20,30 @@ phases:
       - cd backend || echo 'Backend directory not found, proceeding anyway'
       - mkdir -p scripts
       - echo 'Creating deployment scripts...'
+      
+      # Create deployment script
       - |
-        cat > scripts/deploy.sh << 'EOF'
+        cat > deployment-scripts/deploy.sh << 'EOF'
         #!/bin/bash
-        cd /opt/financial-news-engine
+        set -e
+        set -o pipefail
+
+        APP_DIR="/opt/financial-news-engine"
         
         # Check if backend.zip exists and extract it
         if [ -f "/tmp/backend.zip" ]; then
           echo "Extracting backend.zip..."
-          unzip -o /tmp/backend.zip -d .
+          mkdir -p "$APP_DIR"
+          unzip -o /tmp/backend.zip -d "$APP_DIR"
           if [ $? -ne 0 ]; then
             echo "Error extracting backend.zip"
           fi
         else
           echo "backend.zip not found, checking for app.py in S3"
         fi
-        
+
         # Check if app.py exists, if not try to extract from backend-api.yaml in S3
-        if [ ! -f "app.py" ]; then
+        if [ ! -f "$APP_DIR/app.py" ]; then
           echo "Trying to fetch app.py from backend-api.yaml in S3"
           
           # Get the S3 bucket name
@@ -45,24 +53,35 @@ phases:
             echo "Found assets bucket: $BUCKET_NAME"
             
             # Download the backend-api.yaml file
+            mkdir -p /tmp
             aws s3 cp s3://$BUCKET_NAME/api/backend-api.yaml /tmp/backend-api.yaml
             
             if [ -f "/tmp/backend-api.yaml" ]; then
               echo "Extracting app.py from backend-api.yaml"
               # Extract app_code section
-              grep -A10000 "app_code: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > app.py
+              mkdir -p "$APP_DIR"
+              mkdir -p "$APP_DIR/logs"
+              mkdir -p "$APP_DIR/deploy_scripts"
+              
+              # Extract app_code section
+              grep -A10000 "app_code: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > "$APP_DIR/app.py"
               
               # Make it executable
-              chmod +x app.py
+              chmod +x "$APP_DIR/app.py"
               
               # Extract requirements if needed
-              if [ ! -f "requirements.txt" ]; then
+              if [ ! -f "$APP_DIR/requirements.txt" ]; then
                 echo "Extracting requirements.txt from backend-api.yaml"
-                grep -A10000 "requirements: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > requirements.txt
+                grep -A10000 "requirements: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > "$APP_DIR/requirements.txt"
               fi
               
               # Extract service file
               grep -A10000 "service_definition: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > /etc/systemd/system/financial-news.service
+              
+              # Extract environment file creation script
+              echo "Extracting create_env_file.sh from backend-api.yaml"
+              grep -A10000 "create_env_file_script: |" /tmp/backend-api.yaml | tail -n +2 | sed '/^[a-zA-Z]/,$d' | sed 's/^  //' > "$APP_DIR/deploy_scripts/create_env_file.sh"
+              chmod +x "$APP_DIR/deploy_scripts/create_env_file.sh"
             else
               echo "Failed to download backend-api.yaml"
             fi
@@ -70,7 +89,7 @@ phases:
             echo "Could not determine S3 bucket name"
           fi
         fi
-        
+
         # Create a default service file if it doesn't exist
         if [ ! -f "/etc/systemd/system/financial-news.service" ]; then
           echo "Creating default service file"
@@ -95,22 +114,35 @@ phases:
         WantedBy=multi-user.target
         EOL
         fi
-        
+
+        # Set permissions for app directory
+        chown -R ubuntu:ubuntu "$APP_DIR"
+        chmod -R 755 "$APP_DIR"
+        chmod 600 "$APP_DIR/.env" 2>/dev/null || true
+
+        # Run environment file creation script if it exists
+        if [ -f "$APP_DIR/deploy_scripts/create_env_file.sh" ]; then
+          echo "Running environment file creation script"
+          "$APP_DIR/deploy_scripts/create_env_file.sh"
+        else
+          echo "Environment file creation script not found, will use default values"
+        fi
+
         # Install requirements
-        if [ -f "requirements.txt" ]; then
+        if [ -f "$APP_DIR/requirements.txt" ]; then
           echo "Installing Python requirements"
-          pip3 install -r requirements.txt
+          pip3 install -r "$APP_DIR/requirements.txt"
         else
           echo "requirements.txt not found, installing minimal requirements"
           pip3 install flask flask-cors boto3 elasticsearch requests psutil
         fi
-        
+
         # Reload systemd and start service
         systemctl daemon-reload
         systemctl enable financial-news.service
-        
+
         # Check if we have an app.py file before starting the service
-        if [ -f "app.py" ]; then
+        if [ -f "$APP_DIR/app.py" ]; then
           echo "Starting financial-news service"
           systemctl restart financial-news.service
         else
@@ -118,30 +150,150 @@ phases:
           exit 1
         fi
         EOF
-      - chmod +x scripts/deploy.sh
+
+      # Create before install script
       - |
-        cat > scripts/before_install.sh << 'EOF'
+        cat > deployment-scripts/before_install.sh << 'EOF'
         #!/bin/bash
         # Create necessary directories
         mkdir -p /opt/financial-news-engine
         mkdir -p /opt/financial-news-engine/logs
         mkdir -p /opt/financial-news-engine/deploy_scripts
-        
+
         # Install required dependencies
         apt-get update -y || yum update -y
-        apt-get install -y python3-pip jq unzip || yum install -y python3-pip jq unzip
-        
+        apt-get install -y python3-pip jq unzip awscli || yum install -y python3-pip jq unzip aws-cli
+
         # Set proper permissions
         chmod 755 /opt/financial-news-engine
         chmod 755 /opt/financial-news-engine/logs
         chmod 755 /opt/financial-news-engine/deploy_scripts
         EOF
-      - chmod +x scripts/before_install.sh
+
+      # Create the lifecycle handler script
       - |
-        cat > scripts/create_env_file.sh << 'EOF'
+        cat > deployment-scripts/lifecycle_handler.sh << 'EOF'
+        #!/bin/bash
+        # lifecycle_handler.sh - Handler for Auto Scaling Group lifecycle events
+        # This script manages the ASG lifecycle hooks for graceful instance termination
+
+        set -e
+        set -o pipefail
+
+        # Colors for output
+        GREEN='\033[0;32m'
+        RED='\033[0;31m'
+        YELLOW='\033[0;33m'
+        NC='\033[0m' # No Color
+
+        LOG_FILE="/var/log/asg-lifecycle.log"
+        APP_NAME="financial-news"
+        LIFECYCLE_STATE_FILE="/var/run/financial-news-lifecycle-hook-state"
+
+        function log_message() {
+            local message="$1"
+            local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+            echo -e "[$timestamp] $message" | tee -a "$LOG_FILE"
+        }
+
+        # Ensure log directory exists
+        mkdir -p "$(dirname "$LOG_FILE")"
+        touch "$LOG_FILE"
+        chmod 644 "$LOG_FILE"
+
+        log_message "${GREEN}Starting lifecycle handler script${NC}"
+
+        # Get the EC2 instance ID
+        INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+        if [ -z "$INSTANCE_ID" ]; then
+            log_message "${RED}ERROR: Could not retrieve instance ID from metadata service${NC}"
+            exit 1
+        fi
+        log_message "Instance ID: $INSTANCE_ID"
+
+        # Get the Auto Scaling Group name
+        ASG_NAME=$(aws autoscaling describe-auto-scaling-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query "AutoScalingInstances[0].AutoScalingGroupName" \
+            --output text 2>/dev/null)
+            
+        if [ -z "$ASG_NAME" ] || [ "$ASG_NAME" == "None" ]; then
+            log_message "${YELLOW}WARNING: Could not retrieve Auto Scaling Group name for instance $INSTANCE_ID${NC}"
+            # Not running in an ASG, nothing to do
+            exit 0
+        fi
+        log_message "Auto Scaling Group: $ASG_NAME"
+
+        function handle_pending_termination() {
+            log_message "${YELLOW}Received termination notification for instance $INSTANCE_ID${NC}"
+            
+            # Gracefully stop the application to prevent disruptions
+            if systemctl is-active --quiet $APP_NAME; then
+                log_message "Stopping $APP_NAME service"
+                systemctl stop $APP_NAME
+            else
+                log_message "${YELLOW}$APP_NAME service is not running${NC}"
+            fi
+            
+            # Perform any cleanup needed
+            log_message "Performing cleanup operations"
+            
+            # Wait a moment to ensure the service has stopped
+            sleep 5
+            
+            # Complete the lifecycle action
+            log_message "${GREEN}Completing lifecycle action${NC}"
+            aws autoscaling complete-lifecycle-action \
+                --lifecycle-hook-name "$1" \
+                --auto-scaling-group-name "$ASG_NAME" \
+                --lifecycle-action-result CONTINUE \
+                --instance-id "$INSTANCE_ID"
+            
+            # Write state file to indicate we've handled termination
+            echo "TERMINATION_HANDLED" > "$LIFECYCLE_STATE_FILE"
+            
+            log_message "${GREEN}Lifecycle action completed, instance ready for termination${NC}"
+        }
+
+        function register_with_load_balancer() {
+            log_message "Registering instance with load balancer"
+            
+            # Usually automatic, but you can add custom logic here if needed
+            
+            # Start the application service
+            if [ -f "/etc/systemd/system/$APP_NAME.service" ]; then
+                log_message "Starting $APP_NAME service"
+                systemctl start $APP_NAME
+            else
+                log_message "${YELLOW}$APP_NAME service definition not found${NC}"
+            fi
+        }
+
+        # Check if we're running as part of an instance termination
+        if [ "$1" = "TERMINATING" ]; then
+            handle_pending_termination "$2"
+            exit 0
+        fi
+
+        # Otherwise, assume we're starting up
+        log_message "Instance startup detected"
+        register_with_load_balancer
+        log_message "${GREEN}Lifecycle handler completed startup tasks${NC}"
+
+        exit 0
+        EOF
+
+      # Create environment file creation script
+      - |
+        cat > deployment-scripts/create_env_file.sh << 'EOF'
         #!/bin/bash
         # Create .env file with environment variables by fetching from SSM Parameter Store
         echo "Fetching credentials from SSM Parameter Store using get-parameters-by-path..."
+
+        # Create app directory if it doesn't exist
+        APP_DIR="/opt/financial-news-engine"
+        mkdir -p "$APP_DIR"
+        mkdir -p "$APP_DIR/logs"
 
         # Use get-parameters-by-path to get all parameters at once
         echo "Retrieving all parameters at once"
@@ -195,9 +347,7 @@ phases:
         ENV=${ENV:-"development"}
 
         # Create the .env file
-        mkdir -p /opt/financial-news-engine
-        mkdir -p /opt/financial-news-engine/logs
-        cat > /opt/financial-news-engine/.env << EOL
+        cat > "$APP_DIR/.env" << EOL
         ELASTICSEARCH_URL=$ES_URL
         ELASTICSEARCH_API_KEY=$ES_API_KEY
         ELASTICSEARCH_INDEX=$ES_INDEX
@@ -208,10 +358,28 @@ phases:
         EOL
 
         # Set secure permissions
-        chmod 600 /opt/financial-news-engine/.env
+        chmod 600 "$APP_DIR/.env"
+        chown ubuntu:ubuntu "$APP_DIR/.env" 2>/dev/null || true
+        
         echo "Created .env file with environment variables from SSM Parameter Store"
+
+        # Output parameters retrieved (with API key redacted)
+        echo "Environment loaded with the following parameters:"
+        echo "ELASTICSEARCH_URL=$ES_URL"
+        echo "ELASTICSEARCH_API_KEY=****REDACTED****"
+        echo "ELASTICSEARCH_INDEX=$ES_INDEX"
+        echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS"
+        echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS"
+        echo "ENVIRONMENT=$ENV"
         EOF
-      - chmod +x scripts/create_env_file.sh
+
+      # Make scripts executable
+      - chmod +x deployment-scripts/deploy.sh
+      - chmod +x deployment-scripts/before_install.sh
+      - chmod +x deployment-scripts/create_env_file.sh
+      - chmod +x deployment-scripts/lifecycle_handler.sh
+
+      # Create appspec.yml
       - |
         cat > appspec.yml << 'EOF'
         version: 0.0
@@ -219,19 +387,30 @@ phases:
         files:
           - source: dist/backend.zip
             destination: /tmp/
+          - source: deployment-scripts/
+            destination: /opt/financial-news-engine/deploy_scripts/
         hooks:
           BeforeInstall:
-            - location: scripts/before_install.sh
+            - location: deployment-scripts/before_install.sh
               timeout: 300
               runas: root
           AfterInstall:
-            - location: scripts/deploy.sh
+            - location: deployment-scripts/deploy.sh
               timeout: 300
               runas: root
-            - location: scripts/create_env_file.sh
+            - location: deployment-scripts/create_env_file.sh
               timeout: 300
               runas: root
+            ApplicationStart:
+              - location: deployment-scripts/lifecycle_handler.sh
+                timeout: 180
+                runas: root
+            ApplicationStop:
+              - location: deployment-scripts/lifecycle_handler.sh TERMINATING
+                timeout: 180
+                runas: root
         EOF
+
   build:
     commands:
       - echo 'Checking AWS CLI configuration:'
@@ -240,17 +419,34 @@ phases:
       - aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME || echo 'Stack not found or permission issue - continuing deployment anyway'
       - echo 'Listing available stacks:'
       - aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE || echo 'Unable to list stacks - continuing anyway'
-      - echo 'Proceeding with simple deployment without AWS CLI dependencies'
+      - echo 'Proceeding with deployment preparation'
+      
+      # Upload deployment scripts directly to S3
+      - |
+        BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+        if [ -n "$BUCKET_NAME" ]; then
+          echo "Found assets bucket: $BUCKET_NAME"
+          echo "Uploading deployment scripts to S3"
+          aws s3 cp deployment-scripts/deploy.sh s3://$BUCKET_NAME/backend-deploy/deploy.sh
+          aws s3 cp deployment-scripts/before_install.sh s3://$BUCKET_NAME/backend-deploy/before_install.sh
+          aws s3 cp deployment-scripts/create_env_file.sh s3://$BUCKET_NAME/backend-deploy/create_env_file.sh
+          aws s3 cp deployment-scripts/lifecycle_handler.sh s3://$BUCKET_NAME/backend-deploy/lifecycle_handler.sh
+        else
+          echo "Could not find assets bucket"
+        fi
+        
       - echo 'Deployment preparation complete'
+  
   post_build:
     commands:
       - echo 'Verifying deployment artifacts:'
       - ls -la
       - echo 'Starting ASG instance refresh to deploy the new code to all instances'
+      
+      # Get the Auto Scaling Group name from the CloudFormation stack and refresh instances
       - |
-        # Get the Auto Scaling Group name from the CloudFormation stack
         ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-        
+
         if [ -n "$ASG_NAME" ]; then
           echo "Found Auto Scaling Group: $ASG_NAME"
           
@@ -296,10 +492,38 @@ phases:
         else
           echo "WARNING: Could not find Auto Scaling Group name. Instance refresh could not be performed."
         fi
+      
+      # Get the S3 bucket name from the CloudFormation stack and upload app code from the API deployment
+      - |
+        BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+        if [ -n "$BUCKET_NAME" ]; then
+          echo "Found assets bucket: $BUCKET_NAME"
+          
+          # Check if backend-api.yaml exists and download it
+          echo "Checking if backend-api.yaml exists in S3"
+          aws s3 ls s3://$BUCKET_NAME/api/backend-api.yaml
+          if [ $? -eq 0 ]; then
+            echo "backend-api.yaml exists, downloading to update parameters"
+            aws s3 cp s3://$BUCKET_NAME/api/backend-api.yaml /tmp/backend-api.yaml
+            
+            # Ensure the create_env_file.sh script exists in the YAML
+            if grep -q "create_env_file_script:" /tmp/backend-api.yaml; then
+              echo "create_env_file_script section exists"
+            else
+              echo "Adding create_env_file_script section to backend-api.yaml"
+              echo -e "\ncreate_env_file_script: |" >> /tmp/backend-api.yaml
+              cat deployment-scripts/create_env_file.sh | sed 's/^/  /' >> /tmp/backend-api.yaml
+              
+              # Upload modified file back to S3
+              aws s3 cp /tmp/backend-api.yaml s3://$BUCKET_NAME/api/backend-api.yaml
+            fi
+          fi
+        fi
+      
       - echo 'Backend deployment completed successfully'
+      
 artifacts:
   files:
-    - "backend/appspec.yml"
-    - "backend/scripts/**/*"
-    - "backend/dist/backend.zip"
-  discard-paths: no 
+    - appspec.yml
+    - deployment-scripts/**/*
+    - dist/**/* 

@@ -25,8 +25,13 @@ phases:
 artifacts:
   files:
     - appspec.yml
-    - scripts/**/*
-    - frontend/build/**/*
+    - backend/**/*
+    - frontend/**/*
+    - buildspecs/**/*
+    - deployment-scripts/**/*
+    - backend-template.yaml
+    - frontend-template.yaml
+    - cicd-template.yaml
   discard-paths: no
 
 cache:

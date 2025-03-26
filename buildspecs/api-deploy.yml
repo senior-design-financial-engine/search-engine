@@ -12,7 +12,7 @@ phases:
     commands:
       - "echo \"Preparing API code for deployment\""
       - "cd backend || (echo \"Backend directory not found, using project root\"; cd .)"
-      - "mkdir -p api/deploy/deploy_scripts"
+      - "mkdir -p api/deploy/api-scripts"
       - "cp backend.py api/deploy/app.py || cp app.py api/deploy/app.py || echo \"Using fallback app.py\""
       - "cp requirements.txt api/deploy/requirements.txt || echo \"Using fallback requirements.txt\""
       
@@ -21,8 +21,79 @@ phases:
       - "export ASSETS_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue\" --output text)"
       - "echo \"Assets bucket name: $ASSETS_BUCKET_NAME\""
       
-      # Create deploy.sh script at runtime
+      # Create deployment scripts
       - "echo \"Creating deployment scripts\""
+      - |
+        cat > api/deploy/api-scripts/create_env_file.sh << 'EOF'
+        #!/bin/bash
+        # Fetch environment variables from SSM Parameter Store
+        echo "Fetching credentials from SSM Parameter Store - parameters are managed by the CICD stack"
+
+        # Create necessary directories
+        sudo mkdir -p /opt/financial-news-engine
+        sudo mkdir -p /opt/financial-news-engine/logs
+        sudo mkdir -p /opt/financial-news-engine/deploy_scripts
+
+        # Set default values in case parameter retrieval fails
+        ES_URL=""
+        ES_API_KEY=""
+        ES_INDEX="financial_news"
+        ES_SHARDS="3"
+        ES_REPLICAS="2"
+        ENV="production"
+
+        # Get parameters from SSM Parameter Store with error handling and verbosity
+        function get_parameter() {
+            local param_name=$1
+            local default_value=$2
+
+            echo "Fetching parameter: $param_name"
+            local value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
+            local exit_code=$?
+
+            if [ $exit_code -eq 0 ] && [ ! -z "$value" ]; then
+                echo "Successfully retrieved parameter: $param_name"
+                echo "$value"
+            else
+                echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
+                echo "$default_value"
+            fi
+        }
+
+        # Get parameters with default fallbacks
+        ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
+        ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
+        ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
+        ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
+        ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
+        ENV=$(get_parameter "/financial-news/environment" "development")
+
+        # Create the .env file
+        sudo bash -c "cat > /opt/financial-news-engine/.env << EOL
+        ELASTICSEARCH_URL=$ES_URL
+        ELASTICSEARCH_API_KEY=$ES_API_KEY
+        ELASTICSEARCH_INDEX=$ES_INDEX
+        ES_NUMBER_OF_SHARDS=$ES_SHARDS
+        ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+        ENVIRONMENT=$ENV
+        CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
+        EOL"
+
+        # Set secure permissions
+        sudo chmod 600 /opt/financial-news-engine/.env
+        echo "Created .env file with environment variables from SSM Parameter Store"
+
+        # Output parameters retrieved (with API key redacted)
+        echo "Environment loaded with the following parameters:"
+        echo "ELASTICSEARCH_URL=$ES_URL"
+        echo "ELASTICSEARCH_API_KEY=****REDACTED****"
+        echo "ELASTICSEARCH_INDEX=$ES_INDEX"
+        echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS"
+        echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS"
+        echo "ENVIRONMENT=$ENV"
+        EOF
+      
+      # Create deploy.sh script at runtime
       - |
         cat > api/deploy/deploy.sh << 'EOF'
         #!/bin/bash
@@ -50,9 +121,10 @@ phases:
         sudo cp /tmp/api-deploy/requirements.txt $APP_DIR/requirements.txt
         
         # Copy deployment scripts if they exist
-        if [ -d "/tmp/api-deploy/deploy_scripts" ]; then
+        if [ -d "/tmp/api-deploy/api-scripts" ]; then
             echo "Copying deployment scripts"
-            sudo cp -r /tmp/api-deploy/deploy_scripts/* $DEPLOY_SCRIPTS_DIR/
+            sudo cp -r /tmp/api-deploy/api-scripts/* $DEPLOY_SCRIPTS_DIR/
+            sudo chmod +x $DEPLOY_SCRIPTS_DIR/*.sh
         fi
         
         # Set correct permissions
@@ -86,6 +158,10 @@ phases:
         [Install]
         WantedBy=multi-user.target
         EOF'
+        
+        # Run the env file creation script
+        echo "Creating environment file"
+        $DEPLOY_SCRIPTS_DIR/create_env_file.sh
         
         # Reload systemd and restart service
         echo "Reloading systemd and starting service"
@@ -211,7 +287,7 @@ phases:
       
       # Create extract_app.py script at runtime
       - |
-        cat > api/deploy/deploy_scripts/extract_app.py << 'EOF'
+        cat > api/deploy/api-scripts/extract_app.py << 'EOF'
         #!/usr/bin/env python3
         """
         Extract application code from a source file and create app.py
@@ -279,12 +355,129 @@ phases:
         EOF
       
       # Make scripts executable
-      - "chmod +x api/deploy/deploy_scripts/extract_app.py"
+      - "chmod +x api/deploy/api-scripts/extract_app.py"
+      - "chmod +x api/deploy/api-scripts/create_env_file.sh"
       - "chmod +x api/deploy/deploy.sh"
       - "chmod +x api/deploy/verify.sh"
       
+      # Create lifecycle_handler.sh script
+      - |
+        cat > api/deploy/api-scripts/lifecycle_handler.sh << 'EOF'
+        #!/bin/bash
+        # lifecycle_handler.sh - Handler for Auto Scaling Group lifecycle events
+        # This script manages the ASG lifecycle hooks for graceful instance termination
+
+        set -e
+        set -o pipefail
+
+        # Colors for output
+        GREEN='\033[0;32m'
+        RED='\033[0;31m'
+        YELLOW='\033[0;33m'
+        NC='\033[0m' # No Color
+
+        LOG_FILE="/var/log/asg-lifecycle.log"
+        APP_NAME="financial-news"
+        LIFECYCLE_STATE_FILE="/var/run/financial-news-lifecycle-hook-state"
+
+        function log_message() {
+            local message="$1"
+            local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+            echo -e "[$timestamp] $message" | tee -a "$LOG_FILE"
+        }
+
+        # Ensure log directory exists
+        mkdir -p "$(dirname "$LOG_FILE")"
+        touch "$LOG_FILE"
+        chmod 644 "$LOG_FILE"
+
+        log_message "${GREEN}Starting lifecycle handler script${NC}"
+
+        # Get the EC2 instance ID
+        INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+        if [ -z "$INSTANCE_ID" ]; then
+            log_message "${RED}ERROR: Could not retrieve instance ID from metadata service${NC}"
+            exit 1
+        fi
+        log_message "Instance ID: $INSTANCE_ID"
+
+        # Get the Auto Scaling Group name
+        ASG_NAME=$(aws autoscaling describe-auto-scaling-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query "AutoScalingInstances[0].AutoScalingGroupName" \
+            --output text 2>/dev/null)
+            
+        if [ -z "$ASG_NAME" ] || [ "$ASG_NAME" == "None" ]; then
+            log_message "${YELLOW}WARNING: Could not retrieve Auto Scaling Group name for instance $INSTANCE_ID${NC}"
+            # Not running in an ASG, nothing to do
+            exit 0
+        fi
+        log_message "Auto Scaling Group: $ASG_NAME"
+
+        function handle_pending_termination() {
+            log_message "${YELLOW}Received termination notification for instance $INSTANCE_ID${NC}"
+            
+            # Gracefully stop the application to prevent disruptions
+            if systemctl is-active --quiet $APP_NAME; then
+                log_message "Stopping $APP_NAME service"
+                systemctl stop $APP_NAME
+            else
+                log_message "${YELLOW}$APP_NAME service is not running${NC}"
+            fi
+            
+            # Perform any cleanup needed
+            log_message "Performing cleanup operations"
+            
+            # Wait a moment to ensure the service has stopped
+            sleep 5
+            
+            # Complete the lifecycle action
+            log_message "${GREEN}Completing lifecycle action${NC}"
+            aws autoscaling complete-lifecycle-action \
+                --lifecycle-hook-name "$1" \
+                --auto-scaling-group-name "$ASG_NAME" \
+                --lifecycle-action-result CONTINUE \
+                --instance-id "$INSTANCE_ID"
+            
+            # Write state file to indicate we've handled termination
+            echo "TERMINATION_HANDLED" > "$LIFECYCLE_STATE_FILE"
+            
+            log_message "${GREEN}Lifecycle action completed, instance ready for termination${NC}"
+        }
+
+        function register_with_load_balancer() {
+            log_message "Registering instance with load balancer"
+            
+            # Usually automatic, but you can add custom logic here if needed
+            
+            # Start the application service
+            if [ -f "/etc/systemd/system/$APP_NAME.service" ]; then
+                log_message "Starting $APP_NAME service"
+                systemctl start $APP_NAME
+            else
+                log_message "${YELLOW}$APP_NAME service definition not found${NC}"
+            fi
+        }
+
+        # Check if we're running as part of an instance termination
+        if [ "$1" = "TERMINATING" ]; then
+            handle_pending_termination "$2"
+            exit 0
+        fi
+
+        # Otherwise, assume we're starting up
+        log_message "Instance startup detected"
+        register_with_load_balancer
+        log_message "${GREEN}Lifecycle handler completed startup tasks${NC}"
+
+        exit 0
+        EOF
+      
+      # Make lifecycle handler executable
+      - "chmod +x api/deploy/api-scripts/lifecycle_handler.sh"
+      
       # Execute app extraction if needed
-      - "if [ ! -f \"api/deploy/app.py\" ]; then python3 api/deploy/deploy_scripts/extract_app.py; fi"
+      - "if [ ! -f \"api/deploy/app.py\" ]; then python3 api/deploy/api-scripts/extract_app.py; fi"
   
   build:
     commands:
@@ -314,6 +507,8 @@ phases:
       - "aws s3 cp api/deploy/requirements.txt s3://$ASSETS_BUCKET_NAME/temp/requirements.txt"
       - "aws s3 cp api/deploy/deploy.sh s3://$ASSETS_BUCKET_NAME/temp/deploy.sh"
       - "aws s3 cp api/deploy/verify.sh s3://$ASSETS_BUCKET_NAME/temp/verify.sh"
+      - "aws s3 cp api/deploy/api-scripts/create_env_file.sh s3://$ASSETS_BUCKET_NAME/temp/api-scripts/create_env_file.sh"
+      - "aws s3 cp api/deploy/api-scripts/lifecycle_handler.sh s3://$ASSETS_BUCKET_NAME/temp/api-scripts/lifecycle_handler.sh"
       
       # Deploy to each instance
       - "echo \"Deploying to instances\""
@@ -321,9 +516,9 @@ phases:
         if [ "$SKIP_SSM_DEPLOY" = "false" ]; then
           for INSTANCE_ID in $INSTANCE_IDS; do 
             echo "Deploying to instance $INSTANCE_ID"
-            aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text || echo "Failed to create staging directory on $INSTANCE_ID"
+            aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy /tmp/api-deploy/api-scripts']" --comment "Create staging directory" --output text || echo "Failed to create staging directory on $INSTANCE_ID"
             if [ $? -eq 0 ]; then
-              DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
+              DEPLOY_CMD="cd /tmp && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh api-deploy/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh api-deploy/ && mkdir -p api-deploy/api-scripts && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/create_env_file.sh api-deploy/api-scripts/ && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/api-scripts/lifecycle_handler.sh api-deploy/api-scripts/ && chmod +x api-deploy/deploy.sh api-deploy/verify.sh api-deploy/api-scripts/create_env_file.sh api-deploy/api-scripts/lifecycle_handler.sh && cd api-deploy && ./deploy.sh && ./verify.sh"
               aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text || echo "Failed to deploy to $INSTANCE_ID"
               echo "Deployment to instance $INSTANCE_ID completed"
             fi
@@ -365,6 +560,12 @@ phases:
       - "echo \"\" >> backend-api.yaml"
       - "echo \"verification_script: |\" >> backend-api.yaml"
       - "sed 's/^/  /' api/deploy/verify.sh >> backend-api.yaml"
+      - "echo \"\" >> backend-api.yaml"
+      - "echo \"create_env_file_script: |\" >> backend-api.yaml"
+      - "sed 's/^/  /' api/deploy/api-scripts/create_env_file.sh >> backend-api.yaml"
+      - "echo \"\" >> backend-api.yaml"
+      - "echo \"lifecycle_handler_script: |\" >> backend-api.yaml"
+      - "sed 's/^/  /' api/deploy/api-scripts/lifecycle_handler.sh >> backend-api.yaml"
       
       - "echo \"Uploading API code to S3\""
       - "aws s3 cp backend-api.yaml s3://$ASSETS_BUCKET_NAME/api/backend-api.yaml"
@@ -395,4 +596,4 @@ phases:
 artifacts:
   files:
     - "api/deploy/**/*"
-    - "scripts/**/*" 
+    - "api-scripts/**/*" 

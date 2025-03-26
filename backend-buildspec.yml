@@ -181,9 +181,9 @@ echo "Backend service is running"
 # Check Elasticsearch connectivity
 echo "Testing Elasticsearch connectivity..."
 mkdir -p /opt/financial-news-engine/scripts
-if [ -f "/opt/financial-news-engine/scripts/verify_es.sh" ]; then
-  chmod +x /opt/financial-news-engine/scripts/verify_es.sh
-  /opt/financial-news-engine/scripts/verify_es.sh
+if [ -f "/opt/financial-news-engine/deploy_scripts/verify_es.sh" ]; then
+  chmod +x /opt/financial-news-engine/deploy_scripts/verify_es.sh
+  /opt/financial-news-engine/deploy_scripts/verify_es.sh
   if [ $? -ne 0 ]; then
     echo "WARNING: Elasticsearch connectivity check failed"
     # Don't fail deployment if ES check fails, log it and continue
@@ -381,13 +381,16 @@ EOL
 artifacts:
   files:
     - appspec.yml
+    - buildspec.yml
+    - backend-template.yaml
+    - backend/**/*
+    - deploy_scripts/**/*
+    - deployment-scripts/**/*
+    - dist/**/*
     - taskdef.json
     - cluster.txt
     - service.txt
     - deploy_commands.json
-    - backend/**/*
-    - deploy_scripts/**/*
-    - scripts/**/*
     - lifecycle_hook_document.json
   discard-paths: no
 

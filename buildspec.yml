@@ -57,22 +57,14 @@ phases:
     commands:
       - echo "Creating unified artifact structure"
       - mkdir -p artifact_output
-      - if [ -d "frontend/build" ]; then
-          echo "Adding frontend build artifacts";
-          mkdir -p artifact_output/frontend;
-          cp -r frontend/build/* artifact_output/frontend/;
-        fi
-      - if [ -d "backend/dist" ]; then
-          echo "Adding backend build artifacts";
-          mkdir -p artifact_output/backend/dist;
-          cp -r backend/dist/* artifact_output/backend/dist/;
-        fi
+      - mkdir -p artifact_output/scripts
+      - cp -r backend artifact_output/
+      - cp -r frontend artifact_output/
+      - if [ -d "deployment-scripts" ]; then cp -r deployment-scripts/* artifact_output/scripts/; fi
+      - if [ -d "backend/backend-scripts" ]; then cp -r backend/backend-scripts/* artifact_output/scripts/; fi
       - echo "Adding configuration files"
       - mkdir -p artifact_output/buildspecs
       - if [ -d "buildspecs" ]; then cp -r buildspecs/* artifact_output/buildspecs/; fi
-      - mkdir -p artifact_output/scripts
-      - if [ -d "scripts" ]; then cp -r scripts/* artifact_output/scripts/; fi
-      - if [ -d "backend/scripts" ]; then cp -r backend/scripts/* artifact_output/scripts/; fi
       - find . -name "*.yml" -maxdepth 1 -type f -exec cp {} artifact_output/ \; || true
       - find . -name "*.yaml" -maxdepth 1 -type f -exec cp {} artifact_output/ \; || true
       - echo "Final artifact contents:"

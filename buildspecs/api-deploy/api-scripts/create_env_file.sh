@@ -117,7 +117,7 @@ exit 0
 if [ -d "/etc/cron.daily" ]; then
     cat > /etc/cron.daily/update_env_file << EOL
 #!/bin/bash
-/opt/financial-news-engine/scripts/create_env_file.sh
+/opt/financial-news-engine/deploy_scripts/create_env_file.sh
 if systemctl is-active --quiet financial-news.service; then
   systemctl restart financial-news.service
 fi

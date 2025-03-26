@@ -29,14 +29,14 @@ phases:
       - cd ..  # Return to root directory
       - mkdir -p artifact_output
       - echo "Copying frontend build files"
-      - cp -r frontend/build/* artifact_output/
+      - cp -r frontend/build/* artifact_output/frontend/
       - echo "Copying buildspecs directory"
       - cp -r buildspecs artifact_output/
       - echo "Copying root-level buildspec files"
       - cp *.yml artifact_output/ || true
       - echo "Copying deployment scripts"
       - mkdir -p artifact_output/scripts
-      - cp -r scripts/* artifact_output/scripts/ || true
+      - cp -r deployment-scripts/* artifact_output/scripts/ || true
       - echo "Contents of the artifact_output directory:"
       - ls -la artifact_output
       - find artifact_output -type f | sort

@@ -338,14 +338,14 @@ Resources:
                 chmod 755 /opt/financial-news-engine
                 
                 # Fetch backend-api.yaml from S3
-                mkdir -p /tmp/scripts
-                aws s3 cp s3://${FinancialNewsAssetsBucket}/${BackendApiCodeKey} /tmp/scripts/backend-api.yaml
+                mkdir -p /tmp/deployment-scripts
+                aws s3 cp s3://${FinancialNewsAssetsBucket}/${BackendApiCodeKey} /tmp/deployment-scripts/backend-api.yaml
                 
                 # Extract app code, requirements, and verification script from the YAML file
                 python3 -c "
                 import yaml
                 try:
-                    with open('/tmp/scripts/backend-api.yaml', 'r') as f:
+                    with open('/tmp/deployment-scripts/backend-api.yaml', 'r') as f:
                         api_config = yaml.safe_load(f)
                     
                     # Create app.py from app_code section
