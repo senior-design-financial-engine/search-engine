@@ -6,61 +6,56 @@ phases:
     commands:
       - echo "Installing dependencies for deployment notifications"
       - pip install boto3 awscli jq
-      - echo "Converting line endings to Unix format"
-      - tr -d '\r' < /codebuild/output/tmp/script.sh > /codebuild/output/tmp/script.unix.sh && mv /codebuild/output/tmp/script.unix.sh /codebuild/output/tmp/script.sh
   
   build:
     commands:
       - echo "Checking deployment status"
-      - |
-        # Get ASG name from stack outputs
-        ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+      - >
+        # Get ASG name from stack outputs;
+        ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text);
         
         if [ -n "$ASG_NAME" ]; then
-          echo "Found Auto Scaling Group: $ASG_NAME"
+          echo "Found Auto Scaling Group: $ASG_NAME";
           
-          # Get list of instances in ASG
-          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
+          # Get list of instances in ASG;
+          INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text);
           
-          # Get latest instance refresh status
-          LATEST_REFRESH=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name $ASG_NAME --max-items 1 --query "InstanceRefreshes[0]" --output json)
+          # Get latest instance refresh status;
+          LATEST_REFRESH=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name $ASG_NAME --max-items 1 --query "InstanceRefreshes[0]" --output json);
           
-          # Prepare message for SNS notification
+          # Prepare message for SNS notification;
           if [ -n "$LATEST_REFRESH" ]; then
-            REFRESH_ID=$(echo $LATEST_REFRESH | jq -r '.InstanceRefreshId')
-            REFRESH_STATUS=$(echo $LATEST_REFRESH | jq -r '.Status')
-            REFRESH_START_TIME=$(echo $LATEST_REFRESH | jq -r '.StartTime')
-            REFRESH_END_TIME=$(echo $LATEST_REFRESH | jq -r '.EndTime // "In Progress"')
-            REFRESH_PERCENTAGE_COMPLETE=$(echo $LATEST_REFRESH | jq -r '.PercentageComplete // "0"')
+            REFRESH_ID=$(echo $LATEST_REFRESH | jq -r '.InstanceRefreshId');
+            REFRESH_STATUS=$(echo $LATEST_REFRESH | jq -r '.Status');
+            REFRESH_START_TIME=$(echo $LATEST_REFRESH | jq -r '.StartTime');
+            REFRESH_END_TIME=$(echo $LATEST_REFRESH | jq -r '.EndTime // "In Progress"');
+            REFRESH_PERCENTAGE_COMPLETE=$(echo $LATEST_REFRESH | jq -r '.PercentageComplete // "0"');
             
-            MESSAGE=$(cat <<EOF
-            Deployment and Instance Refresh Status for $ENVIRONMENT Environment
-            
-            Auto Scaling Group: $ASG_NAME
-            Instance Refresh ID: $REFRESH_ID
-            Status: $REFRESH_STATUS
-            Start Time: $REFRESH_START_TIME
-            End Time: $REFRESH_END_TIME
-            Percentage Complete: $REFRESH_PERCENTAGE_COMPLETE%
-            
-            Active Instances: $INSTANCE_IDS
-            
-            For more details, visit the AWS Console.
-            EOF
-            )
+            MESSAGE="Deployment and Instance Refresh Status for $ENVIRONMENT Environment
+
+Auto Scaling Group: $ASG_NAME
+Instance Refresh ID: $REFRESH_ID
+Status: $REFRESH_STATUS
+Start Time: $REFRESH_START_TIME
+End Time: $REFRESH_END_TIME
+Percentage Complete: ${REFRESH_PERCENTAGE_COMPLETE}%
+
+Active Instances: $INSTANCE_IDS
+
+For more details, visit the AWS Console.";
           else
-            MESSAGE="Deployment completed but no instance refresh information found for Auto Scaling Group $ASG_NAME"
-          fi
+            MESSAGE="Deployment completed but no instance refresh information found for Auto Scaling Group $ASG_NAME";
+          fi;
           
-          # Publish to SNS topic
-          aws sns publish --topic-arn $SNS_TOPIC_ARN --subject "Financial News Engine Deployment Status: $ENVIRONMENT" --message "$MESSAGE"
-          echo "Deployment notification sent."
+          # Publish to SNS topic;
+          aws sns publish --topic-arn $SNS_TOPIC_ARN --subject "Financial News Engine Deployment Status: $ENVIRONMENT" --message "$MESSAGE";
+          echo "Deployment notification sent.";
           
-          # Log the message to CloudWatch Logs
-          echo "$MESSAGE"
+          # Log the message to CloudWatch Logs;
+          echo "$MESSAGE";
         else
-          echo "Could not find Auto Scaling Group name in stack outputs"
-          aws sns publish --topic-arn $SNS_TOPIC_ARN --subject "Financial News Engine Deployment Status: $ENVIRONMENT" --message "Deployment completed but could not find Auto Scaling Group information."
+          echo "Could not find Auto Scaling Group name in stack outputs";
+          aws sns publish --topic-arn $SNS_TOPIC_ARN --subject "Financial News Engine Deployment Status: $ENVIRONMENT" --message "Deployment completed but could not find Auto Scaling Group information.";
         fi
   
   post_build:
