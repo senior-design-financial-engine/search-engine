@@ -10,275 +10,284 @@ phases:
   
   pre_build:
     commands:
-      - echo "Preparing API code for deployment"
-      - cd backend || (echo "Backend directory not found, using project root"; cd .)
-      - echo "Loading API code from source files"
-      - mkdir -p api/deploy
-      - cp backend.py api/deploy/app.py || echo "Using fallback app.py"
-      - cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
+      - echo "Preparing API deployment scripts"
+      - mkdir -p scripts
       
-      # If app.py wasn't found, use the stored version from backend-api.yaml
-      - if [ ! -f "api/deploy/app.py" ]; then
-          echo "Extracting app.py from backend-api.yaml";
-          python -c "import yaml
+      # Create the main deployment script
+      - cat > scripts/prepare-api-deployment.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "Preparing API code for deployment"
+cd backend || (echo "Backend directory not found, using project root"; cd .)
+echo "Loading API code from source files"
+mkdir -p api/deploy
+cp backend.py api/deploy/app.py || echo "Using fallback app.py"
+cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
+
+# If app.py wasn't found, use the stored version from backend-api.yaml
+if [ ! -f "api/deploy/app.py" ]; then
+  echo "Extracting app.py from backend-api.yaml"
+  python -c "
+import yaml
 with open('backend-api.yaml', 'r') as f:
     config = yaml.safe_load(f)
     with open('api/deploy/app.py', 'w') as app_file:
-        app_file.write(config.get('app_code', ''))";
-        fi
+        app_file.write(config.get('app_code', ''))
+  "
+fi
+
+# Prepare service file
+cat > api/deploy/financial-news.service << 'EOL'
+[Unit]
+Description=Financial News Engine Flask App
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/financial-news-engine
+Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
+Environment="FLASK_ENV=production"
+Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=/opt/financial-news-engine/.env
+ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
+Restart=always
+TimeoutStartSec=60
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Create deployment script
+cat > api/deploy/deploy.sh << 'EOL'
+#!/bin/bash
+set -e
+
+# Create directory if it doesn't exist
+mkdir -p /opt/financial-news-engine
+mkdir -p /opt/financial-news-engine/logs
+
+# Copy files
+cp app.py /opt/financial-news-engine/
+cp requirements.txt /opt/financial-news-engine/
+cp financial-news.service /etc/systemd/system/
+
+# Fetch parameters from SSM Parameter Store
+echo "Fetching credentials from SSM Parameter Store..."
+ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
+ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
+ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
+
+# Create .env file with environment variables
+cat > /opt/financial-news-engine/.env << EOLENV
+ELASTICSEARCH_URL=$ES_URL
+ELASTICSEARCH_API_KEY=$ES_API_KEY
+ELASTICSEARCH_INDEX=$ES_INDEX
+EOLENV
+chmod 600 /opt/financial-news-engine/.env
+echo "Created .env file with credentials from SSM Parameter Store"
+
+# Install dependencies
+cd /opt/financial-news-engine
+pip3 install -r requirements.txt
+
+# Set permissions
+chmod 755 /opt/financial-news-engine
+
+# Reload and start service
+systemctl daemon-reload
+systemctl enable financial-news.service
+systemctl restart financial-news.service
+
+echo "API deployment completed"
+EOL
+chmod +x api/deploy/deploy.sh
+
+# Create verification script
+cat > api/deploy/verify.sh << 'EOL'
+#!/bin/bash
+set -e
+
+echo "Verifying backend service startup..."
+
+# Wait for the service to start
+for i in {1..12}; do
+  if curl -s http://localhost:5000/ping > /dev/null; then
+    echo "Service is responding to ping"
+    break
+  fi
+  
+  if [ $i -eq 12 ]; then
+    echo "ERROR: Service failed to start within 60 seconds"
+    exit 1
+  fi
+  
+  echo "Waiting for service to start (attempt $i/12)..."
+  sleep 5
+done
+
+echo "Checking diagnostic report endpoint..."
+curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/report | grep -q "status" && echo "Diagnostic report endpoint is working" || echo "WARNING: Diagnostic report endpoint is not responding properly"
+
+echo "Checking query endpoint..."
+curl -s -H "Origin: https://financialnewsengine.com" "http://localhost:5000/query?query=test" | grep -q "results" && echo "Query endpoint is working" || echo "WARNING: Query endpoint is not responding properly"
+
+echo "Startup verification successful"
+EOL
+chmod +x api/deploy/verify.sh
+EOF
+      - chmod +x scripts/prepare-api-deployment.sh
       
-      # Prepare service file
-      - cat > api/deploy/financial-news.service << 'EOF'
-        [Unit]
-        Description=Financial News Engine Flask App
-        After=network.target
-        
-        [Service]
-        User=root
-        WorkingDirectory=/opt/financial-news-engine
-        Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
-        Environment="FLASK_ENV=production"
-        Environment="PYTHONUNBUFFERED=1"
-        EnvironmentFile=/opt/financial-news-engine/.env
-        ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
-        Restart=always
-        TimeoutStartSec=60
-        RestartSec=10
-        
-        [Install]
-        WantedBy=multi-user.target
-        EOF
+      # Create the instance deployment script
+      - cat > scripts/deploy-to-instances.sh << 'EOF'
+#!/bin/bash
+set -e
 
-      # Create deployment script
-      - cat > api/deploy/deploy.sh << 'EOF'
-        #!/bin/bash
-        set -e
-        
-        # Create directory if it doesn't exist
-        mkdir -p /opt/financial-news-engine
-        mkdir -p /opt/financial-news-engine/logs
-        
-        # Copy files
-        cp app.py /opt/financial-news-engine/
-        cp requirements.txt /opt/financial-news-engine/
-        cp financial-news.service /etc/systemd/system/
-        
-        # Fetch parameters from SSM Parameter Store
-        echo "Fetching credentials from SSM Parameter Store..."
-        ES_URL=$(aws ssm get-parameter --name "/financial-news/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text)
-        ES_API_KEY=$(aws ssm get-parameter --name "/financial-news/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text)
-        ES_INDEX=$(aws ssm get-parameter --name "/financial-news/elasticsearch-index" --with-decryption --query "Parameter.Value" --output text)
-        
-        # Create .env file with environment variables
-        cat > /opt/financial-news-engine/.env << EOL
-        ELASTICSEARCH_URL=$ES_URL
-        ELASTICSEARCH_API_KEY=$ES_API_KEY
-        ELASTICSEARCH_INDEX=$ES_INDEX
-        EOL
-        chmod 600 /opt/financial-news-engine/.env
-        echo "Created .env file with credentials from SSM Parameter Store"
-        
-        # Install dependencies
-        cd /opt/financial-news-engine
-        pip3 install -r requirements.txt
-        
-        # Set permissions
-        chmod 755 /opt/financial-news-engine
-        
-        # Reload and start service
-        systemctl daemon-reload
-        systemctl enable financial-news.service
-        systemctl restart financial-news.service
-        
-        echo "API deployment completed"
-        EOF
-      - chmod +x api/deploy/deploy.sh
+echo "Getting backend instances from Auto Scaling Group"
+ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+echo "Auto Scaling Group: $ASG_NAME"
 
-      # Create verification script
-      - cat > api/deploy/verify.sh << 'EOF'
-        #!/bin/bash
-        set -e
-        
-        echo "Verifying backend service startup..."
-        
-        # Wait for the service to start
-        for i in {1..12}; do
-          if curl -s http://localhost:5000/ping > /dev/null; then
-            echo "Service is responding to ping"
-            break
-          fi
-          
-          if [ $i -eq 12 ]; then
-            echo "ERROR: Service failed to start within 60 seconds"
-            exit 1
-          fi
-          
-          echo "Waiting for service to start (attempt $i/12)..."
-          sleep 5
-        done
-        
-        echo "Checking diagnostic report endpoint..."
-        curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/report | grep -q "status" && echo "Diagnostic report endpoint is working" || echo "WARNING: Diagnostic report endpoint is not responding properly"
-        
-        echo "Checking query endpoint..."
-        curl -s -H "Origin: https://financialnewsengine.com" "http://localhost:5000/query?query=test" | grep -q "results" && echo "Query endpoint is working" || echo "WARNING: Query endpoint is not responding properly"
-        
-        echo "Startup verification successful"
-        EOF
-      - chmod +x api/deploy/verify.sh
+INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
+echo "Instance IDs: $INSTANCE_IDS"
+
+if [ -z "$INSTANCE_IDS" ]; then
+  echo "No running instances found in Auto Scaling Group"
+  exit 0
+fi
+
+# Deploy to each instance
+for INSTANCE_ID in $INSTANCE_IDS; do
+  echo "Deploying to instance $INSTANCE_ID"
+  
+  # Use SSM to upload and execute the deployment files
+  aws ssm send-command \
+    --document-name "AWS-RunShellScript" \
+    --targets Key=instanceids,Values=$INSTANCE_ID \
+    --parameters '{"commands":["mkdir -p /tmp/api-deploy"]}' \
+    --comment "Create staging directory" \
+    --output text
+  
+  # Upload files one by one to avoid complex YAML
+  aws s3 cp api/deploy/app.py s3://financial-news-assets/temp/app.py
+  aws s3 cp api/deploy/requirements.txt s3://financial-news-assets/temp/requirements.txt
+  aws s3 cp api/deploy/financial-news.service s3://financial-news-assets/temp/financial-news.service
+  aws s3 cp api/deploy/deploy.sh s3://financial-news-assets/temp/deploy.sh
+  aws s3 cp api/deploy/verify.sh s3://financial-news-assets/temp/verify.sh
+  
+  # Download files on the instance and execute
+  aws ssm send-command \
+    --document-name "AWS-RunShellScript" \
+    --targets Key=instanceids,Values=$INSTANCE_ID \
+    --parameters '{"commands":[
+      "cd /tmp/api-deploy",
+      "aws s3 cp s3://financial-news-assets/temp/app.py .",
+      "aws s3 cp s3://financial-news-assets/temp/requirements.txt .",
+      "aws s3 cp s3://financial-news-assets/temp/financial-news.service .",
+      "aws s3 cp s3://financial-news-assets/temp/deploy.sh .",
+      "aws s3 cp s3://financial-news-assets/temp/verify.sh .",
+      "chmod +x deploy.sh verify.sh",
+      "./deploy.sh",
+      "./verify.sh"
+    ]}' \
+    --comment "Deploy and verify API" \
+    --output text
+  
+  echo "Deployment to instance $INSTANCE_ID completed"
+done
+EOF
+      - chmod +x scripts/deploy-to-instances.sh
+      
+      # Create the create-yaml script
+      - cat > scripts/create-api-yaml.sh << 'EOF'
+#!/bin/bash
+set -e
+
+cat > backend-api.yaml << YAMLEOF
+---
+# Financial News Engine API Configuration
+# This file contains the API code to be deployed to the backend instances
+
+app_code: |
+$(sed 's/^/  /' api/deploy/app.py)
+
+requirements: |
+$(sed 's/^/  /' api/deploy/requirements.txt)
+
+service_definition: |
+$(sed 's/^/  /' api/deploy/financial-news.service)
+
+verification_script: |
+$(sed 's/^/  /' api/deploy/verify.sh)
+YAMLEOF
+
+echo "Created backend-api.yaml"
+echo "Uploading API code to S3"
+aws s3 cp backend-api.yaml s3://financial-news-assets/api/backend-api.yaml
+echo "API code uploaded successfully"
+EOF
+      - chmod +x scripts/create-api-yaml.sh
+      
+      # Create the instance refresh script
+      - cat > scripts/refresh-instances.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "Starting ASG instance refresh to deploy API changes to all instances"
+ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+
+if [ -n "$ASG_NAME" ]; then
+  echo "Found Auto Scaling Group: $ASG_NAME"
+  
+  # Start an instance refresh with 50% min healthy percentage
+  REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text)
+  
+  if [ -n "$REFRESH_ID" ]; then
+    echo "Started instance refresh with ID: $REFRESH_ID"
+    
+    # Wait for up to 5 minutes for the refresh to complete
+    MAX_RETRIES=30
+    for i in $(seq 1 $MAX_RETRIES); do
+      STATUS=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name $ASG_NAME --instance-refresh-ids $REFRESH_ID --query "InstanceRefreshes[0].Status" --output text)
+      
+      echo "Instance refresh status: $STATUS (Attempt $i/$MAX_RETRIES)"
+      
+      if [ "$STATUS" = "Successful" ]; then
+        echo "Instance refresh completed successfully"
+        break
+      elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+        echo "Instance refresh failed or was cancelled"
+        # Continue deployment even if refresh failed - don't fail the build
+        break
+      fi
+      
+      if [ $i -eq $MAX_RETRIES ]; then
+        echo "Timed out waiting for instance refresh to complete. Current status: $STATUS"
+        echo "Deployment will continue, refresh will continue in the background."
+      else
+        echo "Waiting 10 seconds before checking status again..."
+        sleep 10
+      fi
+    done
+  else
+    echo "WARNING: Could not start instance refresh. Deployment may require manual instance refresh."
+  fi
+else
+  echo "WARNING: Could not find Auto Scaling Group name. Instance refresh could not be performed."
+fi
+EOF
+      - chmod +x scripts/refresh-instances.sh
   
   build:
     commands:
-      - echo "Getting backend instances from Auto Scaling Group"
-      - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-      - echo "Auto Scaling Group: $ASG_NAME"
-      
-      - INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
-      - echo "Instance IDs: $INSTANCE_IDS"
-      
-      - if [ -z "$INSTANCE_IDS" ]; then
-          echo "No running instances found in Auto Scaling Group";
-          exit 0;
-        fi
-      
-      # Deploy to each instance using SSM Run Command
-      - for INSTANCE_ID in $INSTANCE_IDS; do
-          echo "Deploying to instance $INSTANCE_ID";
-          
-          # Create a staging directory on the instance
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["mkdir -p /tmp/api-deploy"] \
-            --comment "Create staging directory for API deployment" \
-            --output text;
-          
-          # Upload each deployment file
-          echo "Uploading app.py";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cat > /tmp/api-deploy/app.py << 'EOL'\n$(cat api/deploy/app.py)\nEOL"] \
-            --comment "Upload app.py" \
-            --output text;
-          
-          echo "Uploading requirements.txt";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cat > /tmp/api-deploy/requirements.txt << 'EOL'\n$(cat api/deploy/requirements.txt)\nEOL"] \
-            --comment "Upload requirements.txt" \
-            --output text;
-          
-          echo "Uploading service file";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cat > /tmp/api-deploy/financial-news.service << 'EOL'\n$(cat api/deploy/financial-news.service)\nEOL"] \
-            --comment "Upload service file" \
-            --output text;
-          
-          echo "Uploading deployment script";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cat > /tmp/api-deploy/deploy.sh << 'EOL'\n$(cat api/deploy/deploy.sh)\nEOL\nchmod +x /tmp/api-deploy/deploy.sh"] \
-            --comment "Upload deployment script" \
-            --output text;
-          
-          echo "Uploading verification script";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cat > /tmp/api-deploy/verify.sh << 'EOL'\n$(cat api/deploy/verify.sh)\nEOL\nchmod +x /tmp/api-deploy/verify.sh"] \
-            --comment "Upload verification script" \
-            --output text;
-          
-          # Execute deployment
-          echo "Executing deployment on instance $INSTANCE_ID";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cd /tmp/api-deploy && ./deploy.sh"] \
-            --comment "Run API deployment" \
-            --output text;
-          
-          # Execute verification
-          echo "Verifying deployment on instance $INSTANCE_ID";
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["cd /tmp/api-deploy && ./verify.sh"] \
-            --comment "Verify API deployment" \
-            --output text;
-        done
+      - echo "Executing API deployment scripts"
+      - ./scripts/prepare-api-deployment.sh
+      - ./scripts/deploy-to-instances.sh
+      - ./scripts/create-api-yaml.sh
+      - ./scripts/refresh-instances.sh
   
   post_build:
     commands:
-      - cat > backend-api.yaml << EOF
-        ---
-        # Financial News Engine API Configuration
-        # This file contains the API code to be deployed to the backend instances
-        
-        app_code: |
-          $(cat api/deploy/app.py)
-        
-        requirements: |
-          $(cat api/deploy/requirements.txt)
-        
-        service_definition: |
-          $(cat api/deploy/financial-news.service)
-        
-        verification_script: |
-          $(cat api/deploy/verify.sh)
-        EOF
-      - ls -la
-      - echo "Created backend-api.yaml"
-      - echo "Uploading API code to S3"
-      - aws s3 cp backend-api.yaml s3://financial-news-assets/api/backend-api.yaml
-      - echo "API code uploaded successfully"
-      - echo "Starting ASG instance refresh to deploy API changes to all instances"
-      - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-      
-      - if [ -n "$ASG_NAME" ]; then
-          echo "Found Auto Scaling Group: $ASG_NAME";
-          
-          # Start an instance refresh with 50% min healthy percentage
-          REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text);
-          
-          if [ -n "$REFRESH_ID" ]; then
-            echo "Started instance refresh with ID: $REFRESH_ID";
-            
-            # Wait for up to 5 minutes for the refresh to complete
-            MAX_RETRIES=30;
-            for i in $(seq 1 $MAX_RETRIES); do
-              STATUS=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name $ASG_NAME --instance-refresh-ids $REFRESH_ID --query "InstanceRefreshes[0].Status" --output text);
-              
-              echo "Instance refresh status: $STATUS (Attempt $i/$MAX_RETRIES)";
-              
-              if [ "$STATUS" = "Successful" ]; then
-                echo "Instance refresh completed successfully";
-                break;
-              elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
-                echo "Instance refresh failed or was cancelled";
-                # Continue deployment even if refresh failed - don't fail the build
-                break;
-              fi;
-              
-              if [ $i -eq $MAX_RETRIES ]; then
-                echo "Timed out waiting for instance refresh to complete. Current status: $STATUS";
-                echo "Deployment will continue, refresh will continue in the background.";
-              else
-                echo "Waiting 10 seconds before checking status again...";
-                sleep 10;
-              fi;
-            done;
-          else
-            echo "WARNING: Could not start instance refresh. Deployment may require manual instance refresh.";
-          fi;
-        else
-          echo "WARNING: Could not find Auto Scaling Group name. Instance refresh could not be performed.";
-        fi
       - echo "API deployment completed"
 
 artifacts:

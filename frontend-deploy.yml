@@ -4,93 +4,75 @@ phases:
     runtime-versions:
       nodejs: 16
     commands:
-      - echo "Running frontend deployment from root fallback buildspec..."
-      - echo "Current directory: $(pwd)"
-      - ls -la
-      - echo "Looking for all buildspecs in the workspace:"
-      - find . -name "*.yml" -type f | grep -i deploy || echo "No deployment YML files found in find results"
+      - echo "Running frontend deployment..."
   
   pre_build:
     commands:
       - echo "Preparing for deployment..."
-      - if [ -d "buildspecs" ]; then
-          echo "Found buildspecs directory, checking for frontend-deploy.yml";
-          if [ -f "buildspecs/frontend-deploy.yml" ]; then
-            echo "Found buildspecs/frontend-deploy.yml, will use that instead";
-            cat buildspecs/frontend-deploy.yml > frontend-deploy-temp.yml;
-            export BUILDSPEC_OVERRIDE=true;
-          fi
-        fi
-      - echo "Checking for source files..."
-      - if [ ! -d "frontend/build" ] && [ -d "build" ]; then
-          echo "Found build directory at root level, will use this";
-        elif [ ! -d "frontend/build" ] && [ ! -d "build" ]; then
-          echo "WARNING: No build directory found. Checking if we need to build from source...";
-          if [ -f "frontend/package.json" ]; then
-            echo "Found frontend source, will attempt to build";
-            cd frontend && npm install && npm run build && cd ..;
-            mkdir -p build;
-            cp -r frontend/build/* build/;
-          elif [ -f "package.json" ]; then
-            echo "Found package.json at root, will attempt to build";
-            npm install && npm run build;
-          else
-            echo "ERROR: No build directory or source files found";
-            exit 1;
-          fi
-        fi
+      - mkdir -p scripts
+      - cat > scripts/deploy-frontend.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "Checking for source files..."
+if [ ! -d "frontend/build" ] && [ -d "build" ]; then
+  echo "Found build directory at root level, will use this"
+elif [ ! -d "frontend/build" ] && [ ! -d "build" ]; then
+  echo "WARNING: No build directory found. Checking if we need to build from source..."
+  if [ -f "frontend/package.json" ]; then
+    echo "Found frontend source, will attempt to build"
+    cd frontend && npm install && npm run build && cd ..
+    mkdir -p build
+    cp -r frontend/build/* build/
+  elif [ -f "package.json" ]; then
+    echo "Found package.json at root, will attempt to build"
+    npm install && npm run build
+  else
+    echo "ERROR: No build directory or source files found"
+    exit 1
+  fi
+fi
+
+echo "Retrieving S3 bucket name from CloudFormation stack output..."
+BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
+if [ -z "$BUCKET_NAME" ]; then
+  echo "ERROR: Could not retrieve bucket name from CloudFormation stack"
+  echo "Checking for any S3 buckets with 'frontend' in the name:"
+  aws s3 ls | grep frontend
+  echo "Will try to continue with deployment anyway"
+  exit 1
+fi
+
+echo "Retrieved bucket name: $BUCKET_NAME"
+echo "Syncing build files to S3 bucket..."
+if [ -d "build" ]; then
+  aws s3 sync build/ s3://$BUCKET_NAME/ --delete
+elif [ -d "frontend/build" ]; then
+  aws s3 sync frontend/build/ s3://$BUCKET_NAME/ --delete
+else
+  aws s3 sync ./ s3://$BUCKET_NAME/ --delete --exclude "buildspecs/*" --exclude "*.yml" --exclude "scripts/*"
+fi
+
+echo "Creating CloudFront invalidation..."
+CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
+if [ -n "$CLOUDFRONT_ID" ]; then
+  aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
+else
+  echo "WARNING: Could not retrieve CloudFront distribution ID"
+fi
+
+echo "Frontend deployment to S3 completed successfully!"
+EOF
+      - chmod +x scripts/deploy-frontend.sh
   
   build:
     commands:
-      - echo "Preparing deployment artifacts..."
-      - echo "Listing contents of current directory:"
-      - ls -la
-      - if [ "$BUILDSPEC_OVERRIDE" = "true" ]; then
-          echo "Using buildspecs/frontend-deploy.yml instead";
-          exit 0;
-        fi
+      - echo "Executing frontend deployment..."
+      - ./scripts/deploy-frontend.sh
   
   post_build:
     commands:
-      - echo "Post-build phase completed"
-      - echo "Deployment artifacts ready"
-      - echo "Retrieving S3 bucket name from CloudFormation stack output..."
-      - export BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
-      - if [ -z "$BUCKET_NAME" ]; then
-          echo "ERROR: Could not retrieve bucket name from CloudFormation stack";
-          echo "Checking for any S3 buckets with 'frontend' in the name:";
-          aws s3 ls | grep frontend;
-          echo "Will try to continue with deployment anyway";
-          exit 1;
-        fi
-      - echo "Retrieved bucket name: $BUCKET_NAME"
-      - echo "Syncing build files to S3 bucket..."
-      - if [ -d "build" ]; then
-          aws s3 sync build/ s3://$BUCKET_NAME/ --delete;
-        elif [ -d "frontend/build" ]; then
-          aws s3 sync frontend/build/ s3://$BUCKET_NAME/ --delete;
-        else
-          aws s3 sync ./ s3://$BUCKET_NAME/ --delete --exclude "buildspecs/*" --exclude "*.yml" --exclude "scripts/*";
-        fi
-      - echo "Creating CloudFront invalidation..."
-      - export CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
-      - if [ -n "$CLOUDFRONT_ID" ]; then
-          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*";
-        else
-          echo "WARNING: Could not retrieve CloudFront distribution ID";
-        fi
-      - echo "Frontend deployment to S3 completed successfully!"
-      # Deploy to each instance using SSM Run Command
-      - for INSTANCE_ID in $INSTANCE_IDS; do
-          echo "Deploying to instance $INSTANCE_ID";
-          
-          # Create a staging directory on the instance
-          aws ssm send-command \
-            --instance-ids $INSTANCE_ID \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands=["mkdir -p /tmp/api-deploy"] \
-            --comment "Create staging directory for API deployment" \
-            --output text;
+      - echo "Frontend deployment completed"
 
 artifacts:
   files:
