@@ -103,7 +103,8 @@ phases:
       - echo "Stack name: $FRONTEND_STACK_NAME"
       - BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" --output text)
       - echo "Retrieved bucket name: $BUCKET_NAME"
-      - if [ -z "$BUCKET_NAME" ]; then 
+      - |
+        if [ -z "$BUCKET_NAME" ]; then 
           echo "Could not retrieve bucket name from CloudFormation stack"
           echo "Available S3 buckets:"
           aws s3 ls | grep frontend
@@ -130,7 +131,8 @@ phases:
       - echo "Stack name: $FRONTEND_STACK_NAME"
       - CLOUDFRONT_ID=$(aws cloudformation describe-stacks --stack-name $FRONTEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" --output text)
       - echo "Retrieved CloudFront ID: $CLOUDFRONT_ID"
-      - if [ -n "$CLOUDFRONT_ID" ]; then 
+      - |
+        if [ -n "$CLOUDFRONT_ID" ]; then 
           echo "Creating CloudFront invalidation for distribution $CLOUDFRONT_ID"
           aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
           echo "Waiting for invalidation to complete..."

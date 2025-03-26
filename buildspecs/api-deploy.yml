@@ -50,13 +50,13 @@ phases:
       
       # Deploy to each instance
       - echo "Deploying to instances"
-      - |
+      - |-
         for INSTANCE_ID in $INSTANCE_IDS; do 
-          echo "Deploying to instance $INSTANCE_ID"
-          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text
-          DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://financial-news-assets/temp/app.py . && aws s3 cp s3://financial-news-assets/temp/requirements.txt . && aws s3 cp s3://financial-news-assets/temp/financial-news.service . && aws s3 cp s3://financial-news-assets/temp/deploy.sh . && aws s3 cp s3://financial-news-assets/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
-          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text
-          echo "Deployment to instance $INSTANCE_ID completed"
+          echo "Deploying to instance $INSTANCE_ID";
+          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text;
+          DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://financial-news-assets/temp/app.py . && aws s3 cp s3://financial-news-assets/temp/requirements.txt . && aws s3 cp s3://financial-news-assets/temp/financial-news.service . && aws s3 cp s3://financial-news-assets/temp/deploy.sh . && aws s3 cp s3://financial-news-assets/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh";
+          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text;
+          echo "Deployment to instance $INSTANCE_ID completed";
         done
   
   post_build:
@@ -81,7 +81,8 @@ phases:
       
       - echo "Starting ASG instance refresh"
       - ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
-      - if [ -n "$ASG_NAME" ]; then 
+      - |
+        if [ -n "$ASG_NAME" ]; then 
           echo "Found ASG $ASG_NAME"
           REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text)
           if [ -n "$REFRESH_ID" ]; then 
