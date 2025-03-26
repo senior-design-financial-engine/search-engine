@@ -226,6 +226,13 @@ Resources:
                   - 'autoscaling:CancelInstanceRefresh'
                   - 'autoscaling:CompleteLifecycleAction'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:SendCommand'
+                  - 'ssm:DescribeInstanceInformation'
+                  - 'ssm:GetCommandInvocation'
+                  - 'ssm:CancelCommand'
+                Resource: '*'
 
   # Frontend CodeBuild Project
   FrontendBuildProject:

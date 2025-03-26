@@ -1,18 +1,18 @@
 [Unit]
-Description=Financial News Engine Flask App
+Description=Financial News API Service
 After=network.target
 
 [Service]
-User=root
-WorkingDirectory=/opt/financial-news-engine
-Environment="CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com"
-Environment="FLASK_ENV=production"
-Environment="PYTHONUNBUFFERED=1"
-EnvironmentFile=/opt/financial-news-engine/.env
-ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 app:app --access-logfile logs/access.log --error-logfile logs/error.log --capture-output --log-level info
-Restart=always
-TimeoutStartSec=60
-RestartSec=10
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/financial-news
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/financial-news/venv/bin/python3 /opt/financial-news/app.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=financial-news
 
 [Install]
 WantedBy=multi-user.target 

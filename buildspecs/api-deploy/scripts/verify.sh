@@ -1,28 +1,52 @@
 #!/bin/bash
-set -e
 
-echo "Verifying backend service startup..."
+echo "Verifying API deployment"
 
-# Wait for the service to start
-for i in {1..12}; do
-  if curl -s http://localhost:5000/ping > /dev/null; then
-    echo "Service is responding to ping"
+# Define constants
+SERVICE_NAME="financial-news"
+APP_DIR="/opt/financial-news"
+MAX_RETRIES=5
+RETRY_DELAY=10
+STATUS_PORT=8000
+
+# Check if service is running
+echo "Checking service status"
+if ! systemctl is-active --quiet $SERVICE_NAME; then
+  echo "ERROR: Service $SERVICE_NAME is not running"
+  systemctl status $SERVICE_NAME
+  exit 1
+fi
+
+echo "Service is running"
+
+# Check if application process is running
+PID=$(pgrep -f "python.*app.py" || echo "")
+if [ -z "$PID" ]; then
+  echo "ERROR: No Python process found for the API"
+  exit 1
+fi
+
+echo "API process is running with PID: $PID"
+
+# Wait for API to be responsive
+echo "Checking API health endpoint..."
+for i in $(seq 1 $MAX_RETRIES); do
+  echo "Attempt $i of $MAX_RETRIES..."
+  
+  # Try a local request to health or status endpoint
+  if curl -s "http://localhost:$STATUS_PORT/health" | grep -q "ok"; then
+    echo "SUCCESS: API health check passed"
     break
   fi
   
-  if [ $i -eq 12 ]; then
-    echo "ERROR: Service failed to start within 60 seconds"
+  if [ $i -eq $MAX_RETRIES ]; then
+    echo "ERROR: API health check failed after $MAX_RETRIES attempts"
     exit 1
   fi
   
-  echo "Waiting for service to start (attempt $i/12)..."
-  sleep 5
+  echo "Waiting $RETRY_DELAY seconds before next attempt..."
+  sleep $RETRY_DELAY
 done
 
-echo "Checking diagnostic report endpoint..."
-curl -s -H "Origin: https://financialnewsengine.com" http://localhost:5000/diagnostic/report | grep -q "status" && echo "Diagnostic endpoint working" || echo "WARNING: Diagnostic endpoint not responding properly"
-
-echo "Checking query endpoint..."
-curl -s -H "Origin: https://financialnewsengine.com" "http://localhost:5000/query?query=test" | grep -q "results" && echo "Query endpoint working" || echo "WARNING: Query endpoint not responding properly"
-
-echo "Startup verification successful" 
+echo "API verification completed successfully"
+exit 0 

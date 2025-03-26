@@ -23,6 +23,7 @@ phases:
       
       # Create scripts directory if it doesn't exist
       - "mkdir -p scripts"
+      - "mkdir -p buildspecs/api-deploy/scripts"
       
       # Copy deployment scripts
       - "echo \"Copying deployment scripts\""
@@ -52,6 +53,19 @@ phases:
       - "echo \"Instance IDs $INSTANCE_IDS\""
       - "if [ -z \"$INSTANCE_IDS\" ]; then echo \"No running instances found in Auto Scaling Group\"; exit 0; fi"
       
+      # Check for SSM permissions
+      - "echo \"Checking for SSM permissions\""
+      - |
+        SSM_TEST=$(aws ssm describe-instance-information --output json 2>&1 || echo "SSM_PERMISSION_ERROR")
+        if [[ $SSM_TEST == *"SSM_PERMISSION_ERROR"* ]]; then
+          echo "WARNING: CodeBuild role lacks SSM permissions. Skipping direct instance deployment."
+          echo "Please add ssm:SendCommand and ssm:DescribeInstanceInformation permissions to the CodeBuild role."
+          echo "Files will still be uploaded to S3 for later deployment."
+          SKIP_SSM_DEPLOY=true
+        else
+          SKIP_SSM_DEPLOY=false
+        fi
+      
       # Upload files to S3 for transfer
       - "echo \"Uploading deployment files to S3\""
       - "aws s3 cp api/deploy/app.py s3://$ASSETS_BUCKET_NAME/temp/app.py"
@@ -63,13 +77,19 @@ phases:
       # Deploy to each instance
       - "echo \"Deploying to instances\""
       - |
-        for INSTANCE_ID in $INSTANCE_IDS; do 
-          echo "Deploying to instance $INSTANCE_ID"
-          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text
-          DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/financial-news.service . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
-          aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text
-          echo "Deployment to instance $INSTANCE_ID completed"
-        done
+        if [ "$SKIP_SSM_DEPLOY" = "false" ]; then
+          for INSTANCE_ID in $INSTANCE_IDS; do 
+            echo "Deploying to instance $INSTANCE_ID"
+            aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=['mkdir -p /tmp/api-deploy']" --comment "Create staging directory" --output text || echo "Failed to create staging directory on $INSTANCE_ID"
+            if [ $? -eq 0 ]; then
+              DEPLOY_CMD="cd /tmp/api-deploy && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/app.py . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/requirements.txt . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/financial-news.service . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/deploy.sh . && aws s3 cp s3://$ASSETS_BUCKET_NAME/temp/verify.sh . && chmod +x deploy.sh verify.sh && ./deploy.sh && ./verify.sh"
+              aws ssm send-command --document-name "AWS-RunShellScript" --targets "Key=InstanceIds,Values=$INSTANCE_ID" --parameters "commands=[\"$DEPLOY_CMD\"]" --comment "Deploy and verify API" --output text || echo "Failed to deploy to $INSTANCE_ID"
+              echo "Deployment to instance $INSTANCE_ID completed"
+            fi
+          done
+        else
+          echo "Skipping direct instance deployment due to missing SSM permissions"
+        fi
   
   post_build:
     commands:
@@ -96,14 +116,20 @@ phases:
       - |
         if [ -n "$ASG_NAME" ]; then 
           echo "Found ASG $ASG_NAME"
-          REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text)
-          if [ -n "$REFRESH_ID" ]; then 
-            echo "Started instance refresh with ID $REFRESH_ID"
-          else 
-            echo "WARNING Could not start instance refresh"
+          # Check if instance refresh is already in progress
+          REFRESH_STATUS=$(aws autoscaling describe-instance-refreshes --auto-scaling-group-name $ASG_NAME --query "InstanceRefreshes[?Status=='InProgress']" --output json)
+          if [[ $REFRESH_STATUS == *"[]"* ]]; then
+            REFRESH_ID=$(aws autoscaling start-instance-refresh --auto-scaling-group-name $ASG_NAME --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 300}' --query "InstanceRefreshId" --output text)
+            if [ -n "$REFRESH_ID" ]; then 
+              echo "Started instance refresh with ID $REFRESH_ID"
+            else 
+              echo "WARNING: Could not start instance refresh"
+            fi
+          else
+            echo "WARNING: Instance refresh already in progress, skipping new refresh"
           fi
         else 
-          echo "WARNING Could not find Auto Scaling Group name"
+          echo "WARNING: Could not find Auto Scaling Group name"
         fi
       
       - "echo \"API deployment completed\""

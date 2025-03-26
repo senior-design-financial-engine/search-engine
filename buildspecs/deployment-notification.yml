@@ -32,7 +32,7 @@ phases:
             REFRESH_END_TIME=$(echo $LATEST_REFRESH | jq -r '.EndTime // "In Progress"')
             REFRESH_PERCENTAGE_COMPLETE=$(echo $LATEST_REFRESH | jq -r '.PercentageComplete // "0"')
             
-            MESSAGE=$(cat <<EOF
+            MESSAGE=$(cat <<MESSAGE_EOF
 Deployment and Instance Refresh Status for $ENVIRONMENT Environment
 
 Auto Scaling Group: $ASG_NAME
@@ -45,7 +45,7 @@ Percentage Complete: ${REFRESH_PERCENTAGE_COMPLETE}%
 Active Instances: $INSTANCE_IDS
 
 For more details, visit the AWS Console.
-EOF
+MESSAGE_EOF
 )
           else
             MESSAGE="Deployment completed but no instance refresh information found for Auto Scaling Group $ASG_NAME"
