@@ -7,99 +7,100 @@ BU ECE Capstone Project: an effective financial search engine
 search-engine/
 ├── backend/
 │   ├── api/
-│   ├── es_database/
 │   │   ├── __init__.py
-│   │   ├── DataValidator.py
-│   │   ├── Engine.py
-│   │   ├── EngineConfig.py
-│   │   ├── StorageManager.py
-│   │   └── README.md
-│   ├── scraper/
+│   │   ├── es_database/
+│   │   │   ├── __init__.py
+│   │   │   ├── DataValidator.py
+│   │   │   ├── Engine.py
+│   │   │   ├── EngineConfig.py
+│   │   │   ├── StorageManager.py
+│   │   │   └── README.md
+│   │   ├── scraper/
+│   │   │   ├── __init__.py
+│   │   │   ├── README.md
+│   │   │   ├── scrapers.py
+│   │   │   ├── run_scrapers.py
+│   │   │   ├── data/
+│   │   │   └── articles/
+│   │   ├── backend-scripts/
+│   │   │   ├── before_install.sh
+│   │   │   └── deploy.sh
+│   │   ├── utils/
+│   │   ├── .env
+│   │   ├── .env.test
 │   │   ├── __init__.py
+│   │   ├── appspec.yml
+│   │   ├── backend.py
+│   │   ├── check_es_connection.py
+│   │   ├── CI_TEST_README.md
+│   │   ├── conftest.py
+│   │   ├── elasticsearch_test.py
+│   │   ├── pytest.ini
 │   │   ├── README.md
-│   │   ├── scrapers.py
-│   │   ├── run_scrapers.py
-│   │   ├── data/
-│   │   └── articles/
-│   ├── backend-scripts/
+│   │   ├── requirements.txt
+│   │   ├── reset_and_scrape.py
+│   │   ├── update_all_processed_urls.py
+│   │   ├── update_es_database.py
+│   │   └── update_processed_urls.py
+│   ├── buildspecs/
+│   │   ├── api-deploy/
+│   │   │   ├── api-scripts/
+│   │   │   │   ├── deploy.sh
+│   │   │   │   ├── extract_app.py
+│   │   │   │   ├── create_env_file.sh
+│   │   │   │   ├── lifecycle_handler.sh
+│   │   │   │   ├── financial-news.service
+│   │   │   │   └── verify.sh
+│   │   │   ├── api-deploy.yml
+│   │   │   ├── backend-build.yml
+│   │   │   ├── backend-deploy.yml
+│   │   │   ├── deployment-notification.yml
+│   │   │   ├── frontend-build.yml
+│   │   │   ├── frontend-deploy.yml
+│   │   │   └── README.md
+│   ├── frontend/
+│   │   ├── public/
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   ├── services/
+│   │   │   ├── styles/
+│   │   │   ├── App.css
+│   │   │   ├── App.js
+│   │   │   ├── App.test.js
+│   │   │   ├── index.css
+│   │   │   ├── index.js
+│   │   │   └── setupTests.js
+│   │   ├── .env.development
+│   │   ├── .env.production
+│   │   ├── appspec.yml
+│   │   ├── jest.config.js
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   └── README.md
+│   ├── deployment-scripts/
+│   │   ├── after_install.sh
 │   │   ├── before_install.sh
-│   │   └── deploy.sh
-│   ├── utils/
+│   │   ├── cleanup.sh
+│   │   ├── create_env_file.sh
+│   │   ├── lifecycle_handler.sh
+│   │   └── verify_es.sh
 │   ├── .env
-│   ├── .env.test
-│   ├── __init__.py
+│   ├── .env.example
+│   ├── ARCHITECTURE.md
 │   ├── appspec.yml
-│   ├── backend.py
-│   ├── check_es_connection.py
-│   ├── CI_TEST_README.md
-│   ├── conftest.py
-│   ├── elasticsearch_test.py
-│   ├── pytest.ini
-│   ├── README.md
-│   ├── requirements.txt
-│   ├── reset_and_scrape.py
-│   ├── update_all_processed_urls.py
-│   ├── update_es_database.py
-│   └── update_processed_urls.py
-├── buildspecs/
-│   ├── api-deploy/
-│   │   ├── api-scripts/
-│   │   │   ├── deploy.sh
-│   │   │   ├── extract_app.py
-│   │   │   ├── create_env_file.sh
-│   │   │   ├── lifecycle_handler.sh
-│   │   │   ├── financial-news.service
-│   │   │   └── verify.sh
-│   ├── api-deploy.yml
-│   ├── backend-build.yml
-│   ├── backend-deploy.yml
-│   ├── deployment-notification.yml
-│   ├── frontend-build.yml
+│   ├── backend-api.yaml
+│   ├── backend-buildspec.yml
+│   ├── backend-template.yaml
+│   ├── buildspec.yml
+│   ├── cicd-template.yaml
+│   ├── deployspec.yml
 │   ├── frontend-deploy.yml
-│   └── README.md
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── services/
-│   │   ├── styles/
-│   │   ├── App.css
-│   │   ├── App.js
-│   │   ├── App.test.js
-│   │   ├── index.css
-│   │   ├── index.js
-│   │   └── setupTests.js
-│   ├── .env.development
-│   ├── .env.production
-│   ├── appspec.yml
-│   ├── jest.config.js
-│   ├── package-lock.json
-│   ├── package.json
-│   └── README.md
-├── deployment-scripts/
-│   ├── after_install.sh
-│   ├── before_install.sh
-│   ├── cleanup.sh
-│   ├── create_env_file.sh
-│   ├── lifecycle_handler.sh
-│   └── verify_es.sh
-├── .env
-├── .env.example
-├── ARCHITECTURE.md
-├── appspec.yml
-├── backend-api.yaml
-├── backend-buildspec.yml
-├── backend-template.yaml
-├── buildspec.yml
-├── cicd-template.yaml
-├── deployspec.yml
-├── frontend-deploy.yml
-├── frontend-template.yaml
-├── LICENSE
-├── README.md
-├── start.sh
-├── stop.sh
-└── vpc-template.yaml
+│   ├── frontend-template.yaml
+│   ├── LICENSE
+│   ├── README.md
+│   ├── start.sh
+│   ├── stop.sh
+│   └── vpc-template.yaml
 ```
 
 ## Cloud Structure (EC2 Instance)
@@ -179,11 +180,12 @@ Parameters are stored in AWS Systems Manager Parameter Store under this hierarch
 
 ```
 /financial-news/
-├── elasticsearch-url
-├── elasticsearch-api-key
-├── elasticsearch-index
-├── es-number-of-shards
-├── es-number-of-replicas
+├── elasticsearch/
+│   ├── endpoint
+│   ├── api_key
+│   ├── index
+│   ├── shards
+│   └── replicas
 └── environment
 ```
 

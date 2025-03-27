@@ -37,23 +37,24 @@ function get_parameter() {
     local exit_code=1
     
     while [ $attempt -le $max_attempts ]; do
-        # Capture both the value and any error messages
-        value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>&1)
+        # Capture only the value, redirect error messages to stderr
+        value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
         exit_code=$?
         
         if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then
-            echo -e "${GREEN}Successfully retrieved parameter: $param_name (Attempt $attempt)${NC}"
+            echo -e "${GREEN}Successfully retrieved parameter: $param_name (Attempt $attempt)${NC}" >&2
+            # Only output the clean value, no debug messages
             echo "$value"
             return 0
         else
             if [ $attempt -lt $max_attempts ]; then
                 local sleep_time=$((2 ** (attempt - 1) * 3))
-                echo -e "${YELLOW}Attempt $attempt failed. Retrying in $sleep_time seconds...${NC}"
+                echo -e "${YELLOW}Attempt $attempt failed. Retrying in $sleep_time seconds...${NC}" >&2
                 sleep $sleep_time
             else
-                echo -e "${RED}WARNING: Failed to retrieve parameter after $max_attempts attempts: $param_name${NC}"
-                echo -e "${YELLOW}Error message: $value${NC}"
-                echo -e "${YELLOW}Using default value: $default_value${NC}"
+                echo -e "${RED}WARNING: Failed to retrieve parameter after $max_attempts attempts: $param_name${NC}" >&2
+                echo -e "${YELLOW}Using default value: $default_value${NC}" >&2
+                # Only output the clean value, no debug messages
                 echo "$default_value"
                 return 1
             fi

@@ -615,15 +615,6 @@ Resources:
       Value: !Ref EsNumberOfReplicas
       Description: Number of replicas for Elasticsearch index
       Tier: Standard
-      
-  EnvironmentParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: /financial-news/environment
-      Type: String
-      Value: !Ref EnvironmentName
-      Description: Environment name (development, staging, production)
-      Tier: Standard
 
 Outputs:
   PipelineURL:

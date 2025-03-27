@@ -17,7 +17,7 @@ Parameters:
     Default: ""
   
   CorsAllowedOrigins:
-    Description: Comma-separated list of domains allowed to access the API (e.g., https://financialnewsengine.com). Must include all frontend domains, CloudFront domains, and localhost if used for development.
+    Description: Comma-separated list of domains allowed to access the API (include protocol)
     Type: String
     Default: "https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
   
@@ -102,11 +102,6 @@ Parameters:
     Type: String
     Default: "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERTIFICATE_ID"
 
-  BackendApiCodeKey:
-    Description: S3 key for the backend API code
-    Type: String
-    Default: api/backend-api.yaml
-
   HostedZoneId:
     Type: String
     Description: (Optional) Route 53 Hosted Zone ID for DNS Records. Leave empty to skip DNS record creation.
@@ -118,25 +113,12 @@ Conditions:
     - !Condition HasDomainName
     - !Not [!Equals [!Ref HostedZoneId, ""]]
 
-Mappings:
-  RegionMap:
-    us-east-1:
-      AMI: ami-0261755bbcb8c4a84  # Ubuntu 20.04 LTS
-    us-east-2:
-      AMI: ami-0430580de6244e02e  # Ubuntu 20.04 LTS
-    us-west-1:
-      AMI: ami-04669a22aad391419  # Ubuntu 20.04 LTS
-    us-west-2:
-      AMI: ami-0efa651876de2a5ce  # Ubuntu 20.04 LTS
-    eu-west-1:
-      AMI: ami-0a8e758f5e873d1c1  # Ubuntu 20.04 LTS
-
 Resources:
   # S3 Bucket for storing deployment files
   FinancialNewsAssetsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: financial-news-assets
+      BucketName: !Sub "financial-news-assets-${AWS::AccountId}-${AWS::Region}"
       AccessControl: Private
       VersioningConfiguration:
         Status: Enabled
@@ -207,33 +189,16 @@ Resources:
                 Resource: 
                   - !Sub 'arn:aws:s3:::${FinancialNewsAssetsBucket}/*'
                   - !Sub 'arn:aws:s3:::${FinancialNewsAssetsBucket}'
-        - PolicyName: SSMParameterStorePolicy
+        - PolicyName: CloudFormationPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - 'ssm:GetParameter'
-                  - 'ssm:GetParameters'
-                  - 'ssm:GetParametersByPath'
-                Resource: 
-                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/financial-news/*'
-        - PolicyName: SSMRemoteCommandsPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'ssm:DescribeInstanceInformation'
-                  - 'ssm:GetCommandInvocation'
-                  - 'ssm:ListCommandInvocations'
-                  - 'ssm:ListCommands'
-                  - 'ssm:SendCommand'
-                  - 'ssm:GetDocument'
-                  - 'ssm:ListDocuments'
-                Resource: '*'
+                  - 'cloudformation:SignalResource'
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
 
-  # Instance Profile for EC2 instances
+  # IAM Instance Profile for EC2 instances
   BackendInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
@@ -241,41 +206,77 @@ Resources:
       Roles:
         - !Ref BackendInstanceRole
 
-  # Security Group for Backend EC2 instances
+  # Standard SSM Parameters for the application
+  ElasticsearchEndpointParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/endpoint
+      Type: String
+      Value: !Ref ElasticsearchEndpoint
+      Description: Elasticsearch endpoint URL
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchApiKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/api_key
+      Type: String
+      Value: !Ref ElasticsearchApiKey
+      Description: Elasticsearch API key 
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchIndexParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/index
+      Type: String
+      Value: !Ref ElasticsearchIndex
+      Description: Elasticsearch index name
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchShardsParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/shards
+      Type: String
+      Value: !Ref EsNumberOfShards
+      Description: Number of Elasticsearch index shards
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchReplicasParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/replicas
+      Type: String
+      Value: !Ref EsNumberOfReplicas
+      Description: Number of Elasticsearch index replicas
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  EnvironmentNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/environment
+      Type: String
+      Value: !Ref EnvironmentName
+      Description: Application environment name
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  # Security Group for backend instances
   BackendSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for backend servers
-      VpcId: 
-        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      GroupDescription: Enable SSH and HTTP/HTTPS access
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: !Ref SSHLocation
-        - IpProtocol: tcp
-          FromPort: 5000  # Flask default port
-          ToPort: 5000
-          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-sg
-        - Key: Environment
-          Value: !Ref EnvironmentName
-      # Reference the App Server Security Group from VPC Stack for additional security rules
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          CidrIp: 0.0.0.0/0
-          Description: Allow all outbound traffic
-
-  # Security Group for Application Load Balancer
-  LoadBalancerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for Application Load Balancer
-      VpcId:
-        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
-      SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -284,233 +285,23 @@ Resources:
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-alb-sg
+          Value: !Sub ${EnvironmentName}-backend-sg
         - Key: Environment
           Value: !Ref EnvironmentName
 
-  # Launch Template for Auto Scaling Group
+  # Launch Template for backend EC2 instances
   BackendLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
-    Metadata:
-      AWS::CloudFormation::Init:
-        configSets:
-          default:
-            - install_packages
-            - setup_basic_app
-            - configure_services
-            - start_services
-        
-        install_packages:
-          packages:
-            apt:
-              python3: []
-              python3-pip: []
-              python3-dev: []
-              git: []
-              wget: []
-              curl: []
-              jq: []
-              python3-yaml: []
-              xfsprogs: []  # For volume formatting
-              nvme-cli: []  # For NVMe device management
-          commands:
-            01_install_cloudwatch_agent:
-              command: |
-                if [ ! -f "/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl" ]; then
-                  wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -O /tmp/amazon-cloudwatch-agent.deb
-                  dpkg -i /tmp/amazon-cloudwatch-agent.deb
-                else
-                  echo "CloudWatch agent already installed"
-                fi
-            02_check_directory_structure:
-              command: |
-                # Verify all required directories exist and have correct permissions
-                mkdir -p /opt/financial-news-engine
-                mkdir -p /opt/financial-news-engine/logs
-                mkdir -p /opt/financial-news-engine/deploy_scripts
-                chmod 755 /opt/financial-news-engine
-                chmod 755 /opt/financial-news-engine/logs
-                chmod 755 /opt/financial-news-engine/deploy_scripts
-                echo "Directory structure verified at $(date)" > /opt/financial-news-engine/directory_check.log
-        
-        setup_basic_app:
-          commands:
-            01_verify_mount:
-              command: |
-                # Verify the mount point is properly configured
-                if ! mountpoint -q /opt/financial-news-engine; then
-                  echo "WARNING: /opt/financial-news-engine is not a mountpoint, falling back to root volume" > /var/log/mount-check.log
-                fi
-                
-                # Ensure the directory has correct ownership
-                mkdir -p /opt/financial-news-engine
-                chown root:root /opt/financial-news-engine
-                chmod 755 /opt/financial-news-engine
-                
-                # Check available disk space
-                df -h /opt/financial-news-engine | tee -a /var/log/disk-space.log
-            
-            02_create_basic_app:
-              command: |
-                # Create a basic Flask app directory
-                mkdir -p /opt/financial-news-engine
-                mkdir -p /opt/financial-news-engine/logs
-                chmod 755 /opt/financial-news-engine
-                
-                # Fetch backend-api.yaml from S3
-                mkdir -p /tmp/deployment-scripts
-                aws s3 cp s3://${FinancialNewsAssetsBucket}/${BackendApiCodeKey} /tmp/deployment-scripts/backend-api.yaml
-                
-                # Extract app code, requirements, and verification script from the YAML file
-                python3 -c "
-                import yaml
-                try:
-                    with open('/tmp/deployment-scripts/backend-api.yaml', 'r') as f:
-                        api_config = yaml.safe_load(f)
-                    
-                    # Create app.py from app_code section
-                    with open('/opt/financial-news-engine/app.py', 'w') as f:
-                        f.write(api_config.get('app_code', ''))
-                    
-                    # Create requirements.txt from requirements section
-                    with open('/opt/financial-news-engine/requirements.txt', 'w') as f:
-                        f.write(api_config.get('requirements', ''))
-                    
-                    # Create verify_startup.sh from verification_script section
-                    with open('/opt/financial-news-engine/verify_startup.sh', 'w') as f:
-                        f.write(api_config.get('verification_script', ''))
-                    
-                    # Create service file from service_definition section
-                    with open('/etc/systemd/system/financial-news.service', 'w') as f:
-                        f.write(api_config.get('service_definition', ''))
-                except Exception as e:
-                    print(f'Error extracting scripts: {str(e)}')
-                    # Create fallback app.py as a simple health check
-                    with open('/opt/financial-news-engine/app.py', 'w') as f:
-                        f.write('from flask import Flask, jsonify\\n\\napp = Flask(__name__)\\n\\n@app.route(\"/health\")\\ndef health():\\n    return jsonify({\"status\": \"healthy\"})\\n\\nif __name__ == \"__main__\":\\n    app.run(host=\"0.0.0.0\", port=5000)')
-                    
-                    # Create fallback requirements.txt with minimal dependencies
-                    with open('/opt/financial-news-engine/requirements.txt', 'w') as f:
-                        f.write('flask==2.0.1\\ngunicorn==20.1.0')
-                    
-                    # Create fallback verify_startup.sh
-                    with open('/opt/financial-news-engine/verify_startup.sh', 'w') as f:
-                        f.write('#!/bin/bash\\necho \"Basic verification script\"\\nexit 0')
-                "
-                chmod +x /opt/financial-news-engine/verify_startup.sh
-                
-                # Install dependencies
-                cd /opt/financial-news-engine
-                pip3 install -r requirements.txt
-        
-        configure_services:
-          files:
-            /opt/financial-news-engine/.env:
-              content: !Sub |
-                ELASTICSEARCH_URL=${ElasticsearchEndpoint}
-                ELASTICSEARCH_API_KEY=${ElasticsearchApiKey}
-                ELASTICSEARCH_INDEX=${ElasticsearchIndex}
-                ES_NUMBER_OF_SHARDS=${EsNumberOfShards}
-                ES_NUMBER_OF_REPLICAS=${EsNumberOfReplicas}
-                ENVIRONMENT=${EnvironmentName}
-                CORS_ALLOWED_ORIGINS=${CorsAllowedOrigins}
-              mode: "000644"
-              owner: "root"
-              group: "root"
-            
-            /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json:
-              content: |
-                {
-                  "agent": {
-                    "metrics_collection_interval": 60,
-                    "run_as_user": "root"
-                  },
-                  "logs": {
-                    "logs_collected": {
-                      "files": {
-                        "collect_list": [
-                          {
-                            "file_path": "/var/log/syslog",
-                            "log_group_name": "/financial-news/system",
-                            "log_stream_name": "{instance_id}"
-                          },
-                          {
-                            "file_path": "/var/log/user-data.log",
-                            "log_group_name": "/financial-news/initialization",
-                            "log_stream_name": "{instance_id}"
-                          },
-                          {
-                            "file_path": "/opt/financial-news-engine/logs/backend.log",
-                            "log_group_name": "/financial-news/application",
-                            "log_stream_name": "{instance_id}-app"
-                          },
-                          {
-                            "file_path": "/opt/financial-news-engine/logs/error.log",
-                            "log_group_name": "/financial-news/application",
-                            "log_stream_name": "{instance_id}-error"
-                          },
-                          {
-                            "file_path": "/opt/financial-news-engine/logs/access.log",
-                            "log_group_name": "/financial-news/application",
-                            "log_stream_name": "{instance_id}-access"
-                          }
-                        ]
-                      }
-                    }
-                  },
-                  "metrics": {
-                    "metrics_collected": {
-                      "disk": {
-                        "measurement": [
-                          "used_percent"
-                        ],
-                        "resources": [
-                          "/"
-                        ]
-                      },
-                      "mem": {
-                        "measurement": [
-                          "mem_used_percent"
-                        ]
-                      },
-                      "statsd": {
-                        "metrics_collection_interval": 10,
-                        "metrics_aggregation_interval": 60,
-                        "service_address": ":8125"
-                      }
-                    }
-                  }
-                }
-              mode: "000644"
-              owner: "root"
-              group: "root"
-        
-        start_services:
-          commands:
-            01_reload_systemd:
-              command: systemctl daemon-reload
-            
-            02_enable_financial_news:
-              command: systemctl enable financial-news.service
-            
-            03_start_financial_news:
-              command: systemctl start financial-news.service
-            
-            04_start_cloudwatch_agent:
-              command: |
-                systemctl daemon-reload
-                systemctl enable amazon-cloudwatch-agent
-                systemctl start amazon-cloudwatch-agent
-            
-            05_verify_service:
-              command: |
-                /opt/financial-news-engine/verify_startup.sh || echo "Service verification failed but continuing"
-    
     Properties:
-      LaunchTemplateName: !Sub ${EnvironmentName}-backend-lt
-      VersionDescription: Initial version
+      LaunchTemplateName: !Sub ${EnvironmentName}-backend-launch-template
       LaunchTemplateData:
         ImageId: !Ref AMIId
         InstanceType: !Ref InstanceType
@@ -536,246 +327,386 @@ Resources:
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
+            # Log to a file
+            exec > >(tee /var/log/user-data.log) 2>&1
             
-            # Log function
-            function log {
-              echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a /var/log/user-data.log
-            }
-            
+            echo "Starting backend initialization..."
             # Create a status file to track progress
             STATUS_FILE="/var/log/backend-init-status.txt"
             echo "STARTED" > $STATUS_FILE
             
-            log "Starting backend initialization..."
-            
             # Update system packages
-            log "Updating system packages"
-            apt-get update && apt-get install -y python3-pip awscli
-
-            # Format and mount the dedicated volume for financial-news-engine
-            log "Setting up dedicated volume for /opt/financial-news-engine"
+            apt-get update && apt-get install -y python3-pip awscli python3-dev git jq curl wget xfsprogs nvme-cli
             
-            # Wait for the device to be available
+            # Install CloudFormation helper scripts
+            pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
+            ln -s /usr/local/init/ubuntu/cfn-hup /etc/init.d/cfn-hup
+            
+            # Mount dedicated volume
+            echo "Setting up dedicated volume for /opt/financial-news-engine"
             DEVICE_NAME="/dev/nvme1n1"  # AWS NVMe naming for /dev/sdf
-            MAX_RETRIES=10
-            COUNTER=0
-            while [ ! -e $DEVICE_NAME ] && [ $COUNTER -lt $MAX_RETRIES ]; do
-              log "Waiting for device $DEVICE_NAME to be available..."
-              sleep 5
-              COUNTER=$((COUNTER+1))
-              # Try alternate device name formats
-              if [ ! -e $DEVICE_NAME ] && [ -e "/dev/xvdf" ]; then
-                DEVICE_NAME="/dev/xvdf"
-                break
-              fi
-            done
-            
-            if [ ! -e $DEVICE_NAME ]; then
-              log "WARNING: Device $DEVICE_NAME not found after $MAX_RETRIES retries. Falling back to root volume."
-            else
-              # Format the volume
-              log "Formatting $DEVICE_NAME as ext4"
+            if [ -e $DEVICE_NAME ]; then
+              echo "Device found at $DEVICE_NAME"
               mkfs -t ext4 $DEVICE_NAME
-              
-              # Create mount point
-              log "Creating mount point /opt/financial-news-engine"
               mkdir -p /opt/financial-news-engine
-              
-              # Add to fstab for persistent mounting
-              log "Adding to fstab for persistent mounting"
               echo "$DEVICE_NAME /opt/financial-news-engine ext4 defaults,nofail 0 2" >> /etc/fstab
-              
-              # Mount the volume
-              log "Mounting the volume"
               mount /opt/financial-news-engine
-              
-              # Set proper ownership and permissions
-              log "Setting ownership and permissions"
-              chmod 755 /opt/financial-news-engine
+            else
+              echo "WARNING: Device $DEVICE_NAME not found. Falling back to root volume."
+              mkdir -p /opt/financial-news-engine
             fi
             
-            # Create necessary subdirectories with proper permissions
-            log "Creating application subdirectories"
+            chmod 755 /opt/financial-news-engine
+            
+            # Create necessary directories
             mkdir -p /opt/financial-news-engine/logs
             mkdir -p /opt/financial-news-engine/deploy_scripts
             
-            # Set proper permissions
-            chmod 755 /opt/financial-news-engine/logs
-            chmod 755 /opt/financial-news-engine/deploy_scripts
+            # Create scripts directly instead of downloading from S3
+            cat > /opt/financial-news-engine/deploy_scripts/create_env_file.sh << 'EOF'
+            #!/bin/bash
             
-            # Install AWS CloudFormation helpers
-            log "Installing AWS CloudFormation helpers"
-            pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+            # Script to create environment file for the financial news engine
+            ENV_FILE="/opt/financial-news-engine/.env"
             
-            # Create lifecyle hook handler script
-            log "Creating lifecycle hook handler script"
+            # Fetch parameters from AWS SSM Parameter Store
+            fetch_param() {
+              aws ssm get-parameter --name "$1" --with-decryption --query "Parameter.Value" --output text
+            }
+            
+            # Create env file
+            echo "Creating environment file at $ENV_FILE"
+            
+            cat > $ENV_FILE << EOL
+            # Environment variables for Financial News Engine
+            ELASTICSEARCH_ENDPOINT=$(fetch_param "/financial-news/elasticsearch/endpoint")
+            ELASTICSEARCH_API_KEY=$(fetch_param "/financial-news/elasticsearch/api_key")
+            ELASTICSEARCH_INDEX=$(fetch_param "/financial-news/elasticsearch/index")
+            ES_NUMBER_OF_SHARDS=$(fetch_param "/financial-news/elasticsearch/shards")
+            ES_NUMBER_OF_REPLICAS=$(fetch_param "/financial-news/elasticsearch/replicas")
+            ENVIRONMENT=$(fetch_param "/financial-news/environment")
+            CORS_ALLOWED_ORIGINS="${CorsAllowedOrigins}"
+            EOL
+            
+            echo "Environment file created successfully."
+            EOF
+            
             cat > /opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh << 'EOF'
             #!/bin/bash
             
-            LOG_FILE="/var/log/lifecycle-hooks.log"
+            # This script handles AWS Auto Scaling lifecycle hooks
             
-            function log {
-              echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a $LOG_FILE
-            }
-            
-            # Get instance ID
             INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
             REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
             
-            # Process hook types
-            if [ "$1" == "launching" ]; then
-              log "Processing instance launching lifecycle hook for $INSTANCE_ID"
-              
-              # Run environment file creator script
-              log "Updating environment variables on launch"
-              /opt/financial-news-engine/deploy_scripts/create_env_file.sh
-              
-              # Complete the lifecycle action
-              log "Completing lifecycle action"
-              aws autoscaling complete-lifecycle-action \
-                --lifecycle-hook-name UpdateEnvOnLaunch \
-                --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances --instance-ids $INSTANCE_ID --region $REGION --query "AutoScalingInstances[0].AutoScalingGroupName" --output text) \
-                --lifecycle-action-result CONTINUE \
-                --instance-id $INSTANCE_ID \
-                --region $REGION
-                
-            elif [ "$1" == "terminating" ]; then
-              log "Processing instance terminating lifecycle hook for $INSTANCE_ID"
-              
-              # Perform any cleanup actions here
-              
-              # Complete the lifecycle action
-              log "Completing lifecycle action" 
-              aws autoscaling complete-lifecycle-action \
-                --lifecycle-hook-name UpdateEnvOnTerminate \
-                --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances --instance-ids $INSTANCE_ID --region $REGION --query "AutoScalingInstances[0].AutoScalingGroupName" --output text) \
-                --lifecycle-action-result CONTINUE \
-                --instance-id $INSTANCE_ID \
-                --region $REGION
-            else
-              log "Unknown lifecycle hook type: $1"
-              exit 1
-            fi
+            # Get lifecycle action token and name
+            TOKEN=$(aws autoscaling describe-lifecycle-hooks \
+              --region $REGION \
+              --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances \
+                --instance-ids $INSTANCE_ID \
+                --region $REGION \
+                --query "AutoScalingInstances[0].AutoScalingGroupName" \
+                --output text) \
+              --query "LifecycleHooks[?contains(NotificationMetadata, 'terminating')].NotificationToken | [0]" \
+              --output text)
             
-            log "Lifecycle hook handler completed successfully"
+            HOOK_NAME=$(aws autoscaling describe-lifecycle-hooks \
+              --region $REGION \
+              --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances \
+                --instance-ids $INSTANCE_ID \
+                --region $REGION \
+                --query "AutoScalingInstances[0].AutoScalingGroupName" \
+                --output text) \
+              --query "LifecycleHooks[?contains(NotificationMetadata, 'terminating')].LifecycleHookName | [0]" \
+              --output text)
+            
+            # Perform any cleanup necessary before termination
+            echo "Performing cleanup before termination..."
+            
+            # Stop application gracefully
+            systemctl stop financial-news.service
+            
+            # Flush logs
+            sync
+            
+            # Complete lifecycle action if token and hook name are available
+            if [ ! -z "$TOKEN" ] && [ ! -z "$HOOK_NAME" ]; then
+              ASG_NAME=$(aws autoscaling describe-auto-scaling-instances \
+                --instance-ids $INSTANCE_ID \
+                --region $REGION \
+                --query "AutoScalingInstances[0].AutoScalingGroupName" \
+                --output text)
+              
+              aws autoscaling complete-lifecycle-action \
+                --lifecycle-hook-name $HOOK_NAME \
+                --auto-scaling-group-name $ASG_NAME \
+                --lifecycle-action-token $TOKEN \
+                --lifecycle-action-result CONTINUE \
+                --region $REGION
+              
+              echo "Lifecycle action completed."
+            else
+              echo "Could not find lifecycle token or hook name."
+            fi
             EOF
             
-            chmod +x /opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh
+            # Make scripts executable
+            chmod +x /opt/financial-news-engine/deploy_scripts/*.sh
             
-            # Create environment file update script
-            log "Creating environment file update script - parameters are managed by the CICD stack"
-            cat > /opt/financial-news-engine/deploy_scripts/create_env_file.sh << 'EOF'
-            #!/bin/bash
-            # Fetch environment variables from SSM Parameter Store
-            echo "Fetching credentials from SSM Parameter Store - parameters are managed by the CICD stack"
+            # Run the environment file creator script
+            /opt/financial-news-engine/deploy_scripts/create_env_file.sh
             
-            # Set default values in case parameter retrieval fails
-            ES_URL=""
-            ES_API_KEY=""
-            ES_INDEX="financial_news"
-            ES_SHARDS="3"
-            ES_REPLICAS="2"
-            ENV="production"
+            # Create Flask application code directly
+            cat > /opt/financial-news-engine/app.py << 'EOF'
+            from flask import Flask, jsonify, request, Response
+            import os
+            import json
+            import logging
+            from flask_cors import CORS
+            import elasticsearch
+            import requests
             
-            # Get parameters from SSM Parameter Store with error handling and verbosity
-            function get_parameter() {
-                local param_name=$1
-                local default_value=$2
+            # Ensure log directory exists
+            os.makedirs("/opt/financial-news-engine/logs", exist_ok=True)
+            
+            # Configure logging
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                handlers=[
+                    logging.FileHandler("/opt/financial-news-engine/logs/app.log"),
+                    logging.StreamHandler()
+                ]
+            )
+            logger = logging.getLogger(__name__)
+            
+            # Initialize Flask app
+            app = Flask(__name__)
+            
+            # Configure CORS
+            cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
+            CORS(app, resources={r"/*": {"origins": cors_origins}})
+            
+            # Elasticsearch configuration
+            ES_ENDPOINT = os.environ.get('ELASTICSEARCH_ENDPOINT')
+            ES_API_KEY = os.environ.get('ELASTICSEARCH_API_KEY')
+            ES_INDEX = os.environ.get('ELASTICSEARCH_INDEX', 'financial_news')
+            
+            # Initialize Elasticsearch client
+            try:
+                es_client = elasticsearch.Elasticsearch(
+                    [ES_ENDPOINT],
+                    api_key=ES_API_KEY,
+                    use_ssl=True,
+                    verify_certs=True,
+                    connection_class=elasticsearch.connection.RequestsHttpConnection
+                )
+                logger.info(f"Connected to Elasticsearch at {ES_ENDPOINT}")
+            except Exception as e:
+                logger.error(f"Failed to connect to Elasticsearch: {str(e)}")
+                es_client = None
+            
+            @app.route('/health')
+            def health():
+                """Health check endpoint"""
+                es_status = "connected" if es_client and es_client.ping() else "disconnected"
+                return jsonify({
+                    "status": "healthy",
+                    "elasticsearch": es_status
+                })
+            
+            @app.route('/api/search', methods=['GET'])
+            def search():
+                """Search endpoint for financial news"""
+                query = request.args.get('q', '')
+                size = int(request.args.get('size', 10))
+                page = int(request.args.get('page', 1))
+                from_val = (page - 1) * size
                 
-                echo "Fetching parameter: $param_name"
-                local value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
-                local exit_code=$?
+                if not query:
+                    return jsonify({"error": "Query parameter 'q' is required"}), 400
                 
-                if [ $exit_code -eq 0 ] && [ ! -z "$value" ]; then
-                    echo "Successfully retrieved parameter: $param_name"
-                    echo "$value"
-                else
-                    echo "WARNING: Failed to retrieve parameter: $param_name - using default value: $default_value"
-                    echo "$default_value"
-                fi
+                if not es_client:
+                    return jsonify({"error": "Elasticsearch connection not available"}), 503
+                
+                try:
+                    search_query = {
+                        "query": {
+                            "multi_match": {
+                                "query": query,
+                                "fields": ["title^3", "summary^2", "content", "author", "source"],
+                                "fuzziness": "AUTO"
+                            }
+                        },
+                        "highlight": {
+                            "fields": {
+                                "title": {},
+                                "summary": {},
+                                "content": {}
+                            },
+                            "pre_tags": ["<strong>"],
+                            "post_tags": ["</strong>"]
+                        },
+                        "from": from_val,
+                        "size": size
+                    }
+                    
+                    results = es_client.search(index=ES_INDEX, body=search_query)
+                    
+                    # Transform results
+                    total = results['hits']['total']['value']
+                    hits = []
+                    
+                    for hit in results['hits']['hits']:
+                        source = hit['_source']
+                        highlight = hit.get('highlight', {})
+                        
+                        # Get highlighted fields or fall back to original content
+                        title = highlight.get('title', [source.get('title', '')])[0]
+                        summary = highlight.get('summary', [source.get('summary', '')])[0]
+                        
+                        hits.append({
+                            "id": hit['_id'],
+                            "title": title,
+                            "summary": summary,
+                            "author": source.get('author', ''),
+                            "source": source.get('source', ''),
+                            "published_date": source.get('published_date', ''),
+                            "url": source.get('url', ''),
+                            "score": hit['_score']
+                        })
+                    
+                    response = {
+                        "total": total,
+                        "page": page,
+                        "size": size,
+                        "total_pages": (total + size - 1) // size,
+                        "results": hits
+                    }
+                    
+                    return jsonify(response)
+                except Exception as e:
+                    logger.error(f"Error searching Elasticsearch: {str(e)}")
+                    return jsonify({"error": "Search failed", "details": str(e)}), 500
+            
+            @app.route('/api/news/<news_id>', methods=['GET'])
+            def get_news(news_id):
+                """Get specific news article by ID"""
+                if not es_client:
+                    return jsonify({"error": "Elasticsearch connection not available"}), 503
+                
+                try:
+                    result = es_client.get(index=ES_INDEX, id=news_id)
+                    return jsonify(result['_source'])
+                except elasticsearch.NotFoundError:
+                    return jsonify({"error": "News article not found"}), 404
+                except Exception as e:
+                    logger.error(f"Error retrieving news article: {str(e)}")
+                    return jsonify({"error": "Failed to retrieve news article", "details": str(e)}), 500
+            
+            if __name__ == '__main__':
+                app.run(host='0.0.0.0', port=5000)
+            EOF
+            
+            # Create requirements.txt
+            cat > /opt/financial-news-engine/requirements.txt << 'EOF'
+            flask==2.0.1
+            flask-cors==3.0.10
+            elasticsearch==7.14.0
+            gunicorn==20.1.0
+            requests==2.26.0
+            python-dotenv==0.19.0
+            EOF
+            
+            # Create systemd service file
+            cat > /etc/systemd/system/financial-news.service << 'EOF'
+            [Unit]
+            Description=Financial News API
+            After=network.target
+            
+            [Service]
+            User=root
+            WorkingDirectory=/opt/financial-news-engine
+            EnvironmentFile=/opt/financial-news-engine/.env
+            ExecStart=/usr/local/bin/gunicorn -b 0.0.0.0:5000 app:app
+            Restart=always
+            RestartSec=5
+            
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+            
+            # Install app dependencies
+            cd /opt/financial-news-engine && pip3 install -r requirements.txt
+            
+            # Start and enable service
+            systemctl daemon-reload
+            systemctl enable financial-news.service
+            systemctl start financial-news.service
+            
+            # Install Amazon CloudWatch agent
+            wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -O /tmp/amazon-cloudwatch-agent.deb
+            dpkg -i /tmp/amazon-cloudwatch-agent.deb
+            
+            # Configure CloudWatch agent
+            mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/
+            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOL'
+            {
+              "agent": {
+                "metrics_collection_interval": 60,
+                "run_as_user": "root"
+              },
+              "logs": {
+                "logs_collected": {
+                  "files": {
+                    "collect_list": [
+                      {
+                        "file_path": "/var/log/syslog",
+                        "log_group_name": "/financial-news/system",
+                        "log_stream_name": "{instance_id}"
+                      },
+                      {
+                        "file_path": "/var/log/user-data.log",
+                        "log_group_name": "/financial-news/initialization",
+                        "log_stream_name": "{instance_id}"
+                      }
+                    ]
+                  }
+                }
+              },
+              "metrics": {
+                "metrics_collected": {
+                  "disk": {
+                    "measurement": ["used_percent"],
+                    "resources": ["/"]
+                  },
+                  "mem": {
+                    "measurement": ["mem_used_percent"]
+                  }
+                }
+              }
             }
-            
-            # Get parameters with default fallbacks
-            ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
-            ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
-            ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
-            ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
-            ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
-            ENV=$(get_parameter "/financial-news/environment" "${EnvironmentName}")
-            
-            # Create the .env file
-            cat > /opt/financial-news-engine/.env << EOL
-            ELASTICSEARCH_URL=$ES_URL
-            ELASTICSEARCH_API_KEY=$ES_API_KEY
-            ELASTICSEARCH_INDEX=$ES_INDEX
-            ES_NUMBER_OF_SHARDS=$ES_SHARDS
-            ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
-            ENVIRONMENT=$ENV
-            CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
             EOL
             
-            # Set secure permissions
-            chmod 600 /opt/financial-news-engine/.env
-            echo "Created .env file with environment variables from SSM Parameter Store"
-            
-            # Output parameters retrieved (with API key redacted)
-            echo "Environment loaded with the following parameters:"
-            echo "ELASTICSEARCH_URL=$ES_URL"
-            echo "ELASTICSEARCH_API_KEY=****REDACTED****"
-            echo "ELASTICSEARCH_INDEX=$ES_INDEX"
-            echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS"
-            echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS"
-            echo "ENVIRONMENT=$ENV"
-            EOF
-            
-            # Make the script executable
-            chmod +x /opt/financial-news-engine/deploy_scripts/create_env_file.sh
-            
-            # Run the script to create initial env file
-            log "Creating initial environment file from SSM Parameters (managed by CICD stack)"
-            # Retry 3 times with a backoff delay to allow for eventual consistency
-            MAX_RETRIES=3
-            for i in $(seq 1 $MAX_RETRIES); do
-              log "Attempt $i of $MAX_RETRIES to create environment file"
-              /opt/financial-news-engine/deploy_scripts/create_env_file.sh && break
-              if [ $i -eq $MAX_RETRIES ]; then
-                log "WARNING: All attempts to create environment file failed. Using default values."
-              else
-                log "Waiting 10 seconds before retrying..."
-                sleep 10
-              fi
-            done
-            
-            # Set up daily cron job to update environment variables
-            log "Setting up daily cron job to update environment variables"
-            cat > /etc/cron.daily/update_env_file << 'EOF'
-            #!/bin/bash
-            /opt/financial-news-engine/deploy_scripts/create_env_file.sh
-            if systemctl is-active --quiet financial-news.service; then
-              systemctl restart financial-news.service
-            fi
-            EOF
-            chmod +x /etc/cron.daily/update_env_file
-            
-            # Configure the instance
-            log "Configuring the instance using cfn-init"
-            /usr/local/bin/cfn-init -v \
-              --stack ${AWS::StackName} \
-              --resource BackendLaunchTemplate \
-              --region ${AWS::Region}
+            # Start CloudWatch agent
+            systemctl enable amazon-cloudwatch-agent
+            systemctl start amazon-cloudwatch-agent
             
             # Final status
-            log "Initialization completed successfully"
+            echo "Initialization completed successfully"
             echo "COMPLETED" > $STATUS_FILE
             
-            # Signal completion
-            log "Signaling completion to CloudFormation"
+            # Signal completion to CloudFormation
             /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource BackendAutoScalingGroup --region ${AWS::Region}
 
   # Backend Auto Scaling Group
   BackendAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     DependsOn: HTTPSListener
+    CreationPolicy:
+      ResourceSignal:
+        Count: !Ref DesiredCapacity
+        Timeout: "PT15M"
     Properties:
       AutoScalingGroupName: !Sub ${EnvironmentName}-backend-asg
       LaunchTemplate:
@@ -784,11 +715,11 @@ Resources:
       MinSize: !Ref MinSize
       MaxSize: !Ref MaxSize
       DesiredCapacity: !Ref DesiredCapacity
+      TargetGroupARNs:
+        - !Ref BackendTargetGroup
       VPCZoneIdentifier:
         - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet1ID"
         - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet2ID"
-      TargetGroupARNs:
-        - !Ref BackendTargetGroup
       HealthCheckType: ELB
       HealthCheckGracePeriod: 300
       Tags:
@@ -798,96 +729,20 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentName
           PropagateAtLaunch: true
-      LifecycleHookSpecificationList:
-        - DefaultResult: CONTINUE
-          HeartbeatTimeout: 300
-          LifecycleHookName: UpdateEnvOnLaunch
-          LifecycleTransition: autoscaling:EC2_INSTANCE_LAUNCHING
-        - DefaultResult: CONTINUE
-          HeartbeatTimeout: 180
-          LifecycleHookName: UpdateEnvOnTerminate
-          LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
 
-  # Application Load Balancer
-  ApplicationLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  # Auto Scaling Lifecycle Hook for termination
+  BackendTerminationLifecycleHook:
+    Type: AWS::AutoScaling::LifecycleHook
     Properties:
-      Name: !Sub ${EnvironmentName}-backend-alb
-      Scheme: internet-facing
-      LoadBalancerAttributes:
-        - Key: idle_timeout.timeout_seconds
-          Value: '60'
-      Subnets:
-        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
-        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
-      SecurityGroups:
-        - !Ref LoadBalancerSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-alb
-        - Key: Environment
-          Value: !Ref EnvironmentName
+      AutoScalingGroupName: !Ref BackendAutoScalingGroup
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+      DefaultResult: CONTINUE
+      HeartbeatTimeout: 300
+      NotificationMetadata: !Sub |
+        {"action": "terminating", "hook_name": "BackendTerminationLifecycleHook"}
 
-  # HTTPS Listener
-  HTTPSListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 443
-      Protocol: HTTPS
-      Certificates:
-        - CertificateArn: !If 
-            - HasDomainName
-            - !Ref SSLCertificate
-            - !Ref SSLCertificateArn
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref BackendTargetGroup
-      SslPolicy: ELBSecurityPolicy-TLS-1-2-2017-01
-
-  # HTTP Listener (redirects to HTTPS)
-  HTTPListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
-      DefaultActions:
-        - Type: redirect
-          RedirectConfig:
-            Protocol: HTTPS
-            Port: '443'
-            Host: '#{host}'
-            Path: '/#{path}'
-            Query: '#{query}'
-            StatusCode: HTTP_301
-
-  # Target Group for Backend Servers
-  BackendTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub ${EnvironmentName}-backend-tg
-      Port: 5000
-      Protocol: HTTP
-      VpcId:
-        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
-      HealthCheckIntervalSeconds: 30
-      HealthCheckPath: /health
-      HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 3
-      TargetGroupAttributes:
-        - Key: deregistration_delay.timeout_seconds
-          Value: '20'
-      Tags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-backend-tg
-        - Key: Environment
-          Value: !Ref EnvironmentName
-
-  # Auto Scaling Policies
-  ScaleUpPolicy:
+  # Auto Scaling Policy for CPU
+  CPUScalingPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
       AutoScalingGroupName: !Ref BackendAutoScalingGroup
@@ -896,320 +751,102 @@ Resources:
         PredefinedMetricSpecification:
           PredefinedMetricType: ASGAverageCPUUtilization
         TargetValue: 70.0
+        DisableScaleIn: false
 
-  # CloudWatch Alarms
-  HighCPUAlarm:
-    Type: AWS::CloudWatch::Alarm
+  # Load Balancer Security Group
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      AlarmDescription: Alarm if CPU too high for more than 5 minutes
-      MetricName: CPUUtilization
-      Namespace: AWS/EC2
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 85
-      AlarmActions:
-        - !Ref BackendSNSTopic
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref BackendAutoScalingGroup
-      ComparisonOperator: GreaterThanThreshold
-      
-  # Disk Space Alarm for root volume
-  RootDiskSpaceAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: Alarm if root disk space usage exceeds 80% for more than 5 minutes
-      MetricName: disk_used_percent
-      Namespace: CWAgent
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 80
-      AlarmActions:
-        - !Ref BackendSNSTopic
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref BackendAutoScalingGroup
-        - Name: device
-          Value: xvda1
-        - Name: fstype
-          Value: ext4
-        - Name: path
-          Value: /
-      ComparisonOperator: GreaterThanThreshold
+      GroupDescription: Enable HTTP/HTTPS access to ALB
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-lb-sg
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  # Disk Space Alarm for financial-news-engine volume
-  AppDiskSpaceAlarm:
-    Type: AWS::CloudWatch::Alarm
+  # Application Load Balancer for backend
+  BackendLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      AlarmDescription: Alarm if financial-news-engine disk space usage exceeds 80% for more than 5 minutes
-      MetricName: disk_used_percent
-      Namespace: CWAgent
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 80
-      AlarmActions:
-        - !Ref BackendSNSTopic
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref BackendAutoScalingGroup
-        - Name: device
-          Value: xvdf
-        - Name: fstype
-          Value: ext4
-        - Name: path
-          Value: /opt/financial-news-engine
-      ComparisonOperator: GreaterThanThreshold
-      
-  # Metric for custom disk space monitoring
-  LowDiskSpaceMetricAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: Alarm triggered when a script reports low disk space
-      MetricName: LowDiskSpace
-      Namespace: FinancialNewsEngine
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 0
-      AlarmActions:
-        - !Ref BackendSNSTopic
-      ComparisonOperator: GreaterThanThreshold
+      Name: !Sub ${EnvironmentName}-backend-alb
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-alb
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  # SNS Topic for Alarms
-  BackendSNSTopic:
-    Type: AWS::SNS::Topic
+  # Target Group for backend instances
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      DisplayName: !Sub ${EnvironmentName}-backend-alerts
-      TopicName: !Sub ${EnvironmentName}-backend-alerts
+      Name: !Sub ${EnvironmentName}-backend-tg
+      Protocol: HTTP
+      Port: 5000
+      TargetType: instance
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "5000"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-tg
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  # CORS handling is now implemented directly in the Flask application
-  # This rule handles OPTIONS requests and returns a 200 status code
-  # CORS headers must be added by the application code
-  CorsPreflightRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+  # HTTP Listener for ALB
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      ListenerArn: !Ref HTTPSListener
-      Priority: 1
-      Conditions:
-        - Field: http-request-method
-          HttpRequestMethodConfig:
-            Values: [ 'OPTIONS' ]
-      Actions:
-        - Type: fixed-response
-          FixedResponseConfig:
-            ContentType: text/plain
-            StatusCode: '200'
-            MessageBody: 'CORS Preflight'
+      LoadBalancerArn: !Ref BackendLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
 
-  # Forward all non-OPTIONS requests to the target group
-  # The actual CORS headers will be added by the backend application
-  CorsHeadersRule:
-    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+  # HTTPS Listener for ALB
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      ListenerArn: !Ref HTTPSListener
-      Priority: 2
-      Conditions:
-        - Field: path-pattern
-          Values: [ '/*' ]
-      Actions:
+      LoadBalancerArn: !Ref BackendLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !If [HasDomainName, !Ref SSLCertificate, !Ref SSLCertificateArn]
+      DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref BackendTargetGroup
 
-  # Lambda IAM Role for Lambda@Edge
-  CorsLambdaEdgeRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-                - edgelambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Path: /service-role/
-      
-  # Lambda@Edge function to add CORS headers
-  CorsLambdaEdgeFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Code:
-        ZipFile: |
-          'use strict';
-          exports.handler = (event, context, callback) => {
-            // Get the request and response
-            const request = event.Records[0].cf.request;
-            const response = event.Records[0].cf.response;
-            const headers = response.headers;
-            
-            // Extract the origin from the request headers
-            const requestHeaders = request.headers;
-            const origin = requestHeaders.origin && requestHeaders.origin[0] ? requestHeaders.origin[0].value : '*';
-            
-            // List of allowed origins from environment or default set
-            // The actual origins should match those in CORS_ALLOWED_ORIGINS parameter
-            const allowedOrigins = [
-              'https://financialnewsengine.com',
-              'https://www.financialnewsengine.com',
-              'http://localhost:3000',
-              'https://d3dw79zwd8sn9g.cloudfront.net'  // CloudFront domain
-            ];
-            
-            // Determine if the origin should be allowed
-            let corsOrigin = '*';
-            if (origin !== '*') {
-              // If specific origin, check if it's allowed
-              if (allowedOrigins.includes(origin)) {
-                corsOrigin = origin;
-              } else {
-                // For basic wildcard matching
-                for (let allowedOrigin of allowedOrigins) {
-                  if (allowedOrigin.includes('*')) {
-                    const pattern = allowedOrigin.replace('*', '');
-                    if (origin.startsWith(pattern.replace('*.', '')) || 
-                        origin.endsWith(pattern.replace('*', ''))) {
-                      corsOrigin = origin;
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-            
-            // For debugging (this will be visible in CloudWatch Logs)
-            console.log('Request URI:', request.uri);
-            console.log('Request method:', request.method);
-            console.log('Request origin:', origin);
-            console.log('Allowed CORS origin:', corsOrigin);
-            
-            // Define CORS headers
-            headers['access-control-allow-origin'] = [{ key: 'Access-Control-Allow-Origin', value: corsOrigin }];
-            headers['access-control-allow-methods'] = [{ key: 'Access-Control-Allow-Methods', value: 'GET,HEAD,PUT,POST,DELETE,PATCH,OPTIONS' }];
-            headers['access-control-allow-headers'] = [{ key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization,X-Requested-With,X-Amz-Date,X-Api-Key,X-Amz-Security-Token' }];
-            
-            // Only set credentials if we have a specific origin
-            if (corsOrigin !== '*') {
-              headers['access-control-allow-credentials'] = [{ key: 'Access-Control-Allow-Credentials', value: 'true' }];
-            }
-            
-            headers['access-control-max-age'] = [{ key: 'Access-Control-Max-Age', value: '86400' }];
-            
-            // For OPTIONS request, return directly with CORS headers
-            if (request.method === 'OPTIONS') {
-              response.status = '204';
-              response.statusDescription = 'No Content';
-              callback(null, response);
-              return;
-            }
-            
-            // For all other requests, add the CORS headers to the response
-            callback(null, response);
-          };
-      Handler: index.handler
-      Role: !GetAtt CorsLambdaEdgeRole.Arn
-      Runtime: nodejs16.x
-      Description: Lambda@Edge function to add CORS headers to API responses
-      Timeout: 5
-      MemorySize: 128
-
-  # Version for Lambda@Edge function - required for CloudFront
-  CorsLambdaEdgeVersion:
-    Type: AWS::Lambda::Version
-    Properties:
-      FunctionName: !Ref CorsLambdaEdgeFunction
-      Description: !Sub "Version ${AWS::StackName}"
-
-  # CloudFront distribution that sits in front of the ALB
-  CloudFrontDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Comment: !Sub "${EnvironmentName} CloudFront Distribution for Backend API"
-        Enabled: true
-        HttpVersion: http2
-        IPV6Enabled: true
-        Origins:
-          - Id: BackendOrigin
-            DomainName: !GetAtt ApplicationLoadBalancer.DNSName
-            CustomOriginConfig:
-              HTTPPort: 80
-              HTTPSPort: 443
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols:
-                - TLSv1.2
-              OriginReadTimeout: 60
-              OriginKeepaliveTimeout: 30
-            OriginCustomHeaders:
-              - HeaderName: X-Forwarded-Host
-                HeaderValue: !If [HasDomainName, !Ref BackendDomainName, !GetAtt ApplicationLoadBalancer.DNSName]
-        DefaultCacheBehavior:
-          TargetOriginId: BackendOrigin
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT]
-          CachedMethods: [GET, HEAD]
-          ForwardedValues:
-            QueryString: true
-            Headers:
-              - Origin
-              - Access-Control-Request-Method
-              - Access-Control-Request-Headers
-              - Authorization
-            Cookies:
-              Forward: all
-          LambdaFunctionAssociations:
-            - EventType: origin-response
-              LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
-            - EventType: viewer-response
-              LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
-          Compress: true
-        CacheBehaviors:
-          - PathPattern: /health
-            AllowedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-            CachedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-            TargetOriginId: BackendOrigin
-            ViewerProtocolPolicy: redirect-to-https
-            ForwardedValues:
-              QueryString: true
-              Headers:
-                - Origin
-              Cookies:
-                Forward: none
-            LambdaFunctionAssociations:
-              - EventType: origin-response
-                LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
-              - EventType: viewer-response
-                LambdaFunctionARN: !Ref CorsLambdaEdgeVersion
-            MinTTL: 0
-            DefaultTTL: 30
-            MaxTTL: 60
-            Compress: true
-        PriceClass: PriceClass_100
-        Aliases: !If
-          - HasDomainName
-          - [!Ref BackendDomainName]
-          - !Ref AWS::NoValue
-        ViewerCertificate: !If
-          - HasDomainName
-          - AcmCertificateArn: !If [HasDomainName, !Ref SSLCertificate, !Ref SSLCertificateArn]
-            SslSupportMethod: sni-only
-            MinimumProtocolVersion: TLSv1.2_2019
-          - CloudFrontDefaultCertificate: true
-
-  # Route 53 Record Set for CloudFront
-  CloudFrontDNSRecord:
+  # DNS Record for ALB (if domain name is provided)
+  BackendDNSRecord:
     Type: AWS::Route53::RecordSet
     Condition: CreateDNSRecord
     Properties:
@@ -1217,127 +854,13 @@ Resources:
       Name: !Ref BackendDomainName
       Type: A
       AliasTarget:
-        DNSName: !GetAtt CloudFrontDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID (this is fixed)
-        EvaluateTargetHealth: false
-
-  # Configure lifecycle hooks
-  ASGLifecycleLaunchingRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub "${AWS::StackName}-asg-lifecycle-launching"
-      Description: "Rule to process instance launching lifecycle hooks for backend ASG"
-      EventPattern:
-        source:
-          - "aws.autoscaling"
-        detail-type:
-          - "EC2 Instance-launch Lifecycle Action"
-        detail:
-          AutoScalingGroupName:
-            - !Ref BackendAutoScalingGroup
-      State: ENABLED
-      Targets:
-        - Arn: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/AWS-RunShellScript"
-          Id: "LifecycleLaunchingTarget"
-          RoleArn: !GetAtt BackendInstanceRole.Arn
-          RunCommandParameters:
-            RunCommandTargets:
-              - Key: InstanceIds
-                Values:
-                  - ${!detail.EC2InstanceId}
-          Input: !Sub |
-            {
-              "commands": ["/opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh launching"]
-            }
-
-  ASGLifecycleTerminatingRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: !Sub "${AWS::StackName}-asg-lifecycle-terminating"
-      Description: "Rule to process instance terminating lifecycle hooks for backend ASG"
-      EventPattern:
-        source:
-          - "aws.autoscaling"
-        detail-type:
-          - "EC2 Instance-terminate Lifecycle Action"
-        detail:
-          AutoScalingGroupName:
-            - !Ref BackendAutoScalingGroup
-      State: ENABLED
-      Targets:
-        - Arn: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/AWS-RunShellScript"
-          Id: "LifecycleTerminatingTarget"
-          RoleArn: !GetAtt BackendInstanceRole.Arn
-          RunCommandParameters:
-            RunCommandTargets:
-              - Key: InstanceIds
-                Values:
-                  - ${!detail.EC2InstanceId}
-          Input: !Sub |
-            {
-              "commands": ["/opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh terminating"]
-            }
+        HostedZoneId: !GetAtt BackendLoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt BackendLoadBalancer.DNSName
 
 Outputs:
-  BackendALBDNSName:
-    Description: DNS Name of the Application Load Balancer
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendALBDNSName"
-  
-  CloudFrontDomainName:
-    Description: CloudFront Distribution Domain Name
-    Value: !GetAtt CloudFrontDistribution.DomainName
-    Export:
-      Name: !Sub "${AWS::StackName}-CloudFrontDomainName"
-  
-  APIEndpointURL:
-    Description: API Endpoint URL (use this for the frontend configuration)
-    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
-    Export:
-      Name: !Sub "${AWS::StackName}-APIEndpointURL"
-  
-  BackendALBFullQualifiedDNSName:
-    Description: Full DNS Name of the Application Load Balancer
-    Value: !If
-      - HasDomainName
-      - !Sub https://${BackendDomainName}
-      - !Sub https://${ApplicationLoadBalancer.DNSName}
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendALBURL"
-  
-  BackendAutoScalingGroupName:
-    Description: Auto Scaling Group Name
-    Value: !Ref BackendAutoScalingGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendASGName"
-  
-  BackendSecurityGroupId:
-    Description: Security Group ID for Backend Servers
-    Value: !Ref BackendSecurityGroup
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendSGID"
-  
-  BackendSNSTopicArn:
-    Description: ARN of the SNS Topic for Backend Alerts
-    Value: !Ref BackendSNSTopic
-    Export:
-      Name: !Sub "${AWS::StackName}-BackendSNSTopicARN"
-  
-  ElasticsearchSettings:
-    Description: "Elasticsearch configuration used"
-    Value: !Sub "URL: ${ElasticsearchEndpoint}, Index: ${ElasticsearchIndex}"
-    Export:
-      Name: !Sub "${AWS::StackName}-ElasticsearchSettings"
-  
-  SSLCertificateArn:
-    Description: ARN of the SSL certificate
-    Value: !If
-      - HasDomainName
-      - !Ref SSLCertificate
-      - !Ref SSLCertificateArn
-    Export:
-      Name: !Sub "${AWS::StackName}-SSLCertificateArn"
+  BackendURL:
+    Description: URL of the backend API
+    Value: !If [HasDomainName, !Sub "https://${BackendDomainName}", !Sub "https://${BackendLoadBalancer.DNSName}"]
   
   AssetsBucketName:
     Description: S3 bucket name for financial news assets

@@ -312,3 +312,95 @@ For detailed deployment instructions, see:
 - [Backend Setup Guide](backend-setup-readme.md)
 - [Frontend Setup Guide](frontend-setup-readme.md)
 - [CI/CD Setup Guide](cicd-setup-readme.md)
+
+# Financial News Engine Backend
+
+This repository contains the backend infrastructure for the Financial News Engine application.
+
+## Architecture
+
+The backend consists of the following components:
+
+- **EC2 Instances**: Running the Financial News Engine application
+- **Auto Scaling Group**: For high availability and scalability
+- **Application Load Balancer**: For distributing traffic to the instances
+- **CloudWatch**: For monitoring and alerting
+- **SSM Parameter Store**: For securely storing configuration parameters
+- **S3**: For storing deployment assets
+- **Lambda**: For initializing SSM parameters
+
+## CloudFormation Deployment
+
+We've streamlined the CloudFormation deployment by extracting large inline scripts into external files stored in S3. This approach has several benefits:
+
+1. Reduced template size (under the 51,200 byte limit)
+2. Improved maintainability with modular scripts
+3. Better version control of deployment scripts
+4. Simplified template structure
+
+### Build and Deployment Process
+
+The deployment process consists of two main phases:
+
+1. **Prepare Scripts**: Using `buildspecs/backend-scripts-deploy.yml`
+   - Creates deployment scripts and uploads them to S3
+   - Packages Lambda functions and uploads them to S3
+   - This happens before the CloudFormation template is deployed
+
+2. **CloudFormation Deployment**:
+   - The template references scripts in S3 instead of including them inline
+   - EC2 instances download and execute these scripts during initialization
+
+### Key Scripts
+
+- `create_env_file.sh`: Creates the .env file with configuration from SSM Parameter Store
+- `lifecycle_handler.sh`: Handles Auto Scaling Group lifecycle events
+- `initialize_ssm_parameters.py`: Lambda function that initializes SSM parameters
+
+## Deployment Steps
+
+1. First, run the scripts deployment:
+   ```
+   aws codebuild start-build --project-name financial-news-backend-scripts-deploy
+   ```
+
+2. Once the scripts are uploaded to S3, deploy the CloudFormation template:
+   ```
+   aws cloudformation deploy \
+     --template-file backend-template.yaml \
+     --stack-name financial-news-backend \
+     --capabilities CAPABILITY_IAM \
+     --parameter-overrides \
+       EnvironmentName=production \
+       ElasticsearchEndpoint=https://your-es-endpoint.es.amazonaws.com \
+       ElasticsearchApiKey=your-api-key
+   ```
+
+## IAM Permissions
+
+The backend requires the following IAM permissions:
+
+- EC2 instances need access to SSM Parameter Store, S3, and CloudWatch
+- Lambda functions need access to SSM Parameter Store
+- All resources are created with least-privilege permissions
+
+## Monitoring
+
+CloudWatch alarms are configured to monitor:
+
+- CPU utilization
+- Disk space
+- Application health
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. Check CloudWatch Logs for initialization errors
+2. Verify that S3 scripts were properly uploaded
+3. Check IAM permissions
+4. Verify SSM parameters are correctly initialized
+
+---
+
+This architecture ensures the EC2 instances in the Auto Scaling Group have all the required resources in `/opt/financial-news-engine`, with correctly formatted configuration files and application code.
