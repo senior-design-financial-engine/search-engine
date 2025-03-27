@@ -95,22 +95,60 @@
 
 /* Analytics toggle button */
 .analytics-toggle {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1020;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  width: 50px !important;
+  height: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1020 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+  overflow: hidden !important;
+}
+
+.analytics-toggle i {
+  font-size: 1.5rem;
 }
 
 .search-header {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   z-index: 1010;
+  padding: 15px 0;
+  background-color: #fff;
+}
+
+/* Fix for filter overlapping */
+.filter-row {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.filter-col {
+  margin-bottom: 10px;
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+/* Search Results Title */
+.results-title {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+/* Back button styling */
+.back-button {
+  margin-bottom: 15px;
 }
 
 /* Responsive adjustments */
@@ -121,5 +159,26 @@
   
   .card {
     margin-bottom: 1rem;
+  }
+  
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filter-col {
+    width: 100%;
+    min-width: unset;
+  }
+  
+  .search-header {
+    padding-top: 10px;
+    padding-bottom: 15px;
+  }
+  
+  /* Ensure analytics toggle is still visible on mobile */
+  .analytics-toggle {
+    bottom: 15px !important;
+    right: 15px !important;
   }
 }

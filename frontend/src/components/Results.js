@@ -47,20 +47,8 @@ function Results() {
           const searchResults = await searchArticles(query, source, timeRange, sentiment);
           
           // Transform results to ensure consistent structure
-          const normalizedResults = searchResults.map(article => {
-            // Handle both direct properties and Elasticsearch-like _source structure
-            if (article._source) {
-              return { 
-                ...article._source, 
-                id: article._id,
-                // Ensure sentiment_score is properly extracted
-                sentiment_score: article._source.sentiment_score,
-                // Process highlight data if available
-                highlight: article.highlight || {}
-              };
-            }
-            return article;
-          });
+          const normalizedResults = Array.isArray(searchResults) ? searchResults : 
+            (searchResults.articles || []);
           
           setResults(normalizedResults);
         }
@@ -338,103 +326,116 @@ function Results() {
   return (
     <div className={`results-page ${isSideMenuOpen ? 'menu-open' : ''}`}>
       {/* Search header */}
-      <div className="search-header bg-light py-3 border-bottom sticky-top">
+      <div className="search-header">
         <Container>
-          <Row className="align-items-center">
-            <Col>
-              <Button 
-                variant="outline-secondary" 
-                onClick={handleBack} 
-                className="mb-3 rounded-pill"
-              >
-                <i className="bi bi-arrow-left me-2"></i>
-                Back to Search
-              </Button>
-            </Col>
-            <Col>
-              <h2 className="mb-3 fw-bold">
-                <i className="bi bi-search text-primary me-2"></i>
-                Results for "<span className="text-primary">{query}</span>"
-              </h2>
-            </Col>
-            <Col>
-              <div className="d-flex flex-wrap">
-                <Form.Group className="mb-3 me-2">
-                  <Form.Label className="fw-bold">Source</Form.Label>
-                  <Form.Select 
-                    value={source || ''}
-                    onChange={(e) => handleFilterChange('source', e.target.value)}
-                    className="rounded-3"
-                  >
-                    <option value="">All Sources</option>
-                    <option value="Bloomberg">Bloomberg</option>
-                    <option value="Reuters">Reuters</option>
-                    <option value="CNBC">CNBC</option>
-                    <option value="Financial Times">Financial Times</option>
-                    <option value="Wall Street Journal">Wall Street Journal</option>
-                    <option value="MarketWatch">MarketWatch</option>
-                    <option value="Barron's">Barron's</option>
-                  </Form.Select>
-                </Form.Group>
-                <Form.Group className="mb-3 me-2">
-                  <Form.Label className="fw-bold">Time Range</Form.Label>
-                  <Form.Select 
-                    value={timeRange || 'all'}
-                    onChange={(e) => handleFilterChange('time_range', e.target.value)}
-                    className="rounded-3"
-                  >
-                    <option value="all">All Time</option>
-                    <option value="day">Last 24 Hours</option>
-                    <option value="week">Last Week</option>
-                    <option value="month">Last Month</option>
-                    <option value="year">Last Year</option>
-                  </Form.Select>
-                </Form.Group>
-                <Form.Group className="mb-3 me-2">
-                  <Form.Label className="fw-bold">Sentiment</Form.Label>
-                  <Form.Select 
-                    value={sentiment || 'all'}
-                    onChange={(e) => handleFilterChange('sentiment', e.target.value)}
-                    className="rounded-3"
-                  >
-                    <option value="all">All Sentiments</option>
-                    <option value="positive">Positive</option>
-                    <option value="negative">Negative</option>
-                    <option value="neutral">Neutral</option>
-                  </Form.Select>
-                </Form.Group>
-              </div>
-            </Col>
-          </Row>
+          {/* Back button */}
+          <Button 
+            variant="outline-secondary" 
+            onClick={handleBack} 
+            className="back-button rounded-pill"
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            Back to Search
+          </Button>
+          
+          {/* Results title */}
+          <h2 className="results-title fw-bold">
+            <i className="bi bi-search text-primary me-2"></i>
+            Results for "<span className="text-primary">{query}</span>"
+          </h2>
+          
+          {/* Filters row */}
+          <div className="filter-row">
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Source</Form.Label>
+                <Form.Select 
+                  value={source || ''}
+                  onChange={(e) => handleFilterChange('source', e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="">All Sources</option>
+                  <option value="Bloomberg">Bloomberg</option>
+                  <option value="Reuters">Reuters</option>
+                  <option value="CNBC">CNBC</option>
+                  <option value="Financial Times">Financial Times</option>
+                  <option value="Wall Street Journal">Wall Street Journal</option>
+                  <option value="MarketWatch">MarketWatch</option>
+                  <option value="Barron's">Barron's</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
+            
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Time Range</Form.Label>
+                <Form.Select 
+                  value={timeRange || 'all'}
+                  onChange={(e) => handleFilterChange('time_range', e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="all">All Time</option>
+                  <option value="1d">Last 24 Hours</option>
+                  <option value="7d">Last Week</option>
+                  <option value="30d">Last Month</option>
+                  <option value="90d">Last 3 Months</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
+            
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Sentiment</Form.Label>
+                <Form.Select 
+                  value={sentiment || 'all'}
+                  onChange={(e) => handleFilterChange('sentiment', e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="all">All Sentiments</option>
+                  <option value="positive">Positive</option>
+                  <option value="neutral">Neutral</option>
+                  <option value="negative">Negative</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
+            
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Sort By</Form.Label>
+                <Form.Select 
+                  value={sortBy}
+                  onChange={(e) => handleSort(e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="date">Date (Newest)</option>
+                  <option value="sentiment">Sentiment</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
+          </div>
         </Container>
       </div>
-      
-      <Container fluid className="p-0">
-        <Row className="g-0">
-          <Col lg={isSideMenuOpen ? 9 : 12} className="main-results-area">
-            <Container className="py-4">
-              {/* Render results section */}
-              {renderResults()}
-            </Container>
-          </Col>
-          
-          {/* Analytics Side Menu */}
-          <AnalyticsSideMenu 
-            isOpen={isSideMenuOpen} 
-            toggleMenu={toggleSideMenu} 
-            results={results}
-          />
+
+      {/* Main content */}
+      <Container className="py-4 main-results-area">
+        <Row>
+          {renderResults()}
         </Row>
       </Container>
       
-      {/* Analytics toggle button (only visible on mobile when menu is closed) */}
-      <Button
-        variant="primary"
-        className="analytics-toggle d-lg-none"
+      {/* Analytics side menu */}
+      <AnalyticsSideMenu isOpen={isSideMenuOpen} query={query} />
+      
+      {/* Toggle button for analytics */}
+      <Button 
+        variant="primary" 
+        className="analytics-toggle"
         onClick={toggleSideMenu}
-        aria-label="Toggle Analytics"
+        title="Toggle Analytics"
+        size="sm"
       >
-        <i className="bi bi-graph-up-arrow"></i>
+        <i className={`bi bi-${isSideMenuOpen ? 'x-lg' : 'graph-up'}`}></i>
       </Button>
     </div>
   );
