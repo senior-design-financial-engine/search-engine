@@ -6,6 +6,8 @@ import os
 import feedparser
 from urllib.parse import urljoin
 from datetime import datetime, timezone, timedelta
+import openai
+from typing import Optional, Dict, Any
 
 # Define headers for requests
 HEADERS = {
@@ -15,6 +17,9 @@ HEADERS = {
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1"
 }
+
+
+openai.api_key = ''
 
 # Define topics and their related keywords
 TOPICS = {
@@ -45,6 +50,7 @@ class WebScraper:
         self.source = source
         self.html_content = None
         self.article_data = {}
+        self.summary = None
 
     def fetch_content(self):
         """Fetch the HTML content of the webpage."""
@@ -150,8 +156,154 @@ class WebScraper:
 
         return headline, content.strip(), timestamp
 
+    def generate_summary(self, headline: str, content: str, primary_company: str = None) -> Optional[Dict[str, Any]]:
+        """
+        Generate a summary and sentiment analysis of the article using OpenAI's API.
+        
+        Args:
+            headline: The article headline
+            content: The article content
+            primary_company: The primary company to focus sentiment analysis on
+            
+        Returns:
+            Dictionary containing summary and sentiment score or None if generation fails
+        """
+        try:
+            # Calculate ideal summary length based on content length using logarithmic scale
+            content_length = len(content)
+            if content_length < 500:
+                summary_length = "2-3 sentences"  # Short articles get proportionally longer summaries
+            elif content_length < 2000:
+                summary_length = "3-4 sentences"  # Medium articles get balanced summaries
+            elif content_length < 5000:
+                summary_length = "4-5 sentences"  # Longer articles get slightly longer summaries
+            else:
+                summary_length = "5-6 sentences"  # Very long articles get proportionally shorter summaries
+
+            # Truncate content but keep more context
+            truncated_content = content[:2000] + "..." if len(content) > 2000 else content
+
+            # Get company keywords for more focused analysis
+            company_keywords = TOPICS.get(primary_company, [primary_company])
+            company_context = f"Focus the sentiment analysis specifically on {primary_company} and its related topics ({', '.join(company_keywords)})."
+
+            # Prepare a more detailed prompt for the API
+            prompt = f"""Analyze this news article and provide:
+1. A concise summary ({summary_length}) focusing on the most important points
+2. An overall sentiment score specifically for {primary_company} (provide a score from -1 to +1, where:
+   - -1 is very negative
+   - 0 is neutral
+   - +1 is very positive)
+
+{company_context}
+
+Headline: {headline}
+Content: {truncated_content}
+
+Provide your response in this exact format:
+SUMMARY:
+[Your concise summary here]
+
+SENTIMENT: [Score]"""
+
+            # Add delay between API calls to avoid rate limits
+            time.sleep(2)  # Wait 2 seconds between calls
+
+            # Call OpenAI API using GPT-3.5-turbo for cost efficiency
+            response = openai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an expert financial analyst and news article analyzer. Create concise, focused summaries and accurate sentiment analysis scores, focusing specifically on the primary company mentioned."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=400,
+                temperature=0.3
+            )
+
+            # Extract the response
+            full_response = response.choices[0].message.content.strip()
+            
+            # Split the response into summary and sentiment sections
+            summary_section = ""
+            sentiment_score = 0.0
+            current_section = ""
+            
+            for line in full_response.split('\n'):
+                if line.startswith('SUMMARY:'):
+                    current_section = 'summary'
+                elif line.startswith('SENTIMENT:'):
+                    try:
+                        sentiment_score = float(line.split(':', 1)[1].strip())
+                        sentiment_score = max(min(sentiment_score, 1.0), -1.0)
+                    except (ValueError, IndexError):
+                        sentiment_score = 0.0
+                elif line.strip() and current_section == 'summary':
+                    summary_section += line + '\n'
+
+            return {
+                "summary": summary_section.strip(),
+                "sentiment": sentiment_score
+            }
+
+        except openai.RateLimitError as e:
+            print(f"Rate limit exceeded. Waiting 60 seconds before retrying...")
+            time.sleep(60)  # Wait 60 seconds on rate limit error
+            return None
+        except openai.APIError as e:
+            if "insufficient_quota" in str(e):
+                print("OpenAI API quota exceeded. Please check your billing details.")
+            else:
+                print(f"OpenAI API error: {e}")
+            return None
+        except Exception as e:
+            print(f"Error generating summary: {e}")
+            return None
+
+    def get_primary_company(self, content: str, headline: str, tags: list) -> str:
+        """
+        Determine the primary company based on content relevance.
+        
+        Args:
+            content: The article content
+            headline: The article headline
+            tags: List of company tags
+            
+        Returns:
+            The primary company tag
+        """
+        if not tags or len(tags) == 1:
+            return tags[0] if tags else "misc"
+            
+        # Combine headline and content for analysis
+        full_text = (headline + " " + content).lower()
+        
+        # Count mentions of each company in the text
+        mention_counts = {}
+        for tag in tags:
+            # Get keywords for this company from TOPICS
+            keywords = TOPICS.get(tag, [tag])
+            # Count mentions of each keyword
+            count = sum(full_text.count(keyword.lower()) for keyword in keywords)
+            mention_counts[tag] = count
+            
+        # If no mentions found, return the first tag
+        if not any(mention_counts.values()):
+            return tags[0]
+            
+        # Get the company with the most mentions
+        primary_company = max(mention_counts.items(), key=lambda x: x[1])[0]
+        
+        # If the headline contains a company name, prioritize that company
+        headline_lower = headline.lower()
+        for tag in tags:
+            keywords = TOPICS.get(tag, [tag])
+            if any(keyword.lower() in headline_lower for keyword in keywords):
+                return tag
+                
+        return primary_company
+
     def scrape(self):
-        """Scrape the article and return the data with tags."""
+        """Scrape the article and return the data with tags and summary."""
         try:
             self.fetch_content()
             if not self.html_content:
@@ -162,15 +314,29 @@ class WebScraper:
             
             # Get tags for the article
             tags = TopicTagger.get_article_tags(content, headline)
-
+            
+            # Get the primary company based on content relevance
+            primary_company = self.get_primary_company(content, headline, tags)
+            
+            # Generate summary and sentiment analysis focused on the primary company
+            analysis_result = self.generate_summary(headline, content, primary_company)
+            
+            if not analysis_result:
+                return None
+            
             # Build article data dictionary
             article_data = {
                 'url': self.url,
                 'source': self.source,
                 'headline': headline,
                 'content': content,
+                'summary': analysis_result["summary"],
+                'sentiment': {
+                    'company': primary_company,
+                    'score': analysis_result["sentiment"]
+                },
                 'tags': tags,
-                'timestamp': timestamp or time.strftime('%Y-%m-%d %H:%M:%S')  # Use article time if available, fallback to scrape time
+                'timestamp': timestamp or time.strftime('%Y-%m-%d %H:%M:%S')
             }
 
             return article_data
@@ -288,13 +454,13 @@ class OptimizedRSSFeedScraper:
 
     def scrape(self):
         new_articles = self.scrape_new_articles()
-        for url, title, headline_tags, timestamp in new_articles:
+        for url, title, tags, timestamp in new_articles:
             scraper = WebScraper(url, self.source)
             try:
                 article_data = scraper.scrape()  
                 if article_data:
                     # Add the headline tags and timestamp to help track which articles were caught by headline
-                    article_data['headline_tags'] = headline_tags
+                    article_data['headline_tags'] = tags
                     article_data['timestamp'] = timestamp or article_data['timestamp']  # Use RSS timestamp if available
                     self.articles_data.append(article_data)  
                     print(f"Scraped article: {title} (Tags: {article_data['tags']})")
@@ -504,15 +670,32 @@ class CNNScraper:
             
             # Get date from URL
             timestamp = self.extract_date_from_url(url)
+
+            # Generate summary and sentiment analysis using OpenAI API
+            scraper = WebScraper(url, "cnn")
+            
+            # Get the primary company based on content relevance
+            primary_company = scraper.get_primary_company(content, headline, all_tags)
+            
+            # Generate summary and sentiment analysis focused on the primary company
+            analysis_result = scraper.generate_summary(headline, content, primary_company)
+            
+            if not analysis_result:
+                return None
             
             return {
                 "url": url,
                 "headline": headline,
                 "content": content,
+                "summary": analysis_result["summary"],
                 "source": "CNN",
                 "tags": all_tags,
                 "headline_tags": headline_tags,
-                "timestamp": timestamp
+                "timestamp": timestamp,
+                "sentiment": {
+                    "company": primary_company,
+                    "score": analysis_result["sentiment"]
+                }
             }
             
         except Exception as e:
@@ -557,7 +740,7 @@ class CNNScraper:
                 if "misc" not in headline_tags:
                     articles.append({
                         "url": url,
-                        "headline": headline,
+            "headline": headline,
                         "headline_tags": headline_tags
                     })
                     seen_urls.add(url)  # Mark URL as seen

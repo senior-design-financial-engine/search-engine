@@ -1,9 +1,33 @@
 [
     {
+        "url": "https://www.npr.org/2025/03/26/nx-s1-5288157/new-york-times-openai-copyright-case-goes-forward",
+        "source": "npr",
+        "headline": "Judge allows 'New York Times' copyright case against OpenAI to go forward",
+        "content": "A federal judge on Wednesday rejected OpenAI's request to toss out a copyrightlawsuitfromThe New York Timesthat alleges that the tech company exploited the newspaper's content without permission or payment. Inan orderallowing the lawsuit to go forward, Judge Sidney Stein, of the Southern District of New York, narrowed the scope of the lawsuit but allowed the case's main copyright infringement claims to go forward. Stein did not immediately release an opinion but promised one would come \"expeditiously.\" The decision is a victory for the newspaper, which has joined forces with other publishers, includingThe New York Daily Newsand the Center for Investigative Reporting, to challenge the way that OpenAI collected vast amounts of data from the web to train its popular artificial intelligence service, ChatGPT. Attorney Steven Lieberman, who is on the legal team representing the news publishers, celebrated the judge's ruling. \"We appreciate the opportunity to present a jury with the facts about how OpenAI and Microsoft are profiting wildly from stealing the original content of newspapers across the country,\" Lieberman said in a statement to NPR. Lawyers forThe New York Timesbelieve that the paper's articles are one of the biggest sources of copyrighted text that OpenAI used to build ChatGPT into the premier AI chatbot, and they allege that OpenAI violated copyright laws in its siphoning of the newspaper's journalism. In a statement to NPR, OpenAI spokesman Jason Deutrom said the company welcomes the judge's narrowing of the case, adding that lawyers for the ChatGPT maker \"look forward to making it clear that we build our AI models using publicly available data, in a manner grounded in fair use, and supportive of innovation.\" OpenAI leaders have argued that the company's mass data scraping, including articles fromThe Times, is protected under a legal doctrine known as \"fair use.\" It allows for material to be reused without permission in certain instances, including for research, teaching and commentary. The judge's ruling means that the suit can now proceed to trial, but a trial date has not been set. Evidence gathering, including depositions with executives on both sides of the case, are expected to happen confidentially, along with public pretrial hearings to settle disputes over evidence and other matters. The legal fight between one of the world's most influential news outlets and Silicon Valley's leading AI company puts a lot on the line for both the news industry and the future of AI tools. For publishers, the fear is that powerful chatbots that can quickly summarize news articles when queried will mean that readers visit news websites less often, prompting a drop in advertising that could affect the industry's bottom line. And while the suit only names OpenAI and its financial backer, Microsoft, other AI companies also scrape the web for content to train their models. For the most part, the AI industry has followed OpenAI's lead when it comes to training chatbot and other AI services, operating under the premise that processing data found on the open web into chatbot answers is legally protected by copyright law. But the law remains unsettled on the matter. Courts have said fair use of a copyrighted work must generate something new that is \"transformative,\" or comments on or refers back to an original work.The Timesargues that this does not apply to how OpenAI reproduces the paper's original reporting. Another part of the legal analysis will involve an idea known as \"market substitution,\" referring to whether chatbot answers are a substitute for, say, readingThe Timeswebsite, or if chatbots and newspapers operate in different marketplaces. Ina hearingin New York in January, lawyers for the publishers argued that when ChatGPT was asked questions about subjects covered byThe Times, the chatbot regurgitated articles verbatim. Yet OpenAI's legal team shot back that the news outlets appeared to have specifically manipulated prompts to essentially force the chatbot to spit out large chunks lifted from the paper's website. This is not how most people interact with the service, nor how the chatbot is designed to operate, said Joseph Gratz, a lawyer for OpenAI. \"This isn't a document retrieval system. It is a large language mode,\" Gratz said.",
+        "summary": "A federal judge rejected OpenAI's request to dismiss a copyright lawsuit filed by The New York Times, accusing OpenAI of using the newspaper's content without permission or payment. The judge allowed the case to proceed, focusing on copyright infringement claims. The lawsuit alleges that OpenAI collected data from the web, including articles from The New York Times, to train its AI service, ChatGPT. OpenAI maintains that they build their AI models using publicly available data in a manner consistent with fair use.",
+        "sentiment": {
+            "company": "openai",
+            "score": 0.1
+        },
+        "tags": [
+            "microsoft",
+            "openai"
+        ],
+        "timestamp": "2025-03-26 21:07:35",
+        "headline_tags": [
+            "openai"
+        ]
+    },
+    {
         "url": "https://www.npr.org/2025/03/23/nx-s1-5333729/amazon-smart-speakers-disable-a-privacy-setting-that-allowed-local-storage-of-voice-recordings",
         "source": "npr",
         "headline": "Amazon smart speakers disable a privacy setting that allowed local storage of voice recordings",
         "content": "NPR's Ayesha Rascoe talks to Jennifer Tuohy of The Verge about changes to Amazon's smart speakers. Users will no longer be able to opt not to have their voice recordings sent to the cloud.",
+        "summary": "Amazon has disabled a privacy setting on its smart speakers that allowed users to store voice recordings locally. This change means that voice recordings will now be sent to the cloud by default.",
+        "sentiment": {
+            "company": "amazon",
+            "score": -0.6
+        },
         "tags": [
             "amazon"
         ],
