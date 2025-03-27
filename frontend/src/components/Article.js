@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Container, Card, Badge, Button, Spinner, Alert } from 'react-bootstrap';
-import { getArticleById } from '../services/api';
+import { getArticleById } from '../services/elasticsearchClient';
 
 const Article = () => {
   const { id } = useParams();
