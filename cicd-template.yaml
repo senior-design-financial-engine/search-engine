@@ -167,7 +167,8 @@ Resources:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudFrontFullAccess
       Policies:
         - PolicyName: CodeBuildAccess
           PolicyDocument:
@@ -182,27 +183,76 @@ Resources:
                   - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
               - Effect: Allow
                 Action:
-                  - 's3:GetObject'
-                  - 's3:GetObjectVersion'
-                  - 's3:PutObject'
-                  - 's3:ListBucket'
-                Resource:
-                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
-                  - !Sub 'arn:aws:s3:::${ArtifactBucket}'
+                  - 'ec2:CreateNetworkInterface'
+                  - 'ec2:DescribeDhcpOptions'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DeleteNetworkInterface'
+                  - 'ec2:DescribeSubnets'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeVpcs'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:CreateNetworkInterfacePermission'
+                Resource: !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*'
+                Condition:
+                  StringEquals:
+                    ec2:AuthorizedService: codebuild.amazonaws.com
               - Effect: Allow
                 Action:
                   - 'ssm:GetParameter'
                   - 'ssm:GetParameters'
                   - 'ssm:GetParametersByPath'
-                Resource: 
-                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/financial-news/*'
+                  - 'ssm:PutParameter'
+                  - 'ssm:DeleteParameter'
+                  - 'ssm:DescribeParameters'
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/financial-news/*'
               - Effect: Allow
                 Action:
-                  - 'kms:Decrypt'
+                  - 'secretsmanager:GetSecretValue'
+                Resource: 
+                  - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:financial-news-frontend-deployer-credentials-${EnvironmentName}*'
+              - Effect: Allow
+                Action:
+                  - 'cloudformation:DescribeStacks'
+                  - 'cloudformation:ListStackResources'
+                  - 'cloudformation:ListStacks'
                 Resource: '*'
-                Condition:
-                  StringEquals:
-                    'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:StartInstanceRefresh'
+                  - 'autoscaling:DescribeInstanceRefreshes'
+                  - 'autoscaling:CancelInstanceRefresh'
+                  - 'autoscaling:CompleteLifecycleAction'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:SendCommand'
+                  - 'ssm:DescribeInstanceInformation'
+                  - 'ssm:GetCommandInvocation'
+                  - 'ssm:CancelCommand'
+                  - 'ssm:ListCommands'
+                  - 'ssm:ListCommandInvocations'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource: 
+                  - !Ref DeploymentNotificationTopic
+                  - !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:*-financial-news-*'
+              - Effect: Allow
+                Action:
+                  - 'logs:PutLogEvents'
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:DescribeLogStreams'
+                Resource: '*'
 
   # Frontend CodeBuild Project
   FrontendBuildProject:
@@ -224,8 +274,6 @@ Resources:
               Fn::ImportValue: !Sub "${BackendStackName}-BackendALBURL"
           - Name: ENVIRONMENT
             Value: !Ref EnvironmentName
-          - Name: BACKEND_STACK_NAME
-            Value: !Ref BackendStackName
       Source:
         Type: CODEPIPELINE
         BuildSpec: buildspecs/frontend-build.yml
