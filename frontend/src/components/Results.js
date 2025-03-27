@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { searchArticles } from '../services/api';
-import { Container, Row, Col, Card, Button, Badge, Spinner, Form } from 'react-bootstrap';
+import { searchArticles } from '../services/elasticsearchClient';
+import { Container, Row, Col, Card, Button, Badge, Spinner, Form, Alert } from 'react-bootstrap';
 import AnalyticsSideMenu from './AnalyticsSideMenu';
 import '../styles/Results.css';
 
@@ -44,28 +44,13 @@ function Results() {
       
       try {
         if (query) {
-          const searchResults = await searchArticles(query, source, timeRange, sentiment);
+          // Direct Elasticsearch search - the response is already in the format we need
+          const articlesData = await searchArticles(query, source, timeRange, sentiment);
           
-          // Transform results to ensure consistent structure
-          const normalizedResults = searchResults.map(article => {
-            // Handle both direct properties and Elasticsearch-like _source structure
-            if (article._source) {
-              return { 
-                ...article._source, 
-                id: article._id,
-                // Ensure sentiment_score is properly extracted
-                sentiment_score: article._source.sentiment_score,
-                // Process highlight data if available
-                highlight: article.highlight || {}
-              };
-            }
-            return article;
-          });
+          // Log the results for debugging
+          console.log('Search results:', articlesData);
           
-          // Log the normalized results for debugging
-          console.log('Normalized search results:', normalizedResults);
-          
-          setResults(normalizedResults);
+          setResults(articlesData);
         }
       } catch (error) {
         console.error('Error fetching search results:', error);
@@ -213,6 +198,17 @@ function Results() {
         toggleMenu={toggleSideMenu} 
         results={results}
       />
+      
+      {/* Analytics toggle button */}
+      <Button
+        variant="primary"
+        className="side-menu-toggle rounded-circle p-2 d-flex align-items-center justify-content-center"
+        onClick={toggleSideMenu}
+        style={{ width: '48px', height: '48px', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }}
+        aria-label="Toggle Analytics"
+      >
+        <i className="bi bi-bar-chart-fill fs-5"></i>
+      </Button>
       
       <Button 
         variant="outline-secondary" 
