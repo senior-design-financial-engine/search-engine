@@ -19,6 +19,8 @@ ENABLE_REQUEST_LOGGING = os.getenv('ENABLE_REQUEST_LOGGING', 'true').lower() == 
 ENABLE_PERFORMANCE_LOGGING = os.getenv('ENABLE_PERFORMANCE_LOGGING', 'true').lower() == 'true'
 LOG_DIR = os.getenv('LOG_DIR', 'logs')
 SERVICE_NAME = os.getenv('SERVICE_NAME', 'financial-news-engine')
+# Max number of consecutive duplicate log messages to allow before suppressing
+MAX_CONSECUTIVE_DUPLICATES = int(os.getenv('MAX_CONSECUTIVE_DUPLICATES', '1'))
 
 # Create logs directory if it doesn't exist
 if not os.path.exists(LOG_DIR):
@@ -49,6 +51,69 @@ error_file_handler = RotatingFileHandler(
     maxBytes=10*1024*1024,  # 10 MB
     backupCount=10
 )
+
+# Filter for deduplicating consecutive identical log messages
+class DuplicateFilter(logging.Filter):
+    """Filter that prevents logging the same message consecutively more than MAX_CONSECUTIVE_DUPLICATES times."""
+    
+    def __init__(self):
+        super().__init__()
+        self.last_log = {}  # Dict to track last log per thread
+        self.repeat_count = {}  # Count of repetitions
+    
+    def filter(self, record):
+        # Create a key that uniquely identifies this log message
+        # Include thread to avoid false suppression between threads
+        thread_id = threading.get_ident()
+        
+        # Create message key (level + message + module + function)
+        msg_key = f"{record.levelno}:{record.getMessage()}:{record.module}:{record.funcName}"
+        
+        # For errors, also include the traceback to uniquely identify the error
+        if record.levelno >= logging.ERROR and record.exc_info:
+            tb_str = "".join(traceback.format_exception(*record.exc_info))
+            msg_key += f":{tb_str}"
+        
+        # Thread-specific tracking key
+        track_key = f"{thread_id}:{msg_key}"
+        
+        # If this is a repeat of the last message
+        if track_key in self.last_log:
+            self.repeat_count[track_key] += 1
+            
+            # Only log the first MAX_CONSECUTIVE_DUPLICATES occurrences
+            if self.repeat_count[track_key] <= MAX_CONSECUTIVE_DUPLICATES:
+                return True
+            
+            # For every 100th occurrence after suppression starts, log a summary
+            if self.repeat_count[track_key] % 100 == 0:
+                record.msg = f"Previous message repeated {self.repeat_count[track_key]} times: {record.msg}"
+                return True
+                
+            # Suppress this duplicate
+            return False
+        else:
+            # New message, reset counter
+            self.last_log[track_key] = time.time()
+            self.repeat_count[track_key] = 1
+            
+            # Check if we just finished a series of duplicates
+            for old_key in list(self.last_log.keys()):
+                if old_key != track_key and old_key.startswith(f"{thread_id}:"):
+                    old_count = self.repeat_count.pop(old_key, 0)
+                    if old_count > MAX_CONSECUTIVE_DUPLICATES:
+                        # The previous type of message was suppressed, log a summary
+                        parts = old_key.split(':', 2)
+                        level = int(parts[1]) if len(parts) > 1 else logging.INFO
+                        
+                        # Don't create a new record, just modify the current one
+                        if record.levelno == level:
+                            record.msg = f"Previous message was suppressed, occurred {old_count} times. New message: {record.msg}"
+                    
+                    # Clean up old keys
+                    del self.last_log[old_key]
+            
+            return True
 
 # Set log levels
 console_handler.setLevel(getattr(logging, LOG_LEVEL))
@@ -113,6 +178,12 @@ root_logger.addHandler(error_file_handler)
 # Create a specific logger for the application
 logger = logging.getLogger('search_engine_backend')
 logger.setLevel(getattr(logging, LOG_LEVEL))
+
+# Add duplicate filter to file handlers (especially for error logs)
+duplicate_filter = DuplicateFilter()
+file_handler.addFilter(duplicate_filter)
+error_file_handler.addFilter(duplicate_filter)
+debug_file_handler.addFilter(duplicate_filter)
 
 # Add request_id filter to all loggers
 class RequestIdFilter(logging.Filter):
