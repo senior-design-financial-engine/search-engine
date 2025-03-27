@@ -3,11 +3,13 @@
 # Script to create environment file for the financial news engine
 ENV_FILE="/opt/financial-news-engine/.env"
 LOG_FILE="/opt/financial-news-engine/logs/env_setup.log"
+AWS_REGION="us-east-1"  # Set default region
 
 # Ensure log directory exists
 mkdir -p "/opt/financial-news-engine/logs"
 
 echo "$(date) - Starting environment setup" > $LOG_FILE
+echo "Using AWS region: $AWS_REGION" >> $LOG_FILE
 
 # Fetch parameters from AWS SSM Parameter Store with fallback
 fetch_param() {
@@ -24,8 +26,8 @@ fetch_param() {
     return
   fi
   
-  # Try to fetch the parameter
-  value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>> $LOG_FILE)
+  # Try to fetch the parameter with region explicitly set
+  value=$(aws ssm get-parameter --region $AWS_REGION --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>> $LOG_FILE)
   
   # Check if the fetch was successful
   if [ $? -ne 0 ] || [ -z "$value" ] || [ "$value" = "None" ]; then
@@ -36,6 +38,24 @@ fetch_param() {
     echo "$value"
   fi
 }
+
+# Check for instance metadata to get region
+get_instance_region() {
+  if command -v curl &> /dev/null; then
+    # Try to get region from instance metadata
+    local metadata_token=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
+    if [ -n "$metadata_token" ]; then
+      local region=$(curl -s -H "X-aws-ec2-metadata-token: $metadata_token" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
+      if [ -n "$region" ]; then
+        echo "Detected region from instance metadata: $region" >> $LOG_FILE
+        AWS_REGION=$region
+      fi
+    fi
+  fi
+}
+
+# Try to get the region from instance metadata
+get_instance_region
 
 # Create env file
 echo "Creating environment file at $ENV_FILE" | tee -a $LOG_FILE
@@ -50,6 +70,7 @@ ENVIRONMENT=$(fetch_param "/financial-news/environment" "development")
 
 cat > $ENV_FILE << EOL
 # Environment variables for Financial News Engine
+AWS_REGION=$AWS_REGION
 ELASTICSEARCH_URL=$ES_ENDPOINT
 ELASTICSEARCH_ENDPOINT=$ES_ENDPOINT
 ELASTICSEARCH_API_KEY=$ES_API_KEY

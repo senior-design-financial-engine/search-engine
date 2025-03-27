@@ -13,6 +13,8 @@ Environment=MAX_CONSECUTIVE_DUPLICATES=1
 Environment=LOG_DIR=/opt/financial-news-engine/logs
 Environment=LOG_FORMAT=text
 Environment=LOG_LEVEL=DEBUG
+Environment=AWS_REGION=us-east-1
+Environment=AWS_DEFAULT_REGION=us-east-1
 
 # Create log directory and set full permissions for troubleshooting
 ExecStartPre=/bin/mkdir -p /opt/financial-news-engine/logs
@@ -20,6 +22,9 @@ ExecStartPre=/bin/chmod -R 777 /opt/financial-news-engine/logs
 ExecStartPre=/usr/bin/touch /opt/financial-news-engine/logs/startup.log
 # Debug startup issues
 ExecStartPre=/bin/sh -c 'echo "Starting service $(date)" >> /opt/financial-news-engine/logs/startup.log'
+
+# Configure AWS settings
+ExecStartPre=/bin/sh -c 'if [ -f "/opt/financial-news-engine/deploy_scripts/configure_aws.sh" ]; then /bin/bash /opt/financial-news-engine/deploy_scripts/configure_aws.sh; fi'
 
 # Run the environment setup script if it exists
 ExecStartPre=/bin/sh -c 'if [ -f "/opt/financial-news-engine/deploy_scripts/create_env_file.sh" ]; then /bin/bash /opt/financial-news-engine/deploy_scripts/create_env_file.sh; fi'
