@@ -598,6 +598,25 @@ phases:
   
   build:
     commands:
+      - echo "Building and preparing deployment scripts"
+      
+      # Create a zip file for deployment
+      - cd $CODEBUILD_SRC_DIR
+      - mkdir -p artifacts
+      
+      # Make sure all scripts are executable
+      - echo "Making scripts executable..."
+      - chmod +x api/deploy/api-scripts/*.sh
+      - ls -la api/deploy/api-scripts/
+      
+      # Create a deploy scripts directory in the app deployment folder
+      - echo "Setting up deploy_scripts directory structure..."
+      - mkdir -p api/deploy/deploy_scripts
+      - cp api/deploy/api-scripts/create_env_file.sh api/deploy/deploy_scripts/
+      - cp api/deploy/api-scripts/verify_deployment.sh api/deploy/deploy_scripts/
+      - cp api/deploy/api-scripts/fix_environment.sh api/deploy/deploy_scripts/
+      - cp api/deploy/api-scripts/fix-environment.service api/deploy/deploy_scripts/
+      
       - echo "Creating API configuration YAML with verification scripts"
       - echo "---" > backend-api.yaml
       - echo "# Financial News Engine API Configuration" >> backend-api.yaml
@@ -723,4 +742,194 @@ artifacts:
   files:
     - backend-api.yaml
     - api/deploy/verification/verification-resources.yaml
-  discard-paths: no 
+  discard-paths: no
+
+# Create improved environment file creator script to fix missing region issues
+- |
+  cat > api/deploy/api-scripts/create_env_file.sh << 'EOF'
+  #!/bin/bash
+
+  # Script to create environment file for the financial news engine
+  ENV_FILE="/opt/financial-news-engine/.env"
+  LOG_FILE="/opt/financial-news-engine/logs/env_setup.log"
+  AWS_REGION=${AWS_DEFAULT_REGION:-"us-east-1"}  # Use AWS_DEFAULT_REGION if set, otherwise default to us-east-1
+
+  # Ensure log directory exists
+  mkdir -p "/opt/financial-news-engine/logs"
+
+  echo "$(date) - Starting environment setup" > $LOG_FILE
+  echo "Using AWS region: $AWS_REGION" >> $LOG_FILE
+
+  # Fetch parameters from AWS SSM Parameter Store with fallback
+  fetch_param() {
+    local param_name=$1
+    local default_value=$2
+    local value=""
+    
+    echo "Fetching parameter: $param_name" >> $LOG_FILE
+    
+    # Try to fetch the parameter with region explicitly set
+    value=$(aws ssm get-parameter --region $AWS_REGION --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>> $LOG_FILE)
+    
+    # Check if the fetch was successful
+    if [ $? -ne 0 ] || [ -z "$value" ] || [ "$value" = "None" ]; then
+      echo "Failed to fetch parameter $param_name, using default value: $default_value" >> $LOG_FILE
+      echo "$default_value"
+    else
+      echo "Successfully fetched $param_name" >> $LOG_FILE
+      echo "$value"
+    fi
+  }
+
+  # Create env file
+  echo "Creating environment file at $ENV_FILE" | tee -a $LOG_FILE
+  echo "Using AWS region: $AWS_REGION" | tee -a $LOG_FILE
+
+  # Set default values for local development if parameters can't be fetched
+  ES_ENDPOINT=$(fetch_param "/financial-news/elasticsearch/endpoint" "http://localhost:9200")
+  ES_API_KEY=$(fetch_param "/financial-news/elasticsearch/api_key" "default-dev-key")
+  ES_INDEX=$(fetch_param "/financial-news/elasticsearch/index" "financial_news")
+  ES_SHARDS=$(fetch_param "/financial-news/elasticsearch/shards" "1")
+  ES_REPLICAS=$(fetch_param "/financial-news/elasticsearch/replicas" "0")
+  ENVIRONMENT=$(fetch_param "/financial-news/environment" "development")
+
+  # Create the env file with the AWS region explicitly set
+  cat > $ENV_FILE << EOL
+  # Environment variables for Financial News Engine
+  AWS_REGION=$AWS_REGION
+  AWS_DEFAULT_REGION=$AWS_REGION
+  ELASTICSEARCH_URL=$ES_ENDPOINT
+  ELASTICSEARCH_ENDPOINT=$ES_ENDPOINT
+  ELASTICSEARCH_API_KEY=$ES_API_KEY
+  ELASTICSEARCH_INDEX=$ES_INDEX
+  ES_NUMBER_OF_SHARDS=$ES_SHARDS
+  ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+  ENVIRONMENT=$ENVIRONMENT
+  CORS_ALLOWED_ORIGINS="https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
+  APP_VERSION="1.0.0"
+  EOL
+
+  # Set readable permissions for app
+  chmod 644 $ENV_FILE
+
+  echo "Environment file created successfully. Contents (redacted):" | tee -a $LOG_FILE
+  grep -v "API_KEY" $ENV_FILE | tee -a $LOG_FILE
+
+  # Verify the file was created
+  if [ -f "$ENV_FILE" ]; then
+    echo "SUCCESS: Environment file created at $ENV_FILE" | tee -a $LOG_FILE
+  else
+    echo "ERROR: Failed to create environment file" | tee -a $LOG_FILE
+  fi
+  EOF
+
+# Create a script to fix environment setup and run at instance startup
+- |
+  cat > api/deploy/api-scripts/fix_environment.sh << 'EOF'
+  #!/bin/bash
+
+  # Script to fix common environment issues on startup
+  INSTALL_DIR="/opt/financial-news-engine"
+  LOG_FILE="${INSTALL_DIR}/logs/environment_fix.log"
+
+  # Ensure log directory exists
+  mkdir -p "${INSTALL_DIR}/logs"
+  touch $LOG_FILE
+  chmod 666 $LOG_FILE
+
+  echo "$(date) - Running environment fix script" | tee -a $LOG_FILE
+
+  # Check for missing environment file
+  if [ ! -f "${INSTALL_DIR}/.env" ] || [ ! -s "${INSTALL_DIR}/.env" ]; then
+    echo "Missing or empty .env file. Creating now." | tee -a $LOG_FILE
+    
+    # Set AWS region to ensure environment script works properly
+    export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-"us-east-1"}
+    echo "Using AWS region: $AWS_DEFAULT_REGION" | tee -a $LOG_FILE
+    
+    # Run environment file creation script
+    if [ -f "${INSTALL_DIR}/deploy_scripts/create_env_file.sh" ]; then
+      echo "Running create_env_file.sh script" | tee -a $LOG_FILE
+      bash "${INSTALL_DIR}/deploy_scripts/create_env_file.sh"
+    else
+      echo "Environment script not found. Creating basic environment file." | tee -a $LOG_FILE
+      
+      # Create a basic environment file
+      cat > "${INSTALL_DIR}/.env" << EOL
+  # Basic environment file created by fix_environment.sh
+  AWS_REGION=${AWS_DEFAULT_REGION}
+  AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+  ELASTICSEARCH_URL=http://localhost:9200
+  ELASTICSEARCH_ENDPOINT=http://localhost:9200
+  ELASTICSEARCH_API_KEY=default-dev-key
+  ELASTICSEARCH_INDEX=financial_news
+  ES_NUMBER_OF_SHARDS=1
+  ES_NUMBER_OF_REPLICAS=0
+  ENVIRONMENT=development
+  CORS_ALLOWED_ORIGINS="https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
+  APP_VERSION="1.0.0"
+  EOL
+      chmod 644 "${INSTALL_DIR}/.env"
+    fi
+  fi
+
+  # Check for Python package structure
+  for dir in utils es_database api scraper; do
+    if [ -d "${INSTALL_DIR}/${dir}" ] && [ ! -f "${INSTALL_DIR}/${dir}/__init__.py" ]; then
+      echo "Creating missing __init__.py in ${dir} directory" | tee -a $LOG_FILE
+      touch "${INSTALL_DIR}/${dir}/__init__.py"
+    fi
+  done
+
+  # Restart service if it's in a failed state
+  if systemctl is-active --quiet financial-news; then
+    echo "Service is already running." | tee -a $LOG_FILE
+  else
+    echo "Service is not running. Attempting to restart." | tee -a $LOG_FILE
+    systemctl restart financial-news
+    
+    # Check if service started successfully
+    sleep 5
+    if systemctl is-active --quiet financial-news; then
+      echo "Service restarted successfully." | tee -a $LOG_FILE
+    else
+      echo "Service failed to restart. See service logs for details." | tee -a $LOG_FILE
+    fi
+  fi
+
+  echo "Environment fix completed at $(date)" | tee -a $LOG_FILE
+  exit 0
+  EOF
+
+# Create a systemd service that runs our fix script on instance startup
+- |
+  cat > api/deploy/api-scripts/fix-environment.service << 'EOF'
+  [Unit]
+  Description=Financial News Environment Fix Service
+  After=network.target
+
+  [Service]
+  Type=oneshot
+  ExecStart=/opt/financial-news-engine/deploy_scripts/fix_environment.sh
+  RemainAfterExit=true
+  StandardOutput=journal
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  
+# Create a script to install the fix environment service
+- |
+  cat > api/deploy/api-scripts/install_fix_service.sh << 'EOF'
+  #!/bin/bash
+  
+  # Copy the fix environment service file
+  cp /opt/financial-news-engine/deploy_scripts/fix-environment.service /etc/systemd/system/
+  
+  # Enable and start the service
+  systemctl daemon-reload
+  systemctl enable fix-environment.service
+  systemctl start fix-environment.service
+  
+  echo "Fix environment service installed and started"
+  EOF 

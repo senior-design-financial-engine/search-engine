@@ -175,6 +175,33 @@ Resources:
                   
                   logger.info(f"Found {len(instance_ids)} instances to verify: {', '.join(instance_ids)}")
                   
+                  # First, run our environment fix script to ensure proper environment setup
+                  logger.info("Running environment fix script on instances")
+                  fix_env_response = ssm.send_command(
+                      InstanceIds=instance_ids,
+                      DocumentName='AWS-RunShellScript',
+                      Parameters={
+                          'commands': [
+                              'cd /opt/financial-news-engine',
+                              'if [ -f ./deploy_scripts/fix_environment.sh ]; then',
+                              '  bash ./deploy_scripts/fix_environment.sh',
+                              'elif [ -f ./deploy_scripts/create_env_file.sh ]; then',
+                              '  export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-"us-east-1"}',
+                              '  bash ./deploy_scripts/create_env_file.sh',
+                              'else',
+                              '  echo "No environment setup scripts found"',
+                              'fi'
+                          ]
+                      },
+                      Comment=f'Running environment fix script for Financial News Engine'
+                  )
+                  
+                  fix_command_id = fix_env_response['Command']['CommandId']
+                  logger.info(f"Started Environment Fix Command {fix_command_id}")
+                  
+                  # Wait for the environment fix to complete
+                  time.sleep(10)
+                  
                   # Run the verification script on each instance using SSM Run Command
                   ssm_response = ssm.send_command(
                       InstanceIds=instance_ids,
@@ -189,7 +216,7 @@ Resources:
                   )
                   
                   command_id = ssm_response['Command']['CommandId']
-                  logger.info(f"Started SSM Command {command_id}")
+                  logger.info(f"Started Verification Command {command_id}")
                   
                   # Wait a bit for the command to start execution
                   time.sleep(5)
@@ -202,7 +229,7 @@ Resources:
                   
                   return {
                       'statusCode': 200,
-                      'body': json.dumps(f"Verification started on {len(instance_ids)} instances with command ID {command_id}")
+                      'body': json.dumps(f"Verification and environment fix started on {len(instance_ids)} instances")
                   }
               
               except Exception as e:
