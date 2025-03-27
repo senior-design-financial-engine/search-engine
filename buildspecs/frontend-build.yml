@@ -10,37 +10,10 @@ phases:
       - echo "Checking directory structure"
       - if [ -d "frontend" ]; then cd frontend; elif [ -d "../frontend" ]; then cd ../frontend; fi
       - npm install
+      - npm install uuid --save
   
   pre_build:
     commands:
-      - echo "Retrieving search service credentials from SSM Parameter Store..."
-      - |
-        if [ -n "$PARAM_PREFIX" ]; then
-          echo "Using parameter prefix: $PARAM_PREFIX"
-        else
-          PARAM_PREFIX="/financial-news"
-          echo "Using default parameter prefix: $PARAM_PREFIX"
-        fi
-      - |
-        # Retrieve parameters from SSM Parameter Store
-        ES_URL=$(aws ssm get-parameter --name "$PARAM_PREFIX/elasticsearch-url" --with-decryption --query "Parameter.Value" --output text || echo "")
-        ES_API_KEY=$(aws ssm get-parameter --name "$PARAM_PREFIX/elasticsearch-api-key" --with-decryption --query "Parameter.Value" --output text || echo "")
-        ES_INDEX=$(aws ssm get-parameter --name "$PARAM_PREFIX/elasticsearch-index" --query "Parameter.Value" --output text || echo "financial_news")
-        
-        # Create .env file with parameters
-        echo "Creating .env file with search service parameters"
-        echo "REACT_APP_ELASTICSEARCH_URL=$ES_URL" > .env
-        echo "REACT_APP_ELASTICSEARCH_API_KEY=$ES_API_KEY" >> .env
-        echo "REACT_APP_ELASTICSEARCH_INDEX=$ES_INDEX" >> .env
-        echo "REACT_APP_API_URL=$BACKEND_API_URL" >> .env
-        echo "REACT_APP_API_FALLBACK_URL=$BACKEND_API_URL" >> .env
-        
-        # Log success (without revealing sensitive values)
-        if [ -n "$ES_URL" ] && [ -n "$ES_API_KEY" ]; then
-          echo "Successfully injected search service credentials into build environment"
-        else
-          echo "Warning: Some search service parameters could not be retrieved. Build may proceed with reduced functionality."
-        fi
       - echo "Running tests..."
       - npm test -- --watchAll=false --testEnvironment=jsdom || echo "Some tests failed, but continuing with build..."
   
@@ -57,6 +30,8 @@ phases:
       - cd ..  # Return to root directory
       - mkdir -p artifact_output
       - mkdir -p artifact_output/frontend  # Create the frontend directory inside artifact_output
+      - echo "Make configuration injection script executable"
+      - chmod +x deployment-scripts/inject_config.sh
       - echo "Copying frontend build files"
       - cp -r frontend/build/* artifact_output/frontend/
       - echo "Copying buildspecs directory"

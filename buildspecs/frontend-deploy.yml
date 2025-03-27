@@ -43,6 +43,20 @@ phases:
       - BUILD_DIR=$(./detect_build.sh)
       - if [ -z "$BUILD_DIR" ]; then echo "No frontend directory or build artifacts found"; exit 1; fi
       - echo "Using build directory $BUILD_DIR"
+      - echo "Loading Elasticsearch configuration from SSM Parameter Store..."
+      - |
+        # Make ci_utils.sh executable and source it to load functions
+        if [ -f "deployment-scripts/ci_utils.sh" ]; then
+          chmod +x deployment-scripts/ci_utils.sh
+          source deployment-scripts/ci_utils.sh
+          get_es_parameters "${ENVIRONMENT_NAME:-dev}"
+        elif [ -f "scripts/ci_utils.sh" ]; then
+          chmod +x scripts/ci_utils.sh
+          source scripts/ci_utils.sh
+          get_es_parameters "${ENVIRONMENT_NAME:-dev}"
+        else
+          echo "Warning: CI utilities script not found, will use environment variables if available"
+        fi
   
   build:
     commands:
@@ -50,6 +64,23 @@ phases:
       - echo "Listing contents of current directory"
       - ls -la
       - echo "Using build directory $BUILD_DIR"
+      - echo "Injecting runtime configuration..."
+      - |
+        # Determine which script to use
+        if [ -f "deployment-scripts/inject_config.sh" ]; then
+          INJECT_SCRIPT="deployment-scripts/inject_config.sh"
+        elif [ -f "scripts/inject_config.sh" ]; then
+          INJECT_SCRIPT="scripts/inject_config.sh"
+        else
+          echo "Warning: Configuration injection script not found, using default values"
+          exit 1
+        fi
+        
+        # Make script executable
+        chmod +x "$INJECT_SCRIPT"
+        
+        # Run script with appropriate parameters
+        "$INJECT_SCRIPT" "$BUILD_DIR" "$ES_ENDPOINT" "$ES_API_KEY" "$ES_INDEX"
   
   post_build:
     commands:

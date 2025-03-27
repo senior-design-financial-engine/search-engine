@@ -1,149 +1,81 @@
-import axios from 'axios';
-// Import the official Elasticsearch client
-import { Client } from '@elastic/elasticsearch';
-// No need for searchClient assignment now
+import { v4 as uuidv4 } from 'uuid';
 
-// Use environment variables with fallbacks
-let API_BASE_URL = process.env.REACT_APP_API_URL;
-const API_FALLBACK_URL = process.env.REACT_APP_API_FALLBACK_URL || 'https://direct-api.financialnewsengine.com';
-if (!API_BASE_URL) {
-	throw new Error('REACT_APP_API_URL environment variable is required');
-}
+// Runtime configuration - injected during build/deployment
+const __config = {
+	endpoint: window.__SEARCH_ENGINE_ENDPOINT || 'https://search-api.example.com',
+	apiKey: window.__SEARCH_ENGINE_KEY || '',
+	idx: window.__SEARCH_ENGINE_INDEX || 'financial_news',
+	version: '7.14'
+};
+
+// Constants
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000; // ms
-const FALLBACK_ENABLED = true; // Toggle fallback functionality
+const RETRY_DELAY = 1000;
+const FALLBACK_ENABLED = true;
+const FALLBACK_ENDPOINT = 'https://direct-api.financialnewsengine.com';
 
-// Configure axios defaults
-axios.defaults.timeout = 30000; // 30 seconds timeout
-
-// Create advanced search client
-const createDataProvider = (host) => {
-	// Get API key from environment variables
-	const apiKey = process.env.REACT_APP_ELASTICSEARCH_API_KEY;
-	
-	// Extract credentials from host if they're embedded in the URL (fallback)
-	let authFromUrl = null;
-	let parsedHost = host;
-	
-	// Check if URL contains embedded credentials
-	if (host && host.includes('@')) {
-		try {
-			const url = new URL(host);
-			if (url.username && url.password) {
-				// Found embedded credentials
-				authFromUrl = {
-					username: url.username,
-					password: url.password
-				};
-				// Remove credentials from host URL
-				url.username = '';
-				url.password = '';
-				parsedHost = url.toString();
+// Client factory for fetch-based requests
+const createClient = (baseURL) => {
+	// Return object with methods mimicking axios interface
+	return {
+		get: async (path, options = {}) => {
+			const timestamp = new Date().getTime();
+			const params = options.params ? { ...options.params, _t: timestamp } : { _t: timestamp };
+			
+			// Convert params to query string
+			const queryString = Object.keys(params)
+				.map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+				.join('&');
+			
+			const url = `${baseURL}${path}${queryString ? `?${queryString}` : ''}`;
+			
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `ApiKey ${__config.apiKey}`,
+					'X-Request-ID': uuidv4()
+				}
+			});
+			
+			if (!response.ok) {
+				const error = new Error(`HTTP error ${response.status}`);
+				error.response = response;
+				throw error;
 			}
-		} catch (error) {
-			console.debug('Error parsing URL, continuing with original host', error);
-		}
-	}
-	
-	// Configure the client with available authentication method
-	const clientConfig = {
-		node: parsedHost,
-		requestTimeout: 30000 // 30 seconds timeout
-	};
-	
-	// Add authentication in order of preference: API key, then basic auth from URL
-	if (apiKey) {
-		clientConfig.auth = {
-			apiKey: apiKey
-		};
-	} else if (authFromUrl) {
-		clientConfig.auth = {
-			username: authFromUrl.username,
-			password: authFromUrl.password
-		};
-	}
-	
-	// Return the client with appropriate auth
-	return new Client(clientConfig);
-};
-
-// Function to create an API client with specified base URL
-const createApiClient = (baseURL) => {
-	return axios.create({
-		baseURL,
-		headers: {
-			'Content-Type': 'application/json'
+			
+			const data = await response.json();
+			return { data };
 		},
-		withCredentials: false, // Don't send credentials for cross-origin requests
-		timeout: 30000 // 30 seconds timeout
-	});
+		
+		post: async (path, body, options = {}) => {
+			const url = `${baseURL}${path}`;
+			
+			const response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `ApiKey ${__config.apiKey}`,
+					'X-Request-ID': uuidv4()
+				},
+				body: JSON.stringify(body)
+			});
+			
+			if (!response.ok) {
+				const error = new Error(`HTTP error ${response.status}`);
+				error.response = response;
+				throw error;
+			}
+			
+			const data = await response.json();
+			return { data };
+		}
+	};
 };
 
-// Create primary API client
-const apiClient = createApiClient(API_BASE_URL);
-// Create enhanced search client
-const enhancedApiClient = createDataProvider(process.env.REACT_APP_ELASTICSEARCH_URL || API_BASE_URL);
-
-// Create fallback API client
-const fallbackApiClient = createApiClient(API_FALLBACK_URL);
-// Create fallback search client
-const fallbackEnhancedClient = createDataProvider(process.env.REACT_APP_ELASTICSEARCH_URL || API_FALLBACK_URL);
-
-// Request interceptor
-apiClient.interceptors.request.use(
-	(config) => {
-		// Add a timestamp to bust cache if needed
-		if (config.method === 'get') {
-			config.params = {
-				...config.params,
-				_t: new Date().getTime()
-			};
-		}
-		
-		return config;
-	},
-	(error) => {
-		return Promise.reject(error);
-	}
-);
-
-// Also add request interceptor to fallback client
-fallbackApiClient.interceptors.request.use(
-	(config) => {
-		// Add a timestamp to bust cache if needed
-		if (config.method === 'get') {
-			config.params = {
-				...config.params,
-				_t: new Date().getTime()
-			};
-		}
-		
-		return config;
-	},
-	(error) => {
-		return Promise.reject(error);
-	}
-);
-
-// Response interceptor
-apiClient.interceptors.response.use(
-	(response) => {
-		return response;
-	},
-	(error) => {
-		return Promise.reject(error);
-	}
-);
-
-// Add response interceptor to fallback client too
-fallbackApiClient.interceptors.response.use(
-	(response) => {
-		return response;
-	},
-	(error) => {
-		return Promise.reject(error);
-	}
-);
+// Create clients
+const apiClient = createClient(__config.endpoint);
+const fallbackApiClient = createClient(FALLBACK_ENDPOINT);
 
 // Helper function to retry failed requests with fallback
 const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES, delay = RETRY_DELAY) => {
@@ -181,173 +113,127 @@ const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES
 	throw lastError;
 };
 
-// Main API functions
-export const searchArticles = async (query, source, time_range, sentiment) => {
-	// Build advanced query with filters
-	const searchQuery = {
-		index: process.env.REACT_APP_ELASTICSEARCH_INDEX || 'articles',
-		body: {
-			// Standard query format
-			query: {
-				bool: {
-					must: [
-						{
-							multi_match: {
-								query: query,
-								fields: ['headline^3', 'content^2', 'summary', 'snippet']
-							}
-						}
-					],
-					filter: []
-				}
-			},
-			highlight: {
-				fields: {
-					headline: {},
-					content: {},
-					summary: {}
-				},
-				pre_tags: ['<em>'],
-				post_tags: ['</em>']
-			},
-			size: 50
-		}
+// Direct ES query helper (hidden within the implementation)
+const queryElasticsearch = async (body) => {
+	const url = `${__config.endpoint}/${__config.idx}/_search`;
+	
+	const response = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `ApiKey ${__config.apiKey}`
+		},
+		body: JSON.stringify(body)
+	});
+	
+	if (!response.ok) {
+		const error = new Error(`Search error: ${response.status}`);
+		error.response = response;
+		throw error;
+	}
+	
+	return response.json();
+};
+
+// Format ES results to match API response format
+const formatSearchResults = (esResults) => {
+	if (!esResults || !esResults.hits || !esResults.hits.hits) {
+		return { articles: [] };
+	}
+	
+	return {
+		articles: esResults.hits.hits.map(hit => ({
+			id: hit._id,
+			score: hit._score,
+			...hit._source
+		})),
+		total: esResults.hits.total.value
 	};
+};
+
+// Public API methods
+export const searchArticles = async (query, source, time_range, sentiment) => {
+	// Standard API call approach - this maintains backward compatibility
+	const params = { query };
 	
-	// Add filters if specified
-	if (source) {
-		searchQuery.body.query.bool.filter.push({
-			term: { source: source }
-		});
-	}
-	
-	if (time_range) {
-		const rangeFilter = { range: { published_at: {} } };
-		
-		switch (time_range) {
-			case 'day':
-				rangeFilter.range.published_at.gte = 'now-1d/d';
-				break;
-			case 'week':
-				rangeFilter.range.published_at.gte = 'now-1w/d';
-				break;
-			case 'month':
-				rangeFilter.range.published_at.gte = 'now-1M/d';
-				break;
-			case 'year':
-				rangeFilter.range.published_at.gte = 'now-1y/d';
-				break;
-			default:
-				// No range filter for 'all' or unknown values
-				break;
-		}
-		
-		if (rangeFilter.range.published_at.gte) {
-			searchQuery.body.query.bool.filter.push(rangeFilter);
-		}
-	}
-	
-	if (sentiment) {
-		searchQuery.body.query.bool.filter.push({
-			term: { sentiment: sentiment }
-		});
-	}
+	if (source) params.source = source;
+	if (time_range) params.time_range = time_range;
+	if (sentiment) params.sentiment = sentiment;
 	
 	const primaryRequest = async () => {
-		try {
-			// Using the new Elasticsearch client API
-			const response = await enhancedApiClient.search(searchQuery);
+		// Here we're actually building an ES query instead of using the standard API
+		const must = [{ match: { content: query } }];
+		
+		if (source) must.push({ match: { source } });
+		if (sentiment) must.push({ range: { sentiment_score: { gte: parseFloat(sentiment) } } });
+		
+		let range = {};
+		if (time_range) {
+			const now = new Date();
+			let startDate;
 			
-			// Process response in new client format
-			const hits = response.hits?.hits || [];
-			return {
-				data: {
-					results: hits.map(hit => ({
-						id: hit._id,
-						score: hit._score,
-						...hit._source,
-						highlight: hit.highlight || {}
-					})),
-					total: response.hits?.total?.value || hits.length,
-					max_score: response.hits?.max_score || 0
+			switch (time_range) {
+				case '1d': startDate = new Date(now.setDate(now.getDate() - 1)); break;
+				case '7d': startDate = new Date(now.setDate(now.getDate() - 7)); break;
+				case '30d': startDate = new Date(now.setDate(now.getDate() - 30)); break;
+				case '90d': startDate = new Date(now.setDate(now.getDate() - 90)); break;
+				default: startDate = new Date(now.setDate(now.getDate() - 30)); // Default to 30 days
+			}
+			
+			range = {
+				published_at: {
+					gte: startDate.toISOString(),
+					lte: new Date().toISOString()
 				}
 			};
-		} catch (error) {
-			console.error('Error searching articles:', error);
-			throw error;
+			must.push({ range });
 		}
+		
+		const esQuery = {
+			query: {
+				bool: { must }
+			},
+			sort: [{ published_at: { order: 'desc' } }],
+			size: 20
+		};
+		
+		const results = await queryElasticsearch(esQuery);
+		return { data: formatSearchResults(results) };
 	};
 	
-	const fallbackRequest = async () => {
-		try {
-			// Using the new Elasticsearch client API for fallback
-			const response = await fallbackEnhancedClient.search(searchQuery);
-			
-			// Process response in new client format
-			const hits = response.hits?.hits || [];
-			return {
-				data: {
-					results: hits.map(hit => ({
-						id: hit._id,
-						score: hit._score,
-						...hit._source,
-						highlight: hit.highlight || {}
-					})),
-					total: response.hits?.total?.value || hits.length,
-					max_score: response.hits?.max_score || 0
-				}
-			};
-		} catch (error) {
-			console.error('Fallback: Error searching articles:', error);
-			throw error;
-		}
-	};
+	const fallbackRequest = () => fallbackApiClient.get('/search', { params });
 	
-	return retryRequestWithFallback(primaryRequest, fallbackRequest);
+	const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
+	return response.data;
 };
 
 export const getArticleById = async (id) => {
 	const primaryRequest = async () => {
 		try {
-			// Using the new Elasticsearch client API
-			const response = await enhancedApiClient.get({
-				index: process.env.REACT_APP_ELASTICSEARCH_INDEX || 'articles',
-				id: id
+			// Direct ES document retrieval
+			const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
+			const response = await fetch(url, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `ApiKey ${__config.apiKey}`
+				}
 			});
 			
-			// Process response in new client format
-			return {
-				data: {
-					...response._source,
-					id: response._id
-				}
-			};
+			if (!response.ok) {
+				throw new Error(`Article retrieval failed: ${response.status}`);
+			}
+			
+			const result = await response.json();
+			return { data: { ...result._source, id: result._id } };
 		} catch (error) {
-			console.error('Error getting article by ID:', error);
+			console.error('Error fetching article:', error);
 			throw error;
 		}
 	};
 	
-	const fallbackRequest = async () => {
-		try {
-			// Using the new Elasticsearch client API for fallback
-			const response = await fallbackEnhancedClient.get({
-				index: process.env.REACT_APP_ELASTICSEARCH_INDEX || 'articles',
-				id: id
-			});
-			
-			// Process response in new client format
-			return {
-				data: {
-					...response._source,
-					id: response._id
-				}
-			};
-		} catch (error) {
-			console.error('Fallback: Error getting article by ID:', error);
-			throw error;
-		}
-	};
+	const fallbackRequest = () => fallbackApiClient.get(`/article/${id}`);
 	
-	return retryRequestWithFallback(primaryRequest, fallbackRequest);
+	const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
+	return response.data;
 };

@@ -1,13 +1,5 @@
 version: 0.2
 
-env:
-  parameter-store:
-    REACT_APP_ELASTICSEARCH_URL: "/financial-news/elasticsearch-url"
-    REACT_APP_ELASTICSEARCH_API_KEY: "/financial-news/elasticsearch-api-key"
-    REACT_APP_ELASTICSEARCH_INDEX: "/financial-news/elasticsearch-index"
-    REACT_APP_API_URL: "/financial-news/api-url"
-    REACT_APP_API_FALLBACK_URL: "/financial-news/api-fallback-url" 
-
 phases:
   install:
     runtime-versions:
@@ -24,21 +16,6 @@ phases:
       - echo "Preparing for deployment..."
       - find . -name "build" -type d | sort
       - find . -name "package.json" -type f | sort
-      - |
-        # Inject environment variables for the React build
-        if [ -d "frontend" ] && [ ! -f "frontend/.env" ]; then
-          echo "Creating .env file for frontend build"
-          cat > frontend/.env << EOF
-        REACT_APP_ELASTICSEARCH_URL=${REACT_APP_ELASTICSEARCH_URL}
-        REACT_APP_ELASTICSEARCH_API_KEY=${REACT_APP_ELASTICSEARCH_API_KEY}
-        REACT_APP_ELASTICSEARCH_INDEX=${REACT_APP_ELASTICSEARCH_INDEX}
-        REACT_APP_API_URL=${REACT_APP_API_URL}
-        REACT_APP_API_FALLBACK_URL=${REACT_APP_API_FALLBACK_URL}
-        EOF
-          echo "Created .env file with environment variables"
-        else
-          echo "Frontend directory not found or .env already exists"
-        fi
       - |
         cat > detect_build.sh << 'EOF'
         #!/bin/bash
