@@ -4,66 +4,11 @@ import axios from 'axios';
 let API_BASE_URL = process.env.REACT_APP_API_URL;
 const API_FALLBACK_URL = process.env.REACT_APP_API_FALLBACK_URL || 'https://direct-api.financialnewsengine.com';
 if (!API_BASE_URL) {
-	console.error('[API ERROR] REACT_APP_API_URL environment variable is not set. Please ensure the frontend is built with the correct environment variables.');
-	// In development, you might want to use a default URL
-	if (process.env.NODE_ENV === 'development') {
-		console.warn('[API WARNING] Using default development URL. This should only happen in local development.');
-		API_BASE_URL = 'http://localhost:5000';
-	} else {
-		throw new Error('REACT_APP_API_URL environment variable is required in production');
-	}
+	throw new Error('REACT_APP_API_URL environment variable is required');
 }
-const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // ms
 const FALLBACK_ENABLED = true; // Toggle fallback functionality
-
-// Create a custom logger
-const apiLogger = {
-	log: (message, data) => {
-		if (!IS_PRODUCTION) {
-			console.log(`[API] ${message}`, data || '');
-		}
-	},
-	error: (message, error) => {
-		// Always log errors, even in production
-		console.error(`[API ERROR] ${message}`, error);
-		
-		// Save error details to localStorage for troubleshooting
-		try {
-			const errorLog = JSON.parse(localStorage.getItem('api_error_log') || '[]');
-			errorLog.push({
-				timestamp: new Date().toISOString(),
-				message,
-				error: {
-					message: error?.message,
-					status: error?.response?.status,
-					data: error?.response?.data,
-					url: error?.config?.url,
-					method: error?.config?.method,
-				}
-			});
-			// Keep only the last 20 errors
-			if (errorLog.length > 20) {
-				errorLog.shift();
-			}
-			localStorage.setItem('api_error_log', JSON.stringify(errorLog));
-		} catch (e) {
-			console.error('Failed to save error log:', e);
-		}
-	},
-	warn: (message, data) => {
-		console.warn(`[API WARNING] ${message}`, data || '');
-	}
-};
-
-// Log API configuration
-apiLogger.log('API Configuration:', {
-	endpoint: API_BASE_URL,
-	fallbackEndpoint: API_FALLBACK_URL,
-	environment: IS_PRODUCTION ? 'production' : 'development',
-	fallbackEnabled: FALLBACK_ENABLED
-});
 
 // Configure axios defaults
 axios.defaults.timeout = 30000; // 30 seconds timeout
@@ -86,13 +31,9 @@ const apiClient = createApiClient(API_BASE_URL);
 // Create fallback API client
 const fallbackApiClient = createApiClient(API_FALLBACK_URL);
 
-// Response interceptor to handle common errors
+// Request interceptor
 apiClient.interceptors.request.use(
 	(config) => {
-		apiLogger.log(`Request: ${config.method?.toUpperCase()} ${config.url}`, 
-			config.params ? { params: config.params } : null
-		);
-		
 		// Add a timestamp to bust cache if needed
 		if (config.method === 'get') {
 			config.params = {
@@ -104,7 +45,6 @@ apiClient.interceptors.request.use(
 		return config;
 	},
 	(error) => {
-		apiLogger.error('Request configuration error:', error);
 		return Promise.reject(error);
 	}
 );
@@ -112,10 +52,6 @@ apiClient.interceptors.request.use(
 // Also add request interceptor to fallback client
 fallbackApiClient.interceptors.request.use(
 	(config) => {
-		apiLogger.log(`Fallback Request: ${config.method?.toUpperCase()} ${config.url}`, 
-			config.params ? { params: config.params } : null
-		);
-		
 		// Add a timestamp to bust cache if needed
 		if (config.method === 'get') {
 			config.params = {
@@ -127,50 +63,16 @@ fallbackApiClient.interceptors.request.use(
 		return config;
 	},
 	(error) => {
-		apiLogger.error('Fallback request configuration error:', error);
 		return Promise.reject(error);
 	}
 );
 
-// Response interceptor to handle common errors
+// Response interceptor
 apiClient.interceptors.response.use(
 	(response) => {
-		apiLogger.log(`Response from ${response.config.url}:`, { 
-			status: response.status,
-			data: response.data ? 'Data received' : 'No data'
-		});
 		return response;
 	},
 	(error) => {
-		if (error.response) {
-			// Server responded with error status
-			apiLogger.error(`API error (${error.response.status}):`, error);
-			
-			// Log specific error types
-			if (error.response.status === 401 || error.response.status === 403) {
-				apiLogger.error('Authentication/authorization error', error.response.data);
-			} else if (error.response.status >= 500) {
-				apiLogger.error('Server error', error.response.data);
-			}
-		} else if (error.request) {
-			// Request was made but no response received
-			apiLogger.error('API request error (no response):', error);
-			
-			// Check network status
-			if (!navigator.onLine) {
-				apiLogger.warn('Network is offline. Request failed:', error.config?.url);
-			} else {
-				// Could be CORS, timeout, or server down
-				apiLogger.error('Network request failed (possibly CORS or server down):', {
-					url: error.config?.url,
-					method: error.config?.method,
-					message: error.message
-				});
-			}
-		} else {
-			// Something else happened while setting up the request
-			apiLogger.error('API setup error:', error);
-		}
 		return Promise.reject(error);
 	}
 );
@@ -178,302 +80,68 @@ apiClient.interceptors.response.use(
 // Add response interceptor to fallback client too
 fallbackApiClient.interceptors.response.use(
 	(response) => {
-		apiLogger.log(`Fallback Response from ${response.config.url}:`, { 
-			status: response.status,
-			data: response.data ? 'Data received' : 'No data'
-		});
 		return response;
 	},
 	(error) => {
-		if (error.response) {
-			apiLogger.error(`Fallback API error (${error.response.status}):`, error);
-		} else if (error.request) {
-			apiLogger.error('Fallback API request error (no response):', error);
-		} else {
-			apiLogger.error('Fallback API setup error:', error);
-		}
 		return Promise.reject(error);
 	}
 );
 
 // Helper function to retry failed requests with fallback
 const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES, delay = RETRY_DELAY) => {
-	let lastError = null;
-	let useFallback = false;
+	let lastError;
 	
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+	// Try primary endpoint with retries
+	for (let i = 0; i < maxRetries; i++) {
 		try {
-			if (attempt > 1) {
-				apiLogger.log(`Retry attempt ${attempt}/${maxRetries}${useFallback ? ' (using fallback)' : ''}`);
-				// Wait before retrying
-				await new Promise(resolve => setTimeout(resolve, delay * (attempt - 1)));
-			}
-			
-			// Use fallback for 502 errors or connectivity issues
-			if (useFallback && FALLBACK_ENABLED && fnFallback) {
-				apiLogger.log('Trying fallback endpoint...');
-				return await fnFallback();
-			} else {
-				return await fn();
-			}
+			return await fn();
 		} catch (error) {
 			lastError = error;
-			apiLogger.warn(`Request failed (attempt ${attempt}/${maxRetries}):`, error.message);
 			
-			// Check if we should try the fallback on the next attempt
-			if (FALLBACK_ENABLED && 
-				error.response && 
-				error.response.status === 502 && 
-				!useFallback && 
-				fnFallback) {
-				apiLogger.log('Detected 502 error, will try fallback endpoint on next attempt');
-				useFallback = true;
-				continue;
+			// If server responded, don't retry (it's not a connection issue)
+			if (error.response) {
+				break;
 			}
 			
-			// Don't retry for certain error types
-			if (error.response && (error.response.status === 401 || 
-				error.response.status === 403 || 
-				error.response.status === 404)) {
-				apiLogger.log('Not retrying request due to error type');
-				throw error;
+			// Wait before retry
+			if (i < maxRetries - 1) {
+				await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
 			}
 		}
 	}
 	
-	// All retries failed
-	apiLogger.error(`All ${maxRetries} retry attempts failed.`, lastError);
+	// If primary endpoint failed and fallback is enabled, try fallback
+	if (FALLBACK_ENABLED && fnFallback) {
+		try {
+			return await fnFallback();
+		} catch (fallbackError) {
+			// Prefer the primary error in the error response
+			throw lastError || fallbackError;
+		}
+	}
+	
 	throw lastError;
 };
 
-// Helper function to validate diagnostic data
-const validateDiagnosticData = (data) => {
-	if (!data || typeof data !== 'object') {
-		return {
-			_generated: 'default',
-			timestamp: new Date().toISOString(),
-			status: 'error',
-			error: 'Invalid or empty diagnostic data received'
-		};
-	}
-	
-	// Ensure the data has the expected structure
-	return {
-		...data,
-		system: data.system || {},
-		elasticsearch: data.elasticsearch || {},
-		recent_errors: Array.isArray(data.recent_errors) ? data.recent_errors : []
-	};
-};
-
-// Health check function
-export const checkApiHealth = async () => {
-	try {
-		apiLogger.log('Checking API health');
-		// First try the enhanced diagnostic endpoint
-		try {
-			const response = await retryRequestWithFallback(
-				async () => await apiClient.get('/diagnostic/health'),
-				async () => await fallbackApiClient.get('/diagnostic/health')
-			);
-			return {
-				status: response.data.status || 'ok',
-				details: response.data
-			};
-		} catch (error) {
-			// Fall back to the basic health endpoint if diagnostic endpoints aren't available
-			apiLogger.log('Advanced health check failed, trying basic endpoint');
-			const response = await retryRequestWithFallback(
-				async () => await apiClient.get('/health'),
-				async () => await fallbackApiClient.get('/health')
-			);
-			return {
-				status: response.data.status || 'ok',
-				details: response.data
-			};
-		}
-	} catch (error) {
-		apiLogger.error('Health check failed:', error);
-		return {
-			status: 'error',
-			error: error.message || 'Unknown connection error',
-			online: navigator.onLine
-		};
-	}
-};
-
+// Main API functions
 export const searchArticles = async (query, source, time_range, sentiment) => {
-	try {
-		apiLogger.log('Searching articles with query:', { query, source, time_range, sentiment });
-		
-		// Use the retry mechanism with fallback
-		const data = await retryRequestWithFallback(
-			async () => {
-				const response = await apiClient.get('/query', {
-					params: {
-						query,
-						time_range,
-						source,
-						sentiment
-					}
-				});
-				return response.data;
-			},
-			async () => {
-				const response = await fallbackApiClient.get('/query', {
-					params: {
-						query,
-						time_range,
-						source,
-						sentiment
-					}
-				});
-				return response.data;
-			}
-		);
-		
-		// Check if the response matches the new format with 'results' key
-		const articles = data.results || data;
-		
-		// Log response stats
-		apiLogger.log(`Search results received: ${Array.isArray(articles) ? articles.length : 0} items`);
-		
-		return articles;
-	} catch (error) {
-		apiLogger.error('Error searching articles:', error);
-		throw error;
-	}
+	const params = { query };
+	
+	if (source) params.source = source;
+	if (time_range) params.time_range = time_range;
+	if (sentiment) params.sentiment = sentiment;
+	
+	const primaryRequest = () => apiClient.get('/search', { params });
+	const fallbackRequest = () => fallbackApiClient.get('/search', { params });
+	
+	const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
+	return response.data;
 };
 
-// Add more API functions as needed
 export const getArticleById = async (id) => {
-	try {
-		apiLogger.log(`Fetching article by ID: ${id}`);
-		
-		const data = await retryRequestWithFallback(
-			async () => {
-				const response = await apiClient.get(`/article/${id}`);
-				return response.data;
-			},
-			async () => {
-				const response = await fallbackApiClient.get(`/article/${id}`);
-				return response.data;
-			}
-		);
-		
-		apiLogger.log('Article fetched successfully');
-		return data;
-	} catch (error) {
-		apiLogger.error(`Error fetching article by ID ${id}:`, error);
-		throw error;
-	}
-};
-
-// Function to get the error logs for debugging
-export const getApiErrorLogs = () => {
-	try {
-		return JSON.parse(localStorage.getItem('api_error_log') || '[]');
-	} catch (e) {
-		console.error('Failed to retrieve error logs:', e);
-		return [];
-	}
-};
-
-// Function to clear the error logs
-export const clearApiErrorLogs = () => {
-	try {
-		localStorage.removeItem('api_error_log');
-		apiLogger.log('API error logs cleared');
-	} catch (e) {
-		console.error('Failed to clear error logs:', e);
-	}
-};
-
-// New diagnostic API functions
-export const getDiagnosticNetworkInfo = async () => {
-	try {
-		apiLogger.log('Fetching diagnostic network information');
-		const response = await retryRequestWithFallback(
-			async () => await apiClient.get('/diagnostic/network'),
-			async () => await fallbackApiClient.get('/diagnostic/network')
-		);
-		return response.data;
-	} catch (error) {
-		apiLogger.error('Error fetching diagnostic network info:', error);
-		throw error;
-	}
-};
-
-export const getDiagnosticSystemInfo = async () => {
-	try {
-		apiLogger.log('Fetching diagnostic system information');
-		const response = await retryRequestWithFallback(
-			async () => await apiClient.get('/diagnostic/system'),
-			async () => await fallbackApiClient.get('/diagnostic/system')
-		);
-		return response.data;
-	} catch (error) {
-		apiLogger.error('Error fetching diagnostic system info:', error);
-		throw error;
-	}
-};
-
-export const getDiagnosticElasticsearchInfo = async () => {
-	try {
-		apiLogger.log('Fetching diagnostic Elasticsearch information');
-		const response = await retryRequestWithFallback(
-			async () => await apiClient.get('/diagnostic/elasticsearch'),
-			async () => await fallbackApiClient.get('/diagnostic/elasticsearch')
-		);
-		return response.data;
-	} catch (error) {
-		apiLogger.error('Error fetching diagnostic Elasticsearch info:', error);
-		throw error;
-	}
-};
-
-export const getDiagnosticErrorLogs = async () => {
-	try {
-		apiLogger.log('Fetching diagnostic error logs');
-		const response = await retryRequestWithFallback(
-			async () => await apiClient.get('/diagnostic/errors'),
-			async () => await fallbackApiClient.get('/diagnostic/errors')
-		);
-		return response.data;
-	} catch (error) {
-		apiLogger.error('Error fetching diagnostic error logs:', error);
-		throw error;
-	}
-};
-
-export const getFullDiagnosticReport = async () => {
-	try {
-		apiLogger.log('Fetching full diagnostic report');
-		
-		const response = await retryRequestWithFallback(
-			async () => await apiClient.get('/diagnostic/report'),
-			async () => await fallbackApiClient.get('/diagnostic/report')
-		);
-		
-		// Validate and normalize the data
-		const validatedData = validateDiagnosticData(response.data);
-		apiLogger.log('Diagnostic report processed successfully');
-		
-		return validatedData;
-	} catch (error) {
-		apiLogger.error('Error fetching full diagnostic report:', error);
-		
-		// Create a fallback report with error information
-		const errorReport = {
-			_generated: 'error',
-			timestamp: new Date().toISOString(),
-			status: 'error',
-			error: error.message || 'Failed to fetch diagnostic data',
-			system: {},
-			elasticsearch: {},
-			recent_errors: []
-		};
-		
-		throw error;
-	}
+	const primaryRequest = () => apiClient.get(`/article/${id}`);
+	const fallbackRequest = () => fallbackApiClient.get(`/article/${id}`);
+	
+	const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
+	return response.data;
 };

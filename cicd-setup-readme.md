@@ -181,36 +181,6 @@ The CI/CD pipeline has the following workflow:
      - Deploys to each EC2 instance using SSM Run Command
      - Restarts the application service
 
-## Troubleshooting
-
-### Pipeline Fails at Source Stage
-
-- Verify that the GitHub token is valid and has the necessary permissions
-- Check if the webhook was created successfully in your GitHub repository
-
-### Frontend Build Fails
-
-- Check the CodeBuild logs for errors
-- Verify that the frontend code builds locally
-- Ensure you have the correct Node.js version specified in the buildspec.yml
-
-### Backend Build Fails
-
-- Check the CodeBuild logs for errors
-- Verify that the backend code passes tests locally
-- Ensure you have the correct dependencies in requirements.txt
-
-### Deployment Fails
-
-- **Frontend**:
-  - Verify that the S3 bucket and CloudFront distribution exist
-  - Check that the CodeBuild role has permissions to access these resources
-  
-- **Backend**:
-  - Verify that the EC2 instances are running
-  - Check that the SSM agent is installed and running on the instances
-  - Ensure the CodeBuild role has permissions to use SSM Run Command
-
 ## Updating the Pipeline
 
 To update the CI/CD pipeline with new parameters or template changes:

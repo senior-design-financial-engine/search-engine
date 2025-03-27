@@ -110,24 +110,6 @@ After the stack is created, retrieve the outputs (including the ALB DNS name):
 python -m awscli cloudformation describe-stacks --stack-name financial-news-backend-{environment} --query "Stacks[0].Outputs"
 ```
 
-### 6. Test the Deployment
-
-Once the stack is created, test the deployment by accessing the Application Load Balancer URL:
-
-```
-http://<ALB-DNS-Name>/health
-```
-
-This should return a JSON response with `{"status": "healthy"}`.
-
-To test the Elasticsearch connection:
-
-```
-http://<ALB-DNS-Name>/search
-```
-
-This should return information about your Elasticsearch cluster if the connection is successful.
-
 ## Understanding the Deployment
 
 ### Flask Application
@@ -221,30 +203,6 @@ To connect to backend instances:
 ```powershell
 python -m awscli cloudformation delete-stack --stack-name financial-news-backend-{environment}
 ```
-
-## Troubleshooting
-
-- If the stack creation fails, check the error in the CloudFormation console or using:
-  ```powershell
-  python -m awscli cloudformation describe-stack-events --stack-name financial-news-backend-{environment}
-  ```
-
-- If instances fail to start, check the user data execution by connecting to an instance and examining the logs:
-  ```
-  less /var/log/cloud-init-output.log
-  ```
-
-- If the health check fails, verify that:
-  - The security groups allow traffic on port 5000 from the load balancer
-  - The Flask application is running
-  - The Elasticsearch endpoint is correct and accessible
-
-- If Elasticsearch connection fails:
-  - Verify that the VPC endpoint or network connection is correctly configured
-  - Check that the security group rules allow outbound traffic to Elasticsearch
-  - Verify the Elasticsearch credentials and endpoint URL
-
-- If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above 
 
 ## Parameters Reference
 

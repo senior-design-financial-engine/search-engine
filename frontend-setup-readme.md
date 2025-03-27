@@ -250,29 +250,6 @@ Then delete the stack:
 python -m awscli cloudformation delete-stack --stack-name financial-news-frontend-{environment}
 ```
 
-## Troubleshooting
-
-- If the stack creation fails, check the error in the CloudFormation console or using:
-  ```powershell
-  python -m awscli cloudformation describe-stack-events --stack-name financial-news-frontend-{environment}
-  ```
-
-- If SSL certificate validation fails:
-  - Check that the CNAME records for validation have been created
-  - Certificate validation can take up to 30 minutes
-
-- If you're unable to access the website:
-  - Verify that the S3 bucket contains the files (check with `aws s3 ls`)
-  - Check that the CloudFront distribution is deployed (status should be "Deployed")
-  - Verify that the Route 53 records are correctly configured (if using a custom domain)
-
-- If the React app loads but API requests fail:
-  - Verify that the API endpoint URLs are correct
-  - Check CORS settings on both the frontend and backend
-  - Ensure the backend is properly deployed and accessible
-
-- If you see command not found errors with `aws`, remember to use `python -m awscli` as shown above 
-
 ## Parameters Reference
 
 The frontend template accepts the following parameters:

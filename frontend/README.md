@@ -59,12 +59,8 @@ For development without a backend, set `REACT_APP_USE_MOCK_API=true`. This gener
 src/
 ├── components/            # React components
 │   ├── Article.js         # Article display component
-│   ├── DiagnosticTool.js  # Diagnostic tool component
-│   ├── DiagnosticTool/    # Sub-components for diagnostic tool
 │   ├── AnalyticsSideMenu.js # Analytics menu component
 │   ├── Filters.js         # Search filters component
-│   ├── Footer.js          # Page footer component
-│   ├── Header.js          # Page header component
 │   ├── Home.js            # Homepage component
 │   ├── Results.js         # Search results component
 │   └── unused/            # Archived components
@@ -98,12 +94,3 @@ npm test
 ```
 
 The project uses Jest and React Testing Library for component testing.
-
-## Troubleshooting
-
-### Common Issues
-
-- **API Connection Errors**: Check that backend URL is correct in `.env` files
-- **Missing Dependencies**: Run `npm install` to ensure all packages are installed
-- **Build Failures**: Check for syntax errors in the code
-- **Deployment Issues**: Check AWS CloudFormation outputs for endpoint URLs
