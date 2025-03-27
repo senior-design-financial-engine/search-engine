@@ -14,15 +14,15 @@ jest.mock('react-router-dom', () => ({
   Link: ({ children }) => <div>{children}</div>
 }));
 
-test('renders Financial Search Engine navbar', () => {
+test('renders App structure correctly', () => {
   render(<App />);
-  const titleElement = screen.getByText(/Financial Search Engine/i);
-  expect(titleElement).toBeInTheDocument();
+  const homeComponent = screen.getByText(/Home Component/i);
+  expect(homeComponent).toBeInTheDocument();
 });
 
-test('renders Bootstrap Navbar', () => {
+test('renders main wrapper elements', () => {
   render(<App />);
-  const navbarBrand = screen.getByText(/Financial Search Engine/i);
-  expect(navbarBrand).toBeInTheDocument();
-  expect(navbarBrand.tagName.toLowerCase()).toBe('a');
+  const mainElement = screen.getByRole('main');
+  expect(mainElement).toBeInTheDocument();
+  expect(mainElement).toHaveClass('flex-grow-1');
 });

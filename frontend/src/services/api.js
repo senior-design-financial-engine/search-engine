@@ -1,7 +1,7 @@
 import axios from 'axios';
-// Import search client with a generic name
-import elasticsearch from 'elasticsearch-browser';
-const searchClient = elasticsearch; 
+// Import the official Elasticsearch client
+import { Client } from '@elastic/elasticsearch';
+// No need for searchClient assignment now
 
 // Use environment variables with fallbacks
 let API_BASE_URL = process.env.REACT_APP_API_URL;
@@ -47,23 +47,24 @@ const createDataProvider = (host) => {
 	
 	// Configure the client with available authentication method
 	const clientConfig = {
-		host: parsedHost,
-		log: 'error', // Only log errors
+		node: parsedHost,
 		requestTimeout: 30000 // 30 seconds timeout
 	};
 	
 	// Add authentication in order of preference: API key, then basic auth from URL
 	if (apiKey) {
-		clientConfig.apiKey = apiKey;
-		clientConfig.headers = {
-			'Authorization': `ApiKey ${apiKey}`
+		clientConfig.auth = {
+			apiKey: apiKey
 		};
 	} else if (authFromUrl) {
-		clientConfig.httpAuth = `${authFromUrl.username}:${authFromUrl.password}`;
+		clientConfig.auth = {
+			username: authFromUrl.username,
+			password: authFromUrl.password
+		};
 	}
 	
 	// Return the client with appropriate auth
-	return new searchClient.Client(clientConfig);
+	return new Client(clientConfig);
 };
 
 // Function to create an API client with specified base URL
@@ -81,12 +82,12 @@ const createApiClient = (baseURL) => {
 // Create primary API client
 const apiClient = createApiClient(API_BASE_URL);
 // Create enhanced search client
-const enhancedApiClient = createDataProvider(API_BASE_URL);
+const enhancedApiClient = createDataProvider(process.env.REACT_APP_ELASTICSEARCH_URL || API_BASE_URL);
 
 // Create fallback API client
 const fallbackApiClient = createApiClient(API_FALLBACK_URL);
 // Create fallback search client
-const fallbackEnhancedClient = createDataProvider(API_FALLBACK_URL);
+const fallbackEnhancedClient = createDataProvider(process.env.REACT_APP_ELASTICSEARCH_URL || API_FALLBACK_URL);
 
 // Request interceptor
 apiClient.interceptors.request.use(
@@ -184,7 +185,7 @@ const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES
 export const searchArticles = async (query, source, time_range, sentiment) => {
 	// Build advanced query with filters
 	const searchQuery = {
-		index: 'articles',
+		index: process.env.REACT_APP_ELASTICSEARCH_INDEX || 'articles',
 		body: {
 			// Standard query format
 			query: {
@@ -252,151 +253,101 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		});
 	}
 	
-	// Use enhanced search client for more efficient data retrieval
 	const primaryRequest = async () => {
 		try {
-			// Perform search
+			// Using the new Elasticsearch client API
 			const response = await enhancedApiClient.search(searchQuery);
 			
-			// Format the response to match expected API structure
+			// Process response in new client format
+			const hits = response.hits?.hits || [];
 			return {
-				data: response.hits.hits.map(hit => ({
-					_id: hit._id,
-					_source: {
+				data: {
+					results: hits.map(hit => ({
+						id: hit._id,
+						score: hit._score,
 						...hit._source,
-						relevance_score: hit._score / 10, // Normalize score
-					},
-					highlight: hit.highlight || {}
-				}))
+						highlight: hit.highlight || {}
+					})),
+					total: response.hits?.total?.value || hits.length,
+					max_score: response.hits?.max_score || 0
+				}
 			};
 		} catch (error) {
-			// Check for authentication errors
-			if (error.status === 401 || error.status === 403 || 
-				(error.message && (error.message.includes('unauthorized') || error.message.includes('forbidden')))) {
-				console.error('Authentication error with search client', error);
-				
-				// Create a sanitized error for logging
-				const authError = new Error('Search provider authentication failed');
-				authError.status = error.status || 401;
-				throw authError;
-			}
-			
-			// Convert technical errors to generic ones
-			if (error.toString().includes('elasticsearch')) {
-				const genericError = new Error('Search provider error');
-				genericError.status = error.status || 500;
-				throw genericError;
-			}
+			console.error('Error searching articles:', error);
 			throw error;
 		}
 	};
 	
 	const fallbackRequest = async () => {
-		// Use standard API as fallback
-		const params = { query };
-		if (source) params.source = source;
-		if (time_range) params.time_range = time_range;
-		if (sentiment) params.sentiment = sentiment;
-		
-		// Transform API response to normalized format
-		const response = await fallbackApiClient.get('/search', { params });
-		
-		// Check if we need to transform the data
-		if (response.data && Array.isArray(response.data) && response.data.length > 0 && !response.data[0]._source) {
+		try {
+			// Using the new Elasticsearch client API for fallback
+			const response = await fallbackEnhancedClient.search(searchQuery);
+			
+			// Process response in new client format
+			const hits = response.hits?.hits || [];
 			return {
-				data: response.data.map(item => ({
-					_id: item.id || Math.random().toString(36).substring(2, 15),
-					_source: { ...item },
-					highlight: {}
-				}))
+				data: {
+					results: hits.map(hit => ({
+						id: hit._id,
+						score: hit._score,
+						...hit._source,
+						highlight: hit.highlight || {}
+					})),
+					total: response.hits?.total?.value || hits.length,
+					max_score: response.hits?.max_score || 0
+				}
 			};
+		} catch (error) {
+			console.error('Fallback: Error searching articles:', error);
+			throw error;
 		}
-		
-		return response;
 	};
 	
-	try {
-		const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
-		
-		// Add compatibility layer for the frontend
-		// This ensures consistent data format
-		if (response && response.data) {
-			// Return array structure expected by Results.js
-			return response.data;
-		}
-		
-		return [];
-	} catch (error) {
-		console.error('Error in searchArticles:', error);
-		throw error;
-	}
+	return retryRequestWithFallback(primaryRequest, fallbackRequest);
 };
 
 export const getArticleById = async (id) => {
-	// Define article fetch functions
 	const primaryRequest = async () => {
 		try {
-			// Use enhanced client for data retrieval
+			// Using the new Elasticsearch client API
 			const response = await enhancedApiClient.get({
-				index: 'articles',
+				index: process.env.REACT_APP_ELASTICSEARCH_INDEX || 'articles',
 				id: id
 			});
 			
-			// Format response to match API
-			return { 
-				data: { 
+			// Process response in new client format
+			return {
+				data: {
 					...response._source,
 					id: response._id
-				} 
+				}
 			};
 		} catch (error) {
-			// Sanitize error messages
-			if (error.toString().includes('elasticsearch')) {
-				// If it's a 404, just pass through to try the regular API
-				if (error.status === 404) {
-					// Fall through to regular API
-				} else {
-					// For other errors, create a sanitized version
-					const genericError = new Error('Data provider error');
-					genericError.status = error.status || 500;
-					throw genericError;
-				}
-			}
-			
-			// If not found with enhanced client, try regular API
-			const apiResponse = await apiClient.get(`/article/${id}`);
-			
-			// Make sure the response format is consistent
-			if (apiResponse.data) {
-				// Ensure the id field is present
-				if (!apiResponse.data.id) {
-					apiResponse.data.id = id;
-				}
-			}
-			
-			return apiResponse;
+			console.error('Error getting article by ID:', error);
+			throw error;
 		}
 	};
 	
 	const fallbackRequest = async () => {
-		const fallbackResponse = await fallbackApiClient.get(`/article/${id}`);
-		
-		// Make sure the response format is consistent
-		if (fallbackResponse.data && !fallbackResponse.data.id) {
-			fallbackResponse.data.id = id;
+		try {
+			// Using the new Elasticsearch client API for fallback
+			const response = await fallbackEnhancedClient.get({
+				index: process.env.REACT_APP_ELASTICSEARCH_INDEX || 'articles',
+				id: id
+			});
+			
+			// Process response in new client format
+			return {
+				data: {
+					...response._source,
+					id: response._id
+				}
+			};
+		} catch (error) {
+			console.error('Fallback: Error getting article by ID:', error);
+			throw error;
 		}
-		
-		return fallbackResponse;
 	};
 	
-	try {
-		const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
-		return response.data;
-	} catch (error) {
-		// Clean up error message
-		if (error.toString().includes('elasticsearch')) {
-			throw new Error(`Failed to retrieve article ${id}`);
-		}
-		throw error;
-	}
+	return retryRequestWithFallback(primaryRequest, fallbackRequest);
 };
