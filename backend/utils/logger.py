@@ -60,6 +60,8 @@ class DuplicateFilter(logging.Filter):
         super().__init__()
         self.last_log = {}  # Dict to track last log per thread
         self.repeat_count = {}  # Count of repetitions
+        # Store the last suppressed message count to report on the next different message
+        self.last_suppressed = {}
     
     def filter(self, record):
         # Create a key that uniquely identifies this log message
@@ -69,10 +71,16 @@ class DuplicateFilter(logging.Filter):
         # Create message key (level + message + module + function)
         msg_key = f"{record.levelno}:{record.getMessage()}:{record.module}:{record.funcName}"
         
-        # For errors, also include the traceback to uniquely identify the error
-        if record.levelno >= logging.ERROR and record.exc_info:
-            tb_str = "".join(traceback.format_exception(*record.exc_info))
-            msg_key += f":{tb_str}"
+        # Special handling for specific known errors like "ImportError: cannot import name 'WebScraper'"
+        if record.exc_info and record.levelno >= logging.ERROR:
+            if isinstance(record.exc_info[1], ImportError) and "WebScraper" in str(record.exc_info[1]):
+                # Don't include the traceback for these specific import errors
+                # as they may have different line numbers but are the same error
+                msg_key = f"ImportError:WebScraper:{record.module}:{record.funcName}"
+            else:
+                # For other errors, include the traceback to uniquely identify the error
+                tb_str = "".join(traceback.format_exception(*record.exc_info))
+                msg_key += f":{tb_str}"
         
         # Thread-specific tracking key
         track_key = f"{thread_id}:{msg_key}"
@@ -90,29 +98,48 @@ class DuplicateFilter(logging.Filter):
                 record.msg = f"Previous message repeated {self.repeat_count[track_key]} times: {record.msg}"
                 return True
                 
+            # Remember this for the next different message
+            self.last_suppressed[thread_id] = track_key
+            
             # Suppress this duplicate
             return False
         else:
+            # Check if we just finished a series of duplicates
+            if thread_id in self.last_suppressed:
+                old_key = self.last_suppressed[thread_id]
+                old_count = self.repeat_count.pop(old_key, 0)
+                
+                if old_count > MAX_CONSECUTIVE_DUPLICATES:
+                    # The previous message type was suppressed, insert a summary before the new message
+                    old_msg_parts = old_key.split(':', 2)
+                    level = int(old_msg_parts[1]) if len(old_msg_parts) > 1 else logging.INFO
+                    old_msg = old_msg_parts[2] if len(old_msg_parts) > 2 else "unknown message"
+                    
+                    # For specific import errors, customize the message
+                    if "ImportError:WebScraper" in old_key:
+                        old_msg = "ImportError: cannot import name 'WebScraper' from 'scraper'"
+                    
+                    # Log a summary message then continue with the new message
+                    summary_record = logging.LogRecord(
+                        name=record.name,
+                        level=level,
+                        pathname=record.pathname,
+                        lineno=record.lineno,
+                        msg=f"Previous message was suppressed, occurred {old_count} times: {old_msg}",
+                        args=(),
+                        exc_info=None
+                    )
+                    logger = logging.getLogger(record.name)
+                    logger.handle(summary_record)
+                
+                # Clear this key
+                del self.last_suppressed[thread_id]
+                if old_key in self.last_log:
+                    del self.last_log[old_key]
+            
             # New message, reset counter
             self.last_log[track_key] = time.time()
             self.repeat_count[track_key] = 1
-            
-            # Check if we just finished a series of duplicates
-            for old_key in list(self.last_log.keys()):
-                if old_key != track_key and old_key.startswith(f"{thread_id}:"):
-                    old_count = self.repeat_count.pop(old_key, 0)
-                    if old_count > MAX_CONSECUTIVE_DUPLICATES:
-                        # The previous type of message was suppressed, log a summary
-                        parts = old_key.split(':', 2)
-                        level = int(parts[1]) if len(parts) > 1 else logging.INFO
-                        
-                        # Don't create a new record, just modify the current one
-                        if record.levelno == level:
-                            record.msg = f"Previous message was suppressed, occurred {old_count} times. New message: {record.msg}"
-                    
-                    # Clean up old keys
-                    del self.last_log[old_key]
-            
             return True
 
 # Set log levels

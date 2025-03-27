@@ -68,8 +68,18 @@ try:
     try:
         # Import your actual application logic here
         logger.info("Attempting to import main backend application logic")
-        import backend
+        # Import directly from backend.py not from scraper
+        from backend import app as backend_app, backend
         logger.info("Successfully imported backend module")
+        
+        # Register the backend Flask app routes with this app
+        # Copy over the routes from the backend app
+        for rule in backend_app.url_map.iter_rules():
+            # Skip the health check endpoint we already defined
+            if rule.endpoint != 'health_check':
+                endpoint = getattr(backend_app.view_functions, rule.endpoint)
+                app.add_url_rule(rule.rule, rule.endpoint, endpoint, methods=rule.methods)
+                logger.debug(f"Registered route {rule.rule} ({rule.endpoint})")
     except ImportError as e:
         logger.warning(f"Could not import backend module, falling back to basic API: {e}")
         

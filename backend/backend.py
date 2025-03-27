@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from typing import Dict, Optional, List
-from scraper import WebScraper
 from dotenv import load_dotenv
 import logging
 import os
@@ -201,10 +200,6 @@ class BackEnd:
             # Log initialization
             logger.info("Initializing backend components...")
             
-            # Initialize components
-            self.web_scraper = WebScraper()
-            logger.info("Web scraper initialized")
-            
             # Test Elasticsearch connection before initializing engine
             self._test_elasticsearch_connection()
             
@@ -288,7 +283,7 @@ class BackEnd:
                     self.engine.add_article(article)
                 logger.info(f"Added {len(articles)} articles to index")
             else:
-                # Could implement scraping logic here if needed
+                # No scraping logic here - API only interfaces with Elasticsearch
                 logger.info("No articles provided to update index")
         except Exception as e:
             error_trace = traceback.format_exc()
