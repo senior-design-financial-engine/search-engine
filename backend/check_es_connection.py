@@ -153,20 +153,43 @@ def test_es_client(url, api_key=None):
     logger.info("\n=== Testing Elasticsearch client connection ===")
     
     try:
-        # Configure the Elasticsearch client
-        if api_key:
-            es = Elasticsearch(
-                [url],
-                api_key=api_key,
-                verify_certs=False,  # For testing only
-                request_timeout=10
-            )
+        # Get the Elasticsearch version
+        import elasticsearch
+        es_version = elasticsearch.__version__
+        es_major_version = int(es_version.split('.')[0])
+        logger.info(f"Using Elasticsearch client version: {es_version}")
+        
+        # Configure the Elasticsearch client based on version
+        if es_major_version >= 8:
+            # For ES 8.x
+            if api_key:
+                es = Elasticsearch(
+                    url,
+                    api_key=api_key,
+                    verify_certs=False,  # For testing only
+                    request_timeout=10
+                )
+            else:
+                es = Elasticsearch(
+                    url,
+                    verify_certs=False,  # For testing only
+                    request_timeout=10
+                )
         else:
-            es = Elasticsearch(
-                [url],
-                verify_certs=False,  # For testing only
-                request_timeout=10
-            )
+            # For ES 7.x and earlier
+            if api_key:
+                es = Elasticsearch(
+                    [url],
+                    api_key=api_key,
+                    verify_certs=False,  # For testing only
+                    request_timeout=10
+                )
+            else:
+                es = Elasticsearch(
+                    [url],
+                    verify_certs=False,  # For testing only
+                    request_timeout=10
+                )
         
         # Check if the cluster is responding
         info = es.info()
@@ -182,6 +205,7 @@ def test_es_client(url, api_key=None):
         return True, es
     except Exception as e:
         logger.error(f"❌ Elasticsearch client connection failed: {str(e)}")
+        logger.error(f"Exception traceback: {traceback.format_exc()}")
         return False, None
 
 def test_index_operations(es, index_name):

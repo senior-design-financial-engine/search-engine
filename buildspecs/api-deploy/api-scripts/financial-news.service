@@ -4,14 +4,17 @@ After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
+User=root
+Group=root
 WorkingDirectory=/opt/financial-news-engine
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/bin/mkdir -p /opt/financial-news-engine/logs
+ExecStartPre=/bin/chmod -R 755 /opt/financial-news-engine/logs
 ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py
 Restart=on-failure
 RestartSec=5
-StandardOutput=append:/opt/financial-news-engine/logs/backend.log
-StandardError=append:/opt/financial-news-engine/logs/backend.log
+StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
+StandardError=append:/opt/financial-news-engine/logs/service-error.log
 SyslogIdentifier=financial-news
 
 [Install]

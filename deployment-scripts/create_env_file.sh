@@ -79,7 +79,7 @@ fi
 if [ ! -d "/opt/financial-news-engine/logs" ]; then
     echo -e "${YELLOW}Creating logs directory${NC}"
     mkdir -p /opt/financial-news-engine/logs
-    chmod 755 /opt/financial-news-engine/logs
+    chmod 777 /opt/financial-news-engine/logs
 fi
 
 # Check for deploy_scripts directory
@@ -93,26 +93,28 @@ fi
 df -h /opt/financial-news-engine | tee -a /var/log/disk-space.log
 
 # Get parameters with default fallbacks
-ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
-ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
-ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
-ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
-ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
+ES_URL=$(get_parameter "/financial-news/elasticsearch/endpoint" "https://your-elasticsearch-endpoint.es.amazonaws.com")
+ES_API_KEY=$(get_parameter "/financial-news/elasticsearch/api_key" "default-api-key")
+ES_INDEX=$(get_parameter "/financial-news/elasticsearch/index" "financial_news")
+ES_SHARDS=$(get_parameter "/financial-news/elasticsearch/shards" "3")
+ES_REPLICAS=$(get_parameter "/financial-news/elasticsearch/replicas" "2")
 ENV=$(get_parameter "/financial-news/environment" "development")
 
 # Create the .env file
 cat > /opt/financial-news-engine/.env << EOL
+# Environment variables for Financial News Engine
 ELASTICSEARCH_URL=$ES_URL
+ELASTICSEARCH_ENDPOINT=$ES_URL
 ELASTICSEARCH_API_KEY=$ES_API_KEY
 ELASTICSEARCH_INDEX=$ES_INDEX
 ES_NUMBER_OF_SHARDS=$ES_SHARDS
 ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
 ENVIRONMENT=$ENV
-CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
+CORS_ALLOWED_ORIGINS="https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
 EOL
 
 # Set secure permissions
-chmod 600 /opt/financial-news-engine/.env
+chmod 644 /opt/financial-news-engine/.env
 echo -e "${GREEN}Created .env file with environment variables from SSM Parameter Store${NC}"
 
 # Output parameters retrieved (with API key redacted)

@@ -14,8 +14,6 @@ import uuid
 import hashlib
 import json
 from functools import lru_cache
-import elasticsearch
-from elasticsearch import Elasticsearch
 
 # Load environment variables first
 load_dotenv()
@@ -36,6 +34,19 @@ logger.info(f"Environment: {os.getenv('FLASK_ENV', 'development')}")
 logger.info(f"Elasticsearch URL: {os.getenv('ELASTICSEARCH_URL', 'Not configured')}")
 logger.info(f"Elasticsearch Index: {os.getenv('ELASTICSEARCH_INDEX', 'Not configured')}")
 logger.info("="*50)
+
+# Try to import Elasticsearch with version-specific handling
+try:
+    import elasticsearch
+    from elasticsearch import Elasticsearch
+    logger.info(f"Successfully imported elasticsearch version {elasticsearch.__version__}")
+    # Check which Elasticsearch version we're using to handle compatibility
+    es_major_version = int(elasticsearch.__version__.split('.')[0])
+    logger.info(f"Detected Elasticsearch major version: {es_major_version}")
+except Exception as e:
+    es_major_version = 0
+    logger.error(f"Error importing elasticsearch: {str(e)}")
+    logger.error("Will attempt to continue anyway")
 
 # Setup CORS
 # Define default CORS origins
