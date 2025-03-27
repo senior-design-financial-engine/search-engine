@@ -15,6 +15,11 @@ from pathlib import Path
 from datetime import datetime
 import json
 
+# Add current directory to Python path to ensure local modules can be imported
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 # Create log directory
 log_dir = '/opt/financial-news-engine/logs'
 os.makedirs(log_dir, exist_ok=True)
@@ -31,6 +36,30 @@ logging.basicConfig(
 
 logger = logging.getLogger("financial-news")
 logger.info("Starting Financial News Engine application")
+logger.info(f"Python path: {sys.path}")
+
+# Set up custom logger if available, otherwise use the default logger
+try:
+    from utils.logger import get_logger, setup_request_logging, setup_debug_endpoints, performance_monitor
+    logger.info("Successfully imported custom logger from utils.logger")
+except ImportError as e:
+    logger.warning(f"Could not import custom logger: {str(e)}. Using default logger.")
+    # Define fallback functions if logger module is not available
+    def get_logger(name):
+        return logging.getLogger(name)
+    
+    def setup_request_logging(app):
+        logger.info("Using fallback request logging setup")
+        return app
+    
+    def setup_debug_endpoints(app):
+        logger.info("Using fallback debug endpoints setup")
+        return app
+    
+    def performance_monitor(func):
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
 
 # Import Flask and initialize app
 try:
@@ -50,6 +79,9 @@ try:
     app = Flask(__name__)
     CORS(app)
     
+    # Set up request logging if available
+    app = setup_request_logging(app)
+    
     # Health check endpoint
     @app.route('/health', methods=['GET'])
     def health_check():
@@ -62,7 +94,8 @@ try:
                 'url': es_url.split('@')[-1] if es_url else None  # Hide credentials
             },
             'environment': os.getenv('ENVIRONMENT', 'development'),
-            'region': os.getenv('AWS_REGION', 'undefined')
+            'region': os.getenv('AWS_REGION', 'undefined'),
+            'version': os.getenv('APP_VERSION', '1.0.0')
         })
     
     # Initialize main app by importing backend directly
@@ -70,10 +103,17 @@ try:
         # Import your actual application logic here
         logger.info("Attempting to import main backend application logic")
         
-        # Import directly from backend.py - no scraper imports
-        import backend
-        from backend import app as backend_app
-        logger.info("Successfully imported backend module")
+        # Try both import methods to support different deployment structures
+        try:
+            # Import directly from backend.py - no scraper imports
+            import backend
+            from backend import app as backend_app
+            logger.info("Successfully imported backend module as package")
+        except ImportError:
+            # Try relative import from the current directory
+            logger.info("Trying direct module import")
+            from app import backend_app
+            logger.info("Successfully imported backend_app directly")
         
         # Register the backend Flask app routes with this app
         # Copy over the routes from the backend app, excluding routes we've already defined
@@ -114,6 +154,10 @@ try:
                 'error_type': type(e).__name__,
                 'timestamp': datetime.now().isoformat()
             })
+    
+    # Set up debug endpoints if in development mode
+    if os.getenv('ENVIRONMENT', 'development') == 'development':
+        app = setup_debug_endpoints(app)
     
     logger.info("Application initialization complete")
     

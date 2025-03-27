@@ -1,0 +1,726 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo "Installing required tools for API deployment and verification"
+      - pip install pyyaml boto3 awscli jq
+  
+  pre_build:
+    commands:
+      - echo "Preparing API code and verification scripts for deployment"
+      - cd backend || (echo "Backend directory not found, using project root"; cd .)
+      - mkdir -p api/deploy/api-scripts
+      - cp backend.py api/deploy/app.py || cp app.py api/deploy/app.py || echo "Using fallback app.py"
+      - cp requirements.txt api/deploy/requirements.txt || echo "Using fallback requirements.txt"
+      
+      # Create verification scripts directory
+      - mkdir -p api/deploy/verification
+      
+      # Create app version file
+      - APP_VERSION="1.0.$(date +%Y%m%d%H%M)"
+      - echo "Setting application version to $APP_VERSION"
+      - echo $APP_VERSION > api/deploy/version.txt
+      
+      # Get assets bucket name from CloudFormation
+      - echo "Getting assets bucket name from CloudFormation"
+      - export ASSETS_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+      - echo "Assets bucket name: $ASSETS_BUCKET_NAME"
+      
+      # Create verification script
+      - |
+        cat > api/deploy/api-scripts/verify_deployment.sh << 'EOF'
+        #!/bin/bash
+
+        # Script to verify deployment and ensure EC2 instances are running the latest code
+        INSTALL_DIR="/opt/financial-news-engine"
+        LOG_FILE="${INSTALL_DIR}/logs/deployment_verify.log"
+        VERSION_FILE="${INSTALL_DIR}/.version"
+        DEPLOYMENT_TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+        APP_VERSION="${APP_VERSION:-1.0.0}" # Use env var or default
+
+        # Ensure log directory exists
+        mkdir -p "${INSTALL_DIR}/logs"
+        touch $LOG_FILE
+        chmod 666 $LOG_FILE
+
+        echo "$(date) - Starting deployment verification" | tee -a $LOG_FILE
+
+        # Function to check if application needs update
+        check_version() {
+          if [[ -f "$VERSION_FILE" ]]; then
+            local current_version=$(cat "$VERSION_FILE")
+            echo "Current version: $current_version" | tee -a $LOG_FILE
+            echo "Target version: $APP_VERSION" | tee -a $LOG_FILE
+            
+            if [[ "$current_version" == "$APP_VERSION" ]]; then
+              echo "Application is up to date." | tee -a $LOG_FILE
+              return 1
+            else
+              echo "Application needs update. Current: $current_version, Target: $APP_VERSION" | tee -a $LOG_FILE
+              return 0
+            fi
+          else
+            echo "No version file found. Application needs update." | tee -a $LOG_FILE
+            return 0
+          fi
+        }
+
+        # Function to check if Python imports are working correctly
+        check_imports() {
+          echo "Checking Python imports..." | tee -a $LOG_FILE
+          
+          cd $INSTALL_DIR
+          
+          # Test if we can import utils
+          python3 -c "import sys; sys.path.insert(0, '.'); import utils" 2>> $LOG_FILE
+          
+          if [ $? -ne 0 ]; then
+            echo "Import test failed. Application needs update." | tee -a $LOG_FILE
+            return 0
+          else
+            echo "Import test passed." | tee -a $LOG_FILE
+            return 1
+          fi
+        }
+
+        # Function to fix Python path issues by creating __init__.py files if needed
+        fix_python_paths() {
+          echo "Ensuring Python package structure is correct..." | tee -a $LOG_FILE
+          
+          # Make sure utils is a proper package
+          if [[ ! -f "${INSTALL_DIR}/utils/__init__.py" ]]; then
+            echo "Creating missing __init__.py in utils directory" | tee -a $LOG_FILE
+            touch "${INSTALL_DIR}/utils/__init__.py"
+          fi
+          
+          # Check for other directories that should be packages
+          for dir in api es_database scraper backend-scripts; do
+            if [[ -d "${INSTALL_DIR}/${dir}" && ! -f "${INSTALL_DIR}/${dir}/__init__.py" ]]; then
+              echo "Creating missing __init__.py in ${dir} directory" | tee -a $LOG_FILE
+              touch "${INSTALL_DIR}/${dir}/__init__.py"
+            fi
+          done
+          
+          # Add current directory to Python path in app.py if not already there
+          if [[ -f "${INSTALL_DIR}/app.py" ]] && ! grep -q "sys.path.insert" "${INSTALL_DIR}/app.py"; then
+            echo "Adding current directory to Python path in app.py" | tee -a $LOG_FILE
+            sed -i '5i\
+        import sys\
+        current_dir = os.path.dirname(os.path.abspath(__file__))\
+        if current_dir not in sys.path:\
+            sys.path.insert(0, current_dir)' "${INSTALL_DIR}/app.py"
+          fi
+        }
+
+        # Function to update application
+        update_application() {
+          echo "Updating application..." | tee -a $LOG_FILE
+          
+          # Fix Python paths
+          fix_python_paths
+          
+          # Update version file
+          echo "$APP_VERSION" > "$VERSION_FILE"
+          
+          # Add APP_VERSION to environment file
+          if [[ -f "${INSTALL_DIR}/.env" ]]; then
+            if grep -q "APP_VERSION" "${INSTALL_DIR}/.env"; then
+              sed -i "s/APP_VERSION=.*/APP_VERSION=$APP_VERSION/" "${INSTALL_DIR}/.env"
+            else
+              echo "APP_VERSION=$APP_VERSION" >> "${INSTALL_DIR}/.env"
+            fi
+          fi
+          
+          echo "Application updated to version $APP_VERSION" | tee -a $LOG_FILE
+          
+          # Check if the service exists and restart it
+          if systemctl list-unit-files | grep -q financial-news; then
+            echo "Restarting financial-news service..." | tee -a $LOG_FILE
+            systemctl restart financial-news
+            
+            # Verify service is running
+            sleep 5
+            if systemctl is-active --quiet financial-news; then
+              echo "Service successfully restarted." | tee -a $LOG_FILE
+            else
+              echo "WARNING: Service failed to restart." | tee -a $LOG_FILE
+              systemctl status financial-news | tee -a $LOG_FILE
+            fi
+          else
+            echo "Service not found. Application may need to be manually restarted." | tee -a $LOG_FILE
+          fi
+        }
+
+        # Function to check if service is healthy
+        check_health() {
+          echo "Checking application health..." | tee -a $LOG_FILE
+          
+          # Try to access health endpoint
+          health_response=$(curl -s http://localhost:5000/health 2>> $LOG_FILE)
+          
+          if [ $? -eq 0 ] && [[ "$health_response" == *"status"* ]]; then
+            echo "Health check passed. Application is running correctly." | tee -a $LOG_FILE
+            return 0
+          else
+            echo "Health check failed. Application may not be running correctly." | tee -a $LOG_FILE
+            return 1
+          fi
+        }
+
+        # Main execution flow
+        # Check if we need to update
+        if check_version || check_imports; then
+          update_application
+        fi
+
+        # Check health after potential update
+        check_health
+
+        echo "Deployment verification completed at $(date)" | tee -a $LOG_FILE
+
+        # Return success
+        exit 0
+        EOF
+      
+      # Create instance refresh script
+      - |
+        cat > api/deploy/api-scripts/instance_refresh.sh << 'EOF'
+        #!/bin/bash
+
+        # Script to trigger an instance refresh in Auto Scaling Group
+        # This will ensure all EC2 instances are using the latest configuration
+
+        # Configuration
+        ASG_NAME=${1:-""}  # Auto Scaling Group name passed as argument or set via environment
+        AWS_REGION=${2:-$(aws configure get region)}  # Use configured region if not specified
+        REFRESH_MIN_HEALTHY=${REFRESH_MIN_HEALTHY:-90}  # Percentage of instances that must be healthy during refresh
+        REFRESH_TIMEOUT=${REFRESH_TIMEOUT:-600}  # Maximum time in seconds to wait for refresh to complete
+        LOG_FILE="/var/log/asg-refresh.log"  # Log file
+
+        # If ASG_NAME not provided as argument, try to get it from CloudFormation
+        if [ -z "$ASG_NAME" ] && [ -n "$BACKEND_STACK_NAME" ]; then
+            echo "ASG name not provided, getting from CloudFormation stack $BACKEND_STACK_NAME"
+            ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --region $AWS_REGION \
+                --query "Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue" --output text)
+        fi
+
+        if [ -z "$ASG_NAME" ]; then
+            echo "ERROR: Auto Scaling Group name not provided and could not be determined from CloudFormation"
+            exit 1
+        fi
+
+        echo "$(date) - Starting ASG instance refresh for $ASG_NAME in $AWS_REGION"
+
+        # Check if ASG exists
+        if ! aws autoscaling describe-auto-scaling-groups --region $AWS_REGION --auto-scaling-group-names $ASG_NAME &> /dev/null; then
+            echo "ERROR: Auto Scaling Group $ASG_NAME not found in region $AWS_REGION"
+            exit 1
+        fi
+
+        # Check for ongoing instance refreshes
+        ONGOING_REFRESH=$(aws autoscaling describe-instance-refreshes --region $AWS_REGION \
+            --auto-scaling-group-name $ASG_NAME \
+            --query "InstanceRefreshes[?Status=='Pending' || Status=='InProgress'].InstanceRefreshId" \
+            --output text)
+
+        if [ -n "$ONGOING_REFRESH" ]; then
+            echo "WARNING: There is already an ongoing instance refresh with ID: $ONGOING_REFRESH"
+            echo "Cancelling existing refresh before starting a new one"
+            aws autoscaling cancel-instance-refresh --region $AWS_REGION --auto-scaling-group-name $ASG_NAME
+            sleep 10  # Wait for cancellation to take effect
+        fi
+
+        # Start instance refresh
+        REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --region $AWS_REGION \
+            --auto-scaling-group-name $ASG_NAME \
+            --preferences "MinHealthyPercentage=$REFRESH_MIN_HEALTHY,InstanceWarmup=300" \
+            --query "InstanceRefreshId" \
+            --output text)
+
+        if [ -z "$REFRESH_ID" ]; then
+            echo "ERROR: Failed to start instance refresh"
+            exit 1
+        fi
+
+        echo "Instance refresh started with ID: $REFRESH_ID"
+
+        # In CI/CD environment, we may not want to wait for the refresh to complete
+        if [ "$WAIT_FOR_REFRESH" == "true" ]; then
+            # Monitor refresh status
+            echo "Monitoring refresh status..."
+            ELAPSED=0
+            STATUS="Pending"
+
+            while [ "$STATUS" = "Pending" ] || [ "$STATUS" = "InProgress" ]; do
+                if [ $ELAPSED -ge $REFRESH_TIMEOUT ]; then
+                    echo "TIMEOUT: Instance refresh taking too long, exiting monitoring"
+                    break
+                fi
+                
+                sleep 30
+                ELAPSED=$((ELAPSED + 30))
+                
+                STATUS=$(aws autoscaling describe-instance-refreshes \
+                    --region $AWS_REGION \
+                    --auto-scaling-group-name $ASG_NAME \
+                    --instance-refresh-ids $REFRESH_ID \
+                    --query "InstanceRefreshes[0].Status" \
+                    --output text)
+                
+                PERCENTAGE=$(aws autoscaling describe-instance-refreshes \
+                    --region $AWS_REGION \
+                    --auto-scaling-group-name $ASG_NAME \
+                    --instance-refresh-ids $REFRESH_ID \
+                    --query "InstanceRefreshes[0].PercentageComplete" \
+                    --output text)
+                
+                echo "Status: $STATUS, Percentage complete: $PERCENTAGE%, Elapsed time: $ELAPSED seconds"
+            done
+
+            # Final status check
+            if [ "$STATUS" = "Successful" ]; then
+                echo "Instance refresh completed successfully!"
+                exit 0
+            elif [ "$STATUS" = "Cancelled" ]; then
+                echo "WARNING: Instance refresh was cancelled"
+                exit 1
+            elif [ "$STATUS" = "Failed" ]; then
+                echo "ERROR: Instance refresh failed"
+                
+                # Get failure reason
+                FAILURE_REASON=$(aws autoscaling describe-instance-refreshes \
+                    --region $AWS_REGION \
+                    --auto-scaling-group-name $ASG_NAME \
+                    --instance-refresh-ids $REFRESH_ID \
+                    --query "InstanceRefreshes[0].StatusReason" \
+                    --output text)
+                
+                echo "Failure reason: $FAILURE_REASON"
+                exit 1
+            else
+                echo "Instance refresh ended with status: $STATUS"
+                exit 0
+            fi
+        else
+            echo "Instance refresh initiated. Not waiting for completion as WAIT_FOR_REFRESH is not set to 'true'"
+            echo "To check status later, run:"
+            echo "aws autoscaling describe-instance-refreshes --region $AWS_REGION --auto-scaling-group-name $ASG_NAME --instance-refresh-ids $REFRESH_ID"
+            exit 0
+        fi
+        EOF
+      
+      # Create make_scripts_executable.sh script
+      - |
+        cat > api/deploy/api-scripts/make_scripts_executable.sh << 'EOF'
+        #!/bin/bash
+
+        # Make all deployment scripts executable
+        echo "Making all deployment scripts executable..."
+
+        # Set the application directory
+        APP_DIR="/opt/financial-news-engine"
+        SCRIPT_DIR="${APP_DIR}/deploy_scripts"
+
+        # Make scripts executable
+        chmod +x ${SCRIPT_DIR}/*.sh
+        echo "Made scripts in ${SCRIPT_DIR} executable"
+
+        # Create __init__.py files in all subdirectories to fix Python imports
+        find ${APP_DIR} -type d -not -path "*/\.*" -exec touch {}/__init__.py \;
+        echo "Created __init__.py files in all subdirectories"
+
+        # Fix permissions
+        chmod 644 ${APP_DIR}/*.py
+        chmod 644 ${APP_DIR}/*/*.py
+        chmod 755 ${APP_DIR}/deploy_scripts/*.sh
+        echo "Fixed file permissions"
+
+        # Run verify_deployment.sh to check if everything is working
+        ${SCRIPT_DIR}/verify_deployment.sh
+        echo "Verification complete" 
+        EOF
+      
+      # Make scripts executable
+      - chmod +x api/deploy/api-scripts/*.sh
+      
+      # Create CloudFormation template for verification system
+      - |
+        cat > api/deploy/verification/verification-resources.yaml << 'EOF'
+        AWSTemplateFormatVersion: '2010-09-09'
+        Description: 'Financial News Engine - Automated Deployment Verification Resources'
+
+        Parameters:
+          EnvironmentName:
+            Description: Environment name
+            Type: String
+            Default: production
+            AllowedValues:
+              - development
+              - staging
+              - production
+          
+          BackendStackName:
+            Description: Name of the backend CloudFormation stack
+            Type: String
+            Default: financial-news-backend
+          
+          ScheduleExpression:
+            Description: Schedule expression for the verification check
+            Type: String
+            Default: rate(1 hour)
+            Description: How often to run the verification check (e.g., rate(1 hour) or cron(0 * * * ? *))
+          
+          ApplicationVersion:
+            Description: Current application version
+            Type: String
+            Default: 1.0.0
+
+        Resources:
+          # IAM Role for the Lambda verification function
+          VerificationLambdaRole:
+            Type: AWS::IAM::Role
+            Properties:
+              AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Principal:
+                      Service: lambda.amazonaws.com
+                    Action: sts:AssumeRole
+              ManagedPolicyArns:
+                - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+              Path: /
+              Policies:
+                - PolicyName: EC2AccessPolicy
+                  PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'ec2:DescribeInstances'
+                          - 'ec2:DescribeTags'
+                        Resource: '*'
+                - PolicyName: SSMAccessPolicy
+                  PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'ssm:SendCommand'
+                          - 'ssm:ListCommandInvocations'
+                          - 'ssm:DescribeInstanceInformation'
+                        Resource: '*'
+                - PolicyName: AutoScalingPolicy
+                  PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'autoscaling:DescribeAutoScalingGroups'
+                          - 'autoscaling:DescribeAutoScalingInstances'
+                        Resource: '*'
+                - PolicyName: CloudFormationPolicy
+                  PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'cloudformation:DescribeStacks'
+                        Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${BackendStackName}/*'
+
+          # Lambda function code as an inline script
+          VerificationLambdaFunction:
+            Type: AWS::Lambda::Function
+            Properties:
+              FunctionName: !Sub "${EnvironmentName}-financial-news-verify"
+              Handler: index.lambda_handler
+              Role: !GetAtt VerificationLambdaRole.Arn
+              Code:
+                ZipFile: |
+                  import boto3
+                  import json
+                  import os
+                  import logging
+                  import time
+                  
+                  # Set up logging
+                  logger = logging.getLogger()
+                  logger.setLevel(logging.INFO)
+                  
+                  # Configure AWS clients
+                  ec2 = boto3.client('ec2')
+                  ssm = boto3.client('ssm')
+                  cloudformation = boto3.client('cloudformation')
+                  
+                  # Environment variables
+                  ENV = os.environ.get('ENVIRONMENT', 'production')
+                  BACKEND_STACK_NAME = os.environ.get('BACKEND_STACK_NAME')
+                  APP_VERSION = os.environ.get('APP_VERSION', '1.0.0')
+                  
+                  def lambda_handler(event, context):
+                      """
+                      Lambda function to check all EC2 instances in the financial-news ASG
+                      and run verification script on each one
+                      """
+                      logger.info(f"Starting verification of Financial News Engine instances (version {APP_VERSION})")
+                      
+                      try:
+                          # Get Auto Scaling Group name from CloudFormation outputs
+                          asg_name = None
+                          if BACKEND_STACK_NAME:
+                              response = cloudformation.describe_stacks(StackName=BACKEND_STACK_NAME)
+                              for output in response['Stacks'][0]['Outputs']:
+                                  if output['OutputKey'] == 'BackendAutoScalingGroupName':
+                                      asg_name = output['OutputValue']
+                                      break
+                          
+                          # Find all instances with the financial-news tag or in the ASG
+                          filters = [
+                              {
+                                  'Name': 'instance-state-name',
+                                  'Values': ['running']
+                              }
+                          ]
+                          
+                          instance_ids = []
+                          
+                          if asg_name:
+                              logger.info(f"Looking for instances in ASG: {asg_name}")
+                              # Get instances from the ASG
+                              autoscaling = boto3.client('autoscaling')
+                              asg_response = autoscaling.describe_auto_scaling_groups(
+                                  AutoScalingGroupNames=[asg_name]
+                              )
+                              
+                              if asg_response['AutoScalingGroups']:
+                                  instance_ids = [i['InstanceId'] for i in asg_response['AutoScalingGroups'][0]['Instances']]
+                          
+                          # If no instances found in ASG or no ASG name, use tag-based search as fallback
+                          if not instance_ids:
+                              logger.info("No instances found in ASG, using tag-based search")
+                              filters.append({
+                                  'Name': 'tag:Application',
+                                  'Values': ['financial-news-engine']
+                              })
+                              response = ec2.describe_instances(Filters=filters)
+                              for reservation in response['Reservations']:
+                                  for instance in reservation['Instances']:
+                                      instance_ids.append(instance['InstanceId'])
+                          
+                          if not instance_ids:
+                              logger.info("No Financial News Engine instances found")
+                              return {
+                                  'statusCode': 200,
+                                  'body': json.dumps('No instances found to verify')
+                              }
+                          
+                          logger.info(f"Found {len(instance_ids)} instances to verify: {', '.join(instance_ids)}")
+                          
+                          # Run the verification script on each instance using SSM Run Command
+                          ssm_response = ssm.send_command(
+                              InstanceIds=instance_ids,
+                              DocumentName='AWS-RunShellScript',
+                              Parameters={
+                                  'commands': [
+                                      'cd /opt/financial-news-engine',
+                                      f'APP_VERSION={APP_VERSION} bash ./deploy_scripts/verify_deployment.sh'
+                                  ]
+                              },
+                              Comment=f'Running Financial News Engine verification script for version {APP_VERSION}'
+                          )
+                          
+                          command_id = ssm_response['Command']['CommandId']
+                          logger.info(f"Started SSM Command {command_id}")
+                          
+                          # Wait a bit for the command to start execution
+                          time.sleep(5)
+                          
+                          # Check command status
+                          status_response = ssm.list_command_invocations(
+                              CommandId=command_id,
+                              Details=True
+                          )
+                          
+                          return {
+                              'statusCode': 200,
+                              'body': json.dumps(f"Verification started on {len(instance_ids)} instances with command ID {command_id}")
+                          }
+                      
+                      except Exception as e:
+                          logger.error(f"Error during verification: {str(e)}")
+                          return {
+                              'statusCode': 500,
+                              'body': json.dumps(f"Error: {str(e)}")
+                          }
+              Runtime: python3.9
+              Timeout: 300
+              MemorySize: 128
+              Environment:
+                Variables:
+                  ENVIRONMENT: !Ref EnvironmentName
+                  BACKEND_STACK_NAME: !Ref BackendStackName
+                  APP_VERSION: !Ref ApplicationVersion
+
+          # EventBridge rule to trigger the verification Lambda on a schedule
+          VerificationScheduleRule:
+            Type: AWS::Events::Rule
+            Properties:
+              Name: !Sub "${EnvironmentName}-financial-news-verify-schedule"
+              Description: "Schedule to run verification of Financial News Engine instances"
+              ScheduleExpression: !Ref ScheduleExpression
+              State: ENABLED
+              Targets:
+                - Arn: !GetAtt VerificationLambdaFunction.Arn
+                  Id: "VerificationLambdaTarget"
+
+          # Permission for EventBridge to invoke the Lambda function
+          VerificationLambdaPermission:
+            Type: AWS::Lambda::Permission
+            Properties:
+              FunctionName: !Ref VerificationLambdaFunction
+              Action: "lambda:InvokeFunction"
+              Principal: "events.amazonaws.com"
+              SourceArn: !GetAtt VerificationScheduleRule.Arn
+
+        Outputs:
+          VerificationLambdaFunction:
+            Description: "Lambda function that verifies Financial News Engine deployments"
+            Value: !Ref VerificationLambdaFunction
+          
+          VerificationScheduleRule:
+            Description: "EventBridge rule that triggers verification on a schedule"
+            Value: !Ref VerificationScheduleRule
+        EOF
+  
+  build:
+    commands:
+      - echo "Creating API configuration YAML with verification scripts"
+      - echo "---" > backend-api.yaml
+      - echo "# Financial News Engine API Configuration" >> backend-api.yaml
+      - echo "# Version: $APP_VERSION" >> backend-api.yaml
+      - echo "app_code: |" >> backend-api.yaml
+      - sed 's/^/  /' api/deploy/app.py >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "requirements: |" >> backend-api.yaml
+      - sed 's/^/  /' api/deploy/requirements.txt >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "service_definition: |" >> backend-api.yaml
+      - echo "[Unit]" | sed 's/^/  /' >> backend-api.yaml
+      - echo "Description=Financial News API Service" | sed 's/^/  /' >> backend-api.yaml
+      - echo "After=network.target" | sed 's/^/  /' >> backend-api.yaml
+      - echo "" | sed 's/^/  /' >> backend-api.yaml
+      - echo "[Service]" | sed 's/^/  /' >> backend-api.yaml
+      - echo "Type=simple" | sed 's/^/  /' >> backend-api.yaml
+      - echo "User=ubuntu" | sed 's/^/  /' >> backend-api.yaml
+      - echo "WorkingDirectory=/opt/financial-news-engine" | sed 's/^/  /' >> backend-api.yaml
+      - echo "Environment=PYTHONUNBUFFERED=1" | sed 's/^/  /' >> backend-api.yaml
+      - echo "Environment=APP_VERSION=$APP_VERSION" | sed 's/^/  /' >> backend-api.yaml
+      - echo "ExecStart=/usr/bin/python3 /opt/financial-news-engine/app.py" | sed 's/^/  /' >> backend-api.yaml
+      - echo "Restart=on-failure" | sed 's/^/  /' >> backend-api.yaml
+      - echo "RestartSec=5" | sed 's/^/  /' >> backend-api.yaml
+      - echo "StandardOutput=append:/opt/financial-news-engine/logs/backend.log" | sed 's/^/  /' >> backend-api.yaml
+      - echo "StandardError=append:/opt/financial-news-engine/logs/backend.log" | sed 's/^/  /' >> backend-api.yaml
+      - echo "SyslogIdentifier=financial-news" | sed 's/^/  /' >> backend-api.yaml
+      - echo "" | sed 's/^/  /' >> backend-api.yaml
+      - echo "[Install]" | sed 's/^/  /' >> backend-api.yaml
+      - echo "WantedBy=multi-user.target" | sed 's/^/  /' >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "verification_script: |" >> backend-api.yaml
+      - sed 's/^/  /' api/deploy/api-scripts/verify_deployment.sh >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "instance_refresh_script: |" >> backend-api.yaml
+      - sed 's/^/  /' api/deploy/api-scripts/instance_refresh.sh >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "make_scripts_executable_script: |" >> backend-api.yaml
+      - sed 's/^/  /' api/deploy/api-scripts/make_scripts_executable.sh >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "create_env_file_script: |" >> backend-api.yaml
+      - sed 's/^/  /' api/deploy/api-scripts/create_env_file.sh >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      - echo "app_version: |" >> backend-api.yaml
+      - echo "  $APP_VERSION" >> backend-api.yaml
+      - echo "" >> backend-api.yaml
+      
+      - echo "Uploading API code to S3"
+      - aws s3 cp backend-api.yaml s3://$ASSETS_BUCKET_NAME/api/backend-api.yaml
+      - aws s3 cp api/deploy/verification/verification-resources.yaml s3://$ASSETS_BUCKET_NAME/api/verification-resources.yaml
+      
+      # Deploy the verification CloudFormation stack
+      - |
+        echo "Deploying verification CloudFormation stack"
+        VERIFICATION_STACK_NAME="${ENVIRONMENT:-production}-financial-news-verification"
+        # Check if the stack already exists
+        if aws cloudformation describe-stacks --stack-name $VERIFICATION_STACK_NAME 2>&1 | grep -q "Stack with id $VERIFICATION_STACK_NAME does not exist"; then
+          echo "Creating new verification stack: $VERIFICATION_STACK_NAME"
+          aws cloudformation create-stack \
+            --stack-name $VERIFICATION_STACK_NAME \
+            --template-url https://s3.amazonaws.com/$ASSETS_BUCKET_NAME/api/verification-resources.yaml \
+            --parameters \
+              ParameterKey=EnvironmentName,ParameterValue=${ENVIRONMENT:-production} \
+              ParameterKey=BackendStackName,ParameterValue=$BACKEND_STACK_NAME \
+              ParameterKey=ApplicationVersion,ParameterValue=$APP_VERSION \
+            --capabilities CAPABILITY_IAM
+        else
+          echo "Updating existing verification stack: $VERIFICATION_STACK_NAME"
+          aws cloudformation update-stack \
+            --stack-name $VERIFICATION_STACK_NAME \
+            --template-url https://s3.amazonaws.com/$ASSETS_BUCKET_NAME/api/verification-resources.yaml \
+            --parameters \
+              ParameterKey=EnvironmentName,ParameterValue=${ENVIRONMENT:-production} \
+              ParameterKey=BackendStackName,ParameterValue=$BACKEND_STACK_NAME \
+              ParameterKey=ApplicationVersion,ParameterValue=$APP_VERSION \
+            --capabilities CAPABILITY_IAM \
+            || echo "No updates to be performed or an error occurred"
+        fi
+      
+      - echo "Starting ASG instance refresh"
+      - "ASG_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query \"Stacks[0].Outputs[?OutputKey=='BackendAutoScalingGroupName'].OutputValue\" --output text)"
+      
+      - |
+        if [ -n "$ASG_NAME" ]; then
+          echo "Found Auto Scaling Group: $ASG_NAME"
+          
+          # Check for existing instance refresh
+          ONGOING_REFRESH=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name $ASG_NAME \
+            --query "InstanceRefreshes[?Status=='Pending' || Status=='InProgress'].InstanceRefreshId" \
+            --output text)
+            
+          if [ -n "$ONGOING_REFRESH" ]; then
+            echo "There is already an ongoing instance refresh ($ONGOING_REFRESH). Cancelling it before starting a new one."
+            aws autoscaling cancel-instance-refresh --auto-scaling-group-name $ASG_NAME
+            sleep 10  # Wait for cancellation to take effect
+          fi
+          
+          # Start a new instance refresh
+          echo "Starting instance refresh for Auto Scaling Group $ASG_NAME"
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name $ASG_NAME \
+            --preferences "MinHealthyPercentage=90,InstanceWarmup=300" \
+            --query "InstanceRefreshId" \
+            --output text)
+            
+          echo "Instance refresh started with ID: $REFRESH_ID"
+        else
+          echo "Auto Scaling Group not found. Skipping instance refresh."
+        fi
+  
+  post_build:
+    commands:
+      - echo "Deployment completed. Verification system will periodically check all instances."
+      - |
+        if [ -n "$ASG_NAME" ]; then
+          echo "To monitor the instance refresh progress, run:"
+          echo "aws autoscaling describe-instance-refreshes --auto-scaling-group-name $ASG_NAME"
+        fi
+      - echo "To manually check specific instances, use the AWS Systems Manager Run Command to execute the verification script."
+
+artifacts:
+  files:
+    - backend-api.yaml
+    - api/deploy/verification/verification-resources.yaml
+  discard-paths: no 
