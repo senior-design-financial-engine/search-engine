@@ -120,4 +120,65 @@ else
     echo "To check status later, run:"
     echo "aws autoscaling describe-instance-refreshes --region $AWS_REGION --auto-scaling-group-name $ASG_NAME --instance-refresh-ids $REFRESH_ID"
     exit 0
-fi 
+fi
+
+# Ensure all instances in the ASG receive the proper environment setup
+# First, create the SSM command document for environment setup
+ENV_SETUP_DOCUMENT=$(aws ssm create-document \
+    --region $AWS_REGION \
+    --name "FinancialNewsEnvironmentSetup-${DEPLOYMENT_ID:-$(date +%Y%m%d%H%M%S)}" \
+    --document-type "Command" \
+    --content '{
+        "schemaVersion": "2.2",
+        "description": "Financial News Engine environment setup",
+        "parameters": {
+            "Region": {
+                "type": "String",
+                "description": "AWS Region",
+                "default": "'$AWS_REGION'"
+            }
+        },
+        "mainSteps": [
+            {
+                "action": "aws:runShellScript",
+                "name": "setupEnvironment",
+                "inputs": {
+                    "runCommand": [
+                        "#!/bin/bash",
+                        "export AWS_DEFAULT_REGION={{ Region }}",
+                        "INSTALL_DIR=/opt/financial-news-engine",
+                        "LOG_DIR=$INSTALL_DIR/logs",
+                        "mkdir -p $LOG_DIR",
+                        "touch $LOG_DIR/setup.log",
+                        "chmod 666 $LOG_DIR/setup.log",
+                        "echo \"$(date) - Setting up Financial News environment\" | tee -a $LOG_DIR/setup.log",
+                        "# Create basic environment file",
+                        "cat > $INSTALL_DIR/.env << EOL",
+                        "# Environment variables for Financial News Engine",
+                        "AWS_REGION={{ Region }}",
+                        "AWS_DEFAULT_REGION={{ Region }}",
+                        "ELASTICSEARCH_URL=http://localhost:9200",
+                        "ELASTICSEARCH_ENDPOINT=http://localhost:9200",
+                        "ELASTICSEARCH_API_KEY=default-dev-key",
+                        "ELASTICSEARCH_INDEX=financial_news",
+                        "ES_NUMBER_OF_SHARDS=1",
+                        "ES_NUMBER_OF_REPLICAS=0",
+                        "ENVIRONMENT=development",
+                        "CORS_ALLOWED_ORIGINS=\"https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000\"",
+                        "APP_VERSION=\"1.0.0\"",
+                        "EOL",
+                        "chmod 644 $INSTALL_DIR/.env",
+                        "# Create Python package structure",
+                        "for dir in utils es_database api scraper; do",
+                        "  mkdir -p $INSTALL_DIR/$dir",
+                        "  touch $INSTALL_DIR/$dir/__init__.py",
+                        "done",
+                        "# Restart service",
+                        "systemctl restart financial-news || echo \"Service restart failed\"",
+                        "echo \"$(date) - Environment setup completed\" | tee -a $LOG_DIR/setup.log"
+                    ]
+                }
+            }
+        ]
+    }' \
+    --document-format JSON || echo "Could not create document") 

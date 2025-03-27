@@ -325,379 +325,132 @@ Resources:
               DeleteOnTermination: true
               Encrypted: true
         UserData:
-          Fn::Base64: !Sub |
+          Fn::Base64: |
             #!/bin/bash
-            # Log to a file
-            exec > >(tee /var/log/user-data.log) 2>&1
+            # Environment setup script for Financial News EC2 instances
             
-            echo "Starting backend initialization..."
-            # Create a status file to track progress
-            STATUS_FILE="/var/log/backend-init-status.txt"
-            echo "STARTED" > $STATUS_FILE
+            # Set environment variables
+            AWS_DEFAULT_REGION=${AWS::Region}
+            INSTALL_DIR="/opt/financial-news-engine"
+            LOG_DIR="$INSTALL_DIR/logs"
             
-            # Update system packages
-            apt-get update && apt-get install -y python3-pip awscli python3-dev git jq curl wget xfsprogs nvme-cli
+            # Create application directory structure
+            mkdir -p $INSTALL_DIR
+            mkdir -p $LOG_DIR
+            mkdir -p $INSTALL_DIR/deploy_scripts
+            mkdir -p $INSTALL_DIR/utils
             
-            # Install CloudFormation helper scripts
-            pip3 install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-py3-latest.tar.gz
-            ln -s /usr/local/init/ubuntu/cfn-hup /etc/init.d/cfn-hup
+            # Create log file with proper permissions
+            touch $LOG_DIR/init.log
+            chmod 666 $LOG_DIR/init.log
             
-            # Mount dedicated volume
-            echo "Setting up dedicated volume for /opt/financial-news-engine"
-            DEVICE_NAME="/dev/nvme1n1"  # AWS NVMe naming for /dev/sdf
-            if [ -e $DEVICE_NAME ]; then
-              echo "Device found at $DEVICE_NAME"
-              mkfs -t ext4 $DEVICE_NAME
-              mkdir -p /opt/financial-news-engine
-              echo "$DEVICE_NAME /opt/financial-news-engine ext4 defaults,nofail 0 2" >> /etc/fstab
-              mount /opt/financial-news-engine
-            else
-              echo "WARNING: Device $DEVICE_NAME not found. Falling back to root volume."
-              mkdir -p /opt/financial-news-engine
-            fi
+            echo "$(date) - Starting EC2 initialization" >> $LOG_DIR/init.log
             
-            chmod 755 /opt/financial-news-engine
-            
-            # Create necessary directories
-            mkdir -p /opt/financial-news-engine/logs
-            mkdir -p /opt/financial-news-engine/deploy_scripts
-            
-            # Create scripts directly instead of downloading from S3
-            cat > /opt/financial-news-engine/deploy_scripts/create_env_file.sh << 'EOF'
-            #!/bin/bash
-            
-            # Script to create environment file for the financial news engine
-            ENV_FILE="/opt/financial-news-engine/.env"
-            
-            # Fetch parameters from AWS SSM Parameter Store
-            fetch_param() {
-              aws ssm get-parameter --name "$1" --with-decryption --query "Parameter.Value" --output text
-            }
-            
-            # Create env file
-            echo "Creating environment file at $ENV_FILE"
-            
-            cat > $ENV_FILE << EOL
+            # Create basic environment file with AWS region
+            cat > $INSTALL_DIR/.env << EOL
             # Environment variables for Financial News Engine
-            ELASTICSEARCH_ENDPOINT=$(fetch_param "/financial-news/elasticsearch/endpoint")
-            ELASTICSEARCH_API_KEY=$(fetch_param "/financial-news/elasticsearch/api_key")
-            ELASTICSEARCH_INDEX=$(fetch_param "/financial-news/elasticsearch/index")
-            ES_NUMBER_OF_SHARDS=$(fetch_param "/financial-news/elasticsearch/shards")
-            ES_NUMBER_OF_REPLICAS=$(fetch_param "/financial-news/elasticsearch/replicas")
-            ENVIRONMENT=$(fetch_param "/financial-news/environment")
-            CORS_ALLOWED_ORIGINS="${CorsAllowedOrigins}"
+            AWS_REGION=${AWS::Region}
+            AWS_DEFAULT_REGION=${AWS::Region}
+            ELASTICSEARCH_URL=http://localhost:9200
+            ELASTICSEARCH_ENDPOINT=http://localhost:9200
+            ELASTICSEARCH_API_KEY=default-dev-key
+            ELASTICSEARCH_INDEX=financial_news
+            ES_NUMBER_OF_SHARDS=1
+            ES_NUMBER_OF_REPLICAS=0
+            ENVIRONMENT=development
+            CORS_ALLOWED_ORIGINS="https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
+            APP_VERSION="1.0.0"
             EOL
             
-            echo "Environment file created successfully."
-            EOF
+            # Set proper permissions
+            chmod 644 $INSTALL_DIR/.env
             
-            cat > /opt/financial-news-engine/deploy_scripts/lifecycle_handler.sh << 'EOF'
+            # Create empty __init__.py files in Python directories
+            touch $INSTALL_DIR/utils/__init__.py
+            mkdir -p $INSTALL_DIR/es_database
+            touch $INSTALL_DIR/es_database/__init__.py
+            
+            # Create a simple system start script
+            cat > $INSTALL_DIR/deploy_scripts/fix_environment.sh << 'EOL'
             #!/bin/bash
-            
-            # This script handles AWS Auto Scaling lifecycle hooks
-            
-            INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-            REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-            
-            # Get lifecycle action token and name
-            TOKEN=$(aws autoscaling describe-lifecycle-hooks \
-              --region $REGION \
-              --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances \
-                --instance-ids $INSTANCE_ID \
-                --region $REGION \
-                --query "AutoScalingInstances[0].AutoScalingGroupName" \
-                --output text) \
-              --query "LifecycleHooks[?contains(NotificationMetadata, 'terminating')].NotificationToken | [0]" \
-              --output text)
-            
-            HOOK_NAME=$(aws autoscaling describe-lifecycle-hooks \
-              --region $REGION \
-              --auto-scaling-group-name $(aws autoscaling describe-auto-scaling-instances \
-                --instance-ids $INSTANCE_ID \
-                --region $REGION \
-                --query "AutoScalingInstances[0].AutoScalingGroupName" \
-                --output text) \
-              --query "LifecycleHooks[?contains(NotificationMetadata, 'terminating')].LifecycleHookName | [0]" \
-              --output text)
-            
-            # Perform any cleanup necessary before termination
-            echo "Performing cleanup before termination..."
-            
-            # Stop application gracefully
-            systemctl stop financial-news.service
-            
-            # Flush logs
-            sync
-            
-            # Complete lifecycle action if token and hook name are available
-            if [ ! -z "$TOKEN" ] && [ ! -z "$HOOK_NAME" ]; then
-              ASG_NAME=$(aws autoscaling describe-auto-scaling-instances \
-                --instance-ids $INSTANCE_ID \
-                --region $REGION \
-                --query "AutoScalingInstances[0].AutoScalingGroupName" \
-                --output text)
-              
-              aws autoscaling complete-lifecycle-action \
-                --lifecycle-hook-name $HOOK_NAME \
-                --auto-scaling-group-name $ASG_NAME \
-                --lifecycle-action-token $TOKEN \
-                --lifecycle-action-result CONTINUE \
-                --region $REGION
-              
-              echo "Lifecycle action completed."
-            else
-              echo "Could not find lifecycle token or hook name."
-            fi
-            EOF
-            
-            # Make scripts executable
-            chmod +x /opt/financial-news-engine/deploy_scripts/*.sh
-            
-            # Run the environment file creator script
-            /opt/financial-news-engine/deploy_scripts/create_env_file.sh
-            
-            # Create Flask application code directly
-            cat > /opt/financial-news-engine/app.py << 'EOF'
-            from flask import Flask, jsonify, request, Response
-            import os
-            import json
-            import logging
-            from flask_cors import CORS
-            import elasticsearch
-            import requests
+            # Script to fix common environment issues on startup
+            INSTALL_DIR="/opt/financial-news-engine"
+            LOG_FILE="${INSTALL_DIR}/logs/environment_fix.log"
             
             # Ensure log directory exists
-            os.makedirs("/opt/financial-news-engine/logs", exist_ok=True)
+            mkdir -p "${INSTALL_DIR}/logs"
+            touch $LOG_FILE
+            chmod 666 $LOG_FILE
             
-            # Configure logging
-            logging.basicConfig(
-                level=logging.INFO,
-                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                handlers=[
-                    logging.FileHandler("/opt/financial-news-engine/logs/app.log"),
-                    logging.StreamHandler()
-                ]
-            )
-            logger = logging.getLogger(__name__)
+            echo "$(date) - Running environment fix script" | tee -a $LOG_FILE
             
-            # Initialize Flask app
-            app = Flask(__name__)
+            # Check for Python package structure
+            for dir in utils es_database api scraper; do
+              if [ -d "${INSTALL_DIR}/${dir}" ] && [ ! -f "${INSTALL_DIR}/${dir}/__init__.py" ]; then
+                echo "Creating missing __init__.py in ${dir} directory" | tee -a $LOG_FILE
+                touch "${INSTALL_DIR}/${dir}/__init__.py"
+              elif [ ! -d "${INSTALL_DIR}/${dir}" ]; then
+                echo "Creating ${dir} directory with __init__.py" | tee -a $LOG_FILE
+                mkdir -p "${INSTALL_DIR}/${dir}"
+                touch "${INSTALL_DIR}/${dir}/__init__.py"
+              fi
+            done
             
-            # Configure CORS
-            cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
-            CORS(app, resources={r"/*": {"origins": cors_origins}})
+            # Add current directory to Python path in app.py if not already there
+            if [ -f "${INSTALL_DIR}/app.py" ] && ! grep -q "sys.path.insert" "${INSTALL_DIR}/app.py"; then
+              echo "Adding current directory to Python path in app.py" | tee -a $LOG_FILE
+              sed -i '5i\
+            import sys\
+            current_dir = os.path.dirname(os.path.abspath(__file__))\
+            if current_dir not in sys.path:\
+                sys.path.insert(0, current_dir)' "${INSTALL_DIR}/app.py"
+            fi
             
-            # Elasticsearch configuration
-            ES_ENDPOINT = os.environ.get('ELASTICSEARCH_ENDPOINT')
-            ES_API_KEY = os.environ.get('ELASTICSEARCH_API_KEY')
-            ES_INDEX = os.environ.get('ELASTICSEARCH_INDEX', 'financial_news')
+            # Restart service if it's in a failed state
+            if systemctl is-active --quiet financial-news; then
+              echo "Service is already running." | tee -a $LOG_FILE
+            else
+              echo "Service is not running. Attempting to restart." | tee -a $LOG_FILE
+              systemctl restart financial-news
+              
+              # Check if service started successfully
+              sleep 5
+              if systemctl is-active --quiet financial-news; then
+                echo "Service restarted successfully." | tee -a $LOG_FILE
+              else
+                echo "Service failed to restart. See service logs for details." | tee -a $LOG_FILE
+              fi
+            fi
             
-            # Initialize Elasticsearch client
-            try:
-                es_client = elasticsearch.Elasticsearch(
-                    [ES_ENDPOINT],
-                    api_key=ES_API_KEY,
-                    use_ssl=True,
-                    verify_certs=True,
-                    connection_class=elasticsearch.connection.RequestsHttpConnection
-                )
-                logger.info(f"Connected to Elasticsearch at {ES_ENDPOINT}")
-            except Exception as e:
-                logger.error(f"Failed to connect to Elasticsearch: {str(e)}")
-                es_client = None
+            echo "Environment fix completed at $(date)" | tee -a $LOG_FILE
+            exit 0
+            EOL
             
-            @app.route('/health')
-            def health():
-                """Health check endpoint"""
-                es_status = "connected" if es_client and es_client.ping() else "disconnected"
-                return jsonify({
-                    "status": "healthy",
-                    "elasticsearch": es_status
-                })
+            # Make the fix script executable
+            chmod +x $INSTALL_DIR/deploy_scripts/fix_environment.sh
             
-            @app.route('/api/search', methods=['GET'])
-            def search():
-                """Search endpoint for financial news"""
-                query = request.args.get('q', '')
-                size = int(request.args.get('size', 10))
-                page = int(request.args.get('page', 1))
-                from_val = (page - 1) * size
-                
-                if not query:
-                    return jsonify({"error": "Query parameter 'q' is required"}), 400
-                
-                if not es_client:
-                    return jsonify({"error": "Elasticsearch connection not available"}), 503
-                
-                try:
-                    search_query = {
-                        "query": {
-                            "multi_match": {
-                                "query": query,
-                                "fields": ["title^3", "summary^2", "content", "author", "source"],
-                                "fuzziness": "AUTO"
-                            }
-                        },
-                        "highlight": {
-                            "fields": {
-                                "title": {},
-                                "summary": {},
-                                "content": {}
-                            },
-                            "pre_tags": ["<strong>"],
-                            "post_tags": ["</strong>"]
-                        },
-                        "from": from_val,
-                        "size": size
-                    }
-                    
-                    results = es_client.search(index=ES_INDEX, body=search_query)
-                    
-                    # Transform results
-                    total = results['hits']['total']['value']
-                    hits = []
-                    
-                    for hit in results['hits']['hits']:
-                        source = hit['_source']
-                        highlight = hit.get('highlight', {})
-                        
-                        # Get highlighted fields or fall back to original content
-                        title = highlight.get('title', [source.get('title', '')])[0]
-                        summary = highlight.get('summary', [source.get('summary', '')])[0]
-                        
-                        hits.append({
-                            "id": hit['_id'],
-                            "title": title,
-                            "summary": summary,
-                            "author": source.get('author', ''),
-                            "source": source.get('source', ''),
-                            "published_date": source.get('published_date', ''),
-                            "url": source.get('url', ''),
-                            "score": hit['_score']
-                        })
-                    
-                    response = {
-                        "total": total,
-                        "page": page,
-                        "size": size,
-                        "total_pages": (total + size - 1) // size,
-                        "results": hits
-                    }
-                    
-                    return jsonify(response)
-                except Exception as e:
-                    logger.error(f"Error searching Elasticsearch: {str(e)}")
-                    return jsonify({"error": "Search failed", "details": str(e)}), 500
-            
-            @app.route('/api/news/<news_id>', methods=['GET'])
-            def get_news(news_id):
-                """Get specific news article by ID"""
-                if not es_client:
-                    return jsonify({"error": "Elasticsearch connection not available"}), 503
-                
-                try:
-                    result = es_client.get(index=ES_INDEX, id=news_id)
-                    return jsonify(result['_source'])
-                except elasticsearch.NotFoundError:
-                    return jsonify({"error": "News article not found"}), 404
-                except Exception as e:
-                    logger.error(f"Error retrieving news article: {str(e)}")
-                    return jsonify({"error": "Failed to retrieve news article", "details": str(e)}), 500
-            
-            if __name__ == '__main__':
-                app.run(host='0.0.0.0', port=5000)
-            EOF
-            
-            # Create requirements.txt
-            cat > /opt/financial-news-engine/requirements.txt << 'EOF'
-            flask==2.0.1
-            flask-cors==3.0.10
-            elasticsearch==7.14.0
-            gunicorn==20.1.0
-            requests==2.26.0
-            python-dotenv==0.19.0
-            EOF
-            
-            # Create systemd service file
-            cat > /etc/systemd/system/financial-news.service << 'EOF'
+            # Create fix environment service
+            cat > /etc/systemd/system/fix-environment.service << EOL
             [Unit]
-            Description=Financial News API
+            Description=Financial News Environment Fix Service
             After=network.target
             
             [Service]
-            User=root
-            WorkingDirectory=/opt/financial-news-engine
-            EnvironmentFile=/opt/financial-news-engine/.env
-            ExecStart=/usr/local/bin/gunicorn -b 0.0.0.0:5000 app:app
-            Restart=always
-            RestartSec=5
+            Type=oneshot
+            ExecStart=/opt/financial-news-engine/deploy_scripts/fix_environment.sh
+            RemainAfterExit=true
+            StandardOutput=journal
             
             [Install]
             WantedBy=multi-user.target
-            EOF
-            
-            # Install app dependencies
-            cd /opt/financial-news-engine && pip3 install -r requirements.txt
-            
-            # Start and enable service
-            systemctl daemon-reload
-            systemctl enable financial-news.service
-            systemctl start financial-news.service
-            
-            # Install Amazon CloudWatch agent
-            wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -O /tmp/amazon-cloudwatch-agent.deb
-            dpkg -i /tmp/amazon-cloudwatch-agent.deb
-            
-            # Configure CloudWatch agent
-            mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/
-            cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOL'
-            {
-              "agent": {
-                "metrics_collection_interval": 60,
-                "run_as_user": "root"
-              },
-              "logs": {
-                "logs_collected": {
-                  "files": {
-                    "collect_list": [
-                      {
-                        "file_path": "/var/log/syslog",
-                        "log_group_name": "/financial-news/system",
-                        "log_stream_name": "{instance_id}"
-                      },
-                      {
-                        "file_path": "/var/log/user-data.log",
-                        "log_group_name": "/financial-news/initialization",
-                        "log_stream_name": "{instance_id}"
-                      }
-                    ]
-                  }
-                }
-              },
-              "metrics": {
-                "metrics_collected": {
-                  "disk": {
-                    "measurement": ["used_percent"],
-                    "resources": ["/"]
-                  },
-                  "mem": {
-                    "measurement": ["mem_used_percent"]
-                  }
-                }
-              }
-            }
             EOL
             
-            # Start CloudWatch agent
-            systemctl enable amazon-cloudwatch-agent
-            systemctl start amazon-cloudwatch-agent
+            # Reload systemd and enable the fix service
+            systemctl daemon-reload
+            systemctl enable fix-environment.service
+            systemctl start fix-environment.service
             
-            # Final status
-            echo "Initialization completed successfully"
-            echo "COMPLETED" > $STATUS_FILE
-            
-            # Signal completion to CloudFormation
-            /usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource BackendAutoScalingGroup --region ${AWS::Region}
+            echo "$(date) - EC2 initialization completed" >> $LOG_DIR/init.log
 
   # Backend Auto Scaling Group
   BackendAutoScalingGroup:
@@ -861,6 +614,18 @@ Outputs:
   BackendURL:
     Description: URL of the backend API
     Value: !If [HasDomainName, !Sub "https://${BackendDomainName}", !Sub "https://${BackendLoadBalancer.DNSName}"]
+  
+  BackendALBURL:
+    Description: DNS name of the backend Application Load Balancer
+    Value: !GetAtt BackendLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendALBURL"
+  
+  BackendAutoScalingGroupName:
+    Description: Name of the Auto Scaling Group for backend instances
+    Value: !Ref BackendAutoScalingGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendAutoScalingGroupName"
   
   AssetsBucketName:
     Description: S3 bucket name for financial news assets
