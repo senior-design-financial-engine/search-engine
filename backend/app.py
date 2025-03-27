@@ -61,27 +61,39 @@ try:
                 'configured': bool(es_url),
                 'url': es_url.split('@')[-1] if es_url else None  # Hide credentials
             },
-            'environment': os.getenv('ENVIRONMENT', 'development')
+            'environment': os.getenv('ENVIRONMENT', 'development'),
+            'region': os.getenv('AWS_REGION', 'undefined')
         })
     
-    # Initialize main app by importing from backend
+    # Initialize main app by importing backend directly
     try:
         # Import your actual application logic here
         logger.info("Attempting to import main backend application logic")
-        # Import directly from backend.py not from scraper
-        from backend import app as backend_app, backend
+        
+        # Import directly from backend.py - no scraper imports
+        import backend
+        from backend import app as backend_app
         logger.info("Successfully imported backend module")
         
         # Register the backend Flask app routes with this app
-        # Copy over the routes from the backend app
+        # Copy over the routes from the backend app, excluding routes we've already defined
+        registered_routes = 0
         for rule in backend_app.url_map.iter_rules():
             # Skip the health check endpoint we already defined
             if rule.endpoint != 'health_check':
-                endpoint = getattr(backend_app.view_functions, rule.endpoint)
-                app.add_url_rule(rule.rule, rule.endpoint, endpoint, methods=rule.methods)
-                logger.debug(f"Registered route {rule.rule} ({rule.endpoint})")
+                # Get the view function from the backend app
+                view_func = backend_app.view_functions.get(rule.endpoint)
+                if view_func:
+                    app.add_url_rule(rule.rule, rule.endpoint, view_func, methods=rule.methods)
+                    registered_routes += 1
+                    logger.debug(f"Registered route {rule.rule} ({rule.endpoint})")
+        
+        logger.info(f"Successfully registered {registered_routes} routes from the backend module")
+        
     except ImportError as e:
-        logger.warning(f"Could not import backend module, falling back to basic API: {e}")
+        error_trace = traceback.format_exc()
+        logger.warning(f"Could not import backend module, falling back to basic API: {str(e)}")
+        logger.debug(f"Import error traceback: {error_trace}")
         
         # Create a mock API if main logic import fails
         @app.route('/', methods=['GET'])
@@ -89,6 +101,7 @@ try:
             return jsonify({
                 'service': 'Financial News Engine',
                 'status': 'API running in limited mode',
+                'error': str(e),
                 'endpoints': ['/health', '/api/status']
             })
         
@@ -97,14 +110,17 @@ try:
             return jsonify({
                 'status': 'limited',
                 'message': 'API is running in fallback mode with limited functionality',
-                'error': str(e)
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'timestamp': datetime.now().isoformat()
             })
     
     logger.info("Application initialization complete")
     
 except Exception as e:
-    logger.critical(f"Fatal error during application initialization: {e}")
-    logger.critical(traceback.format_exc())
+    error_trace = traceback.format_exc()
+    logger.critical(f"Fatal error during application initialization: {str(e)}")
+    logger.critical(f"Error traceback: {error_trace}")
     
     # Create a minimal Flask app for error reporting
     from flask import Flask, jsonify
@@ -115,7 +131,9 @@ except Exception as e:
         return jsonify({
             'status': 'error',
             'message': 'Application failed to initialize properly',
-            'error': str(e)
+            'error': str(e),
+            'error_type': type(e).__name__,
+            'timestamp': datetime.now().isoformat()
         }), 500
 
 # This is needed for gunicorn to find the app
