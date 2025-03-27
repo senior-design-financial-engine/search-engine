@@ -1,5 +1,9 @@
 """
-Utilities for the search engine backend.
+Utility modules for Financial News Engine
+"""
 
-This package contains various utilities used by the backend service.
-""" 
+# Make key utility modules available at package level
+try:
+    from .env_setup import setup_environment, create_env_file
+except ImportError:
+    pass 
