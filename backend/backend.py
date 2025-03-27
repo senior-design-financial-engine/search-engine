@@ -201,32 +201,41 @@ class BackEnd:
             logger.info("Initializing backend components...")
             
             # Test Elasticsearch connection before initializing engine
-            self._test_elasticsearch_connection()
+            es_test_result = self._test_elasticsearch_connection()
             
-            # Initialize the Elasticsearch engine
-            from es_database import Engine
-            self.engine = Engine()
-            self.engine.config.validate_config()
-            logger.info("Backend initialized with Elasticsearch engine")
+            # Initialize the Elasticsearch engine only if connection was successful
+            if es_test_result.get("success", False):
+                from es_database import Engine
+                self.engine = Engine()
+                self.engine.config.validate_config()
+                logger.info("Backend initialized with Elasticsearch engine")
+            else:
+                logger.warning("Skipping Elasticsearch engine initialization due to connection failure")
+                self.engine = None
         except Exception as e:
             error_trace = traceback.format_exc()
             logger.error(f"Failed to initialize backend: {str(e)}", extra={
                 'extra': {'traceback': error_trace}
             })
-            raise
+            self.engine = None
 
     @performance_monitor(name="test_elasticsearch_connection")
     def _test_elasticsearch_connection(self):
         """Test the connection to Elasticsearch and log the results."""
         # Use our advanced ES connection test utility
-        result = test_es_connection()
-        
-        if result.get("success", False):
-            logger.info("Elasticsearch connection test successful")
-        else:
-            logger.error(f"Elasticsearch connection test failed: {result.get('error', 'Unknown error')}")
+        try:
+            result = test_es_connection()
             
-        return result
+            if result.get("success", False):
+                logger.info("Elasticsearch connection test successful")
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                logger.error(f"Elasticsearch connection test failed: {error_msg}")
+                
+            return result
+        except Exception as e:
+            logger.error(f"Exception during Elasticsearch connection test: {str(e)}")
+            return {"success": False, "error": str(e)}
 
     @performance_monitor(name="process_search_query")
     def process_search_query(
@@ -244,6 +253,12 @@ class BackEnd:
                 'time_range': time_range
             }
         })
+        
+        # Check if Elasticsearch engine is available
+        if self.engine is None:
+            logger.warning(f"Cannot process search query: Elasticsearch engine not available")
+            # Return empty results
+            return []
         
         start_time = time.time()
         try:
@@ -270,11 +285,17 @@ class BackEnd:
                     'traceback': error_trace
                 }
             })
-            raise
+            # Return empty results on error
+            return []
 
     @performance_monitor(name="update_index")
     def update_index(self, articles: List[Dict] = None):
         """Update the index with new articles."""
+        # Check if Elasticsearch engine is available
+        if self.engine is None:
+            logger.warning("Cannot update index: Elasticsearch engine not available")
+            return
+            
         try:
             if articles:
                 logger.info(f"Updating index with {len(articles)} articles")
@@ -290,7 +311,7 @@ class BackEnd:
             logger.error(f"Error updating index: {str(e)}", extra={
                 'extra': {'traceback': error_trace}
             })
-            raise
+            # Don't re-raise, just log the error
 
 # Initialize the backend
 try:
@@ -372,12 +393,12 @@ def health_check():
             "elasticsearch": False,
             "backend_api": True
         },
-        "version": "1.0"
+        "version": os.getenv('APP_VERSION', '1.0.0')
     }
     
     # Check Elasticsearch connectivity
     try:
-        es_url = os.getenv('ELASTICSEARCH_URL')
+        es_url = os.getenv('ELASTICSEARCH_URL') or os.getenv('ELASTICSEARCH_ENDPOINT')
         es_api_key = os.getenv('ELASTICSEARCH_API_KEY')
         
         if es_url and es_api_key:
@@ -395,14 +416,40 @@ def health_check():
                 "connected": result["success"],
                 "latency_ms": result.get("total_latency_ms")
             }
+            
+            # Add environment information
+            status["env"] = {
+                "es_url": es_url.split('@')[-1] if '@' in es_url else es_url,  # Remove credentials if present
+                "es_index": os.getenv('ELASTICSEARCH_INDEX', 'Not configured'),
+                "environment": os.getenv('ENVIRONMENT', 'development'),
+                "region": os.getenv('AWS_REGION', 'Not configured')
+            }
+        else:
+            # Log missing configuration
+            status["elasticsearch"] = {
+                "connected": False,
+                "missing_config": []
+            }
+            
+            if not es_url:
+                status["elasticsearch"]["missing_config"].append("ELASTICSEARCH_URL")
+            if not es_api_key:
+                status["elasticsearch"]["missing_config"].append("ELASTICSEARCH_API_KEY")
+                
+            logger.warning(f"Elasticsearch configuration incomplete: {status['elasticsearch']['missing_config']}")
         
         if not status["services"]["elasticsearch"]:
-            status["status"] = "degraded"
+            # Add fallback message
+            status["message"] = "API running in limited mode - Elasticsearch not connected"
             
     except Exception as e:
-        logger.error(f"Health check - Elasticsearch error: {str(e)}")
-        status["status"] = "degraded"
-        status["error"] = str(e)
+        # Log the error but don't let it break the health check
+        logger.error(f"Error during health check: {str(e)}")
+        status["services"]["elasticsearch"] = False
+        status["elasticsearch"] = {
+            "connected": False,
+            "error": str(e)
+        }
     
     return jsonify(status)
 

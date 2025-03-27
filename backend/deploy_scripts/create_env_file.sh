@@ -3,13 +3,13 @@
 # Script to create environment file for the financial news engine
 ENV_FILE="/opt/financial-news-engine/.env"
 LOG_FILE="/opt/financial-news-engine/logs/env_setup.log"
-AWS_REGION="us-east-1"  # Set default region
+AWS_REGION=${AWS_DEFAULT_REGION:-"us-east-1"}  # Use AWS_DEFAULT_REGION if set, otherwise default to us-east-1
 
 # Ensure log directory exists
 mkdir -p "/opt/financial-news-engine/logs"
 
 echo "$(date) - Starting environment setup" > $LOG_FILE
-echo "Using default AWS region: $AWS_REGION" >> $LOG_FILE
+echo "Initial AWS region: $AWS_REGION" >> $LOG_FILE
 
 # Function to check if AWS CLI is installed and properly configured
 check_aws_cli() {
@@ -33,7 +33,7 @@ fetch_param() {
   
   echo "Fetching parameter: $param_name" >> $LOG_FILE
   
-  # Check if AWS CLI is available
+  # Skip AWS CLI if not available and use defaults
   if ! check_aws_cli; then
     echo "Using default value for $param_name: $default_value" >> $LOG_FILE
     echo "$default_value"
@@ -41,8 +41,9 @@ fetch_param() {
   fi
   
   # Try to fetch the parameter with region explicitly set
-  # Add error handling and explicit region specification
-  value=$(aws ssm get-parameter --region $AWS_REGION --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>> $LOG_FILE)
+  # Add --no-verify-ssl to avoid SSL issues in some environments
+  # Always specify the region parameter
+  value=$(aws ssm get-parameter --region "$AWS_REGION" --name "$param_name" --with-decryption --query "Parameter.Value" --output text --no-verify-ssl 2>> $LOG_FILE)
   
   # Check if the fetch was successful
   if [ $? -ne 0 ] || [ -z "$value" ] || [ "$value" = "None" ]; then
@@ -59,12 +60,12 @@ get_instance_region() {
   echo "Attempting to detect AWS region from instance metadata..." >> $LOG_FILE
   
   if command -v curl &> /dev/null; then
-    # Try to get region from instance metadata
-    local metadata_token=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
+    # Try to get region from instance metadata with timeout to avoid hanging
+    local metadata_token=$(curl -s --connect-timeout 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null)
     
     if [ -n "$metadata_token" ]; then
       echo "Successfully obtained IMDSv2 token" >> $LOG_FILE
-      local region=$(curl -s -H "X-aws-ec2-metadata-token: $metadata_token" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
+      local region=$(curl -s --connect-timeout 2 -H "X-aws-ec2-metadata-token: $metadata_token" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
       
       if [ -n "$region" ]; then
         echo "Detected region from instance metadata: $region" >> $LOG_FILE
@@ -76,8 +77,8 @@ get_instance_region() {
     else
       echo "Failed to obtain IMDSv2 token, trying IMDSv1" >> $LOG_FILE
       
-      # Try IMDSv1 as fallback
-      local region=$(curl -s http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
+      # Try IMDSv1 as fallback with timeout
+      local region=$(curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null)
       
       if [ -n "$region" ]; then
         echo "Detected region from IMDSv1: $region" >> $LOG_FILE
@@ -105,31 +106,28 @@ get_config_region() {
     fi
   fi
   
-  echo "No region found in AWS config, using default: $AWS_REGION" >> $LOG_FILE
+  echo "No region found in AWS config, keeping current region: $AWS_REGION" >> $LOG_FILE
   return 1
 }
 
-# Try multiple methods to determine the region
+# Try multiple methods to determine the region, but always ensure a valid region
 determine_region() {
-  # First try instance metadata
-  if get_instance_region; then
-    return 0
+  # Try instance metadata first
+  get_instance_region || true
+  
+  # Try AWS config file if we still have the default
+  if [ "$AWS_REGION" = "us-east-1" ]; then
+    get_config_region || true
   fi
   
-  # Then try AWS config file
-  if get_config_region; then
-    return 0
-  fi
-  
-  # Finally, use environment variable if set
+  # Finally, check if AWS_DEFAULT_REGION is explicitly set
   if [ -n "$AWS_DEFAULT_REGION" ]; then
     AWS_REGION=$AWS_DEFAULT_REGION
     echo "Using region from AWS_DEFAULT_REGION: $AWS_REGION" >> $LOG_FILE
-    return 0
   fi
   
-  # Keep using the default
-  echo "Using default region: $AWS_REGION" >> $LOG_FILE
+  # Make sure we always have a region defined
+  echo "Final region determination: $AWS_REGION" >> $LOG_FILE
   return 0
 }
 
@@ -161,6 +159,7 @@ ES_NUMBER_OF_SHARDS=$ES_SHARDS
 ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
 ENVIRONMENT=$ENVIRONMENT
 CORS_ALLOWED_ORIGINS="https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
+APP_VERSION="1.0.0"
 EOL
 
 # Set readable permissions for app

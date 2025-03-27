@@ -408,79 +408,132 @@ network_diagnostics = NetworkDiagnostics()
 
 def test_es_connection():
     """Test the connection to Elasticsearch and return detailed results."""
-    es_url = os.getenv('ELASTICSEARCH_URL')
-    es_api_key = os.getenv('ELASTICSEARCH_API_KEY')
+    # Try multiple environment variable patterns for Elasticsearch URL
+    es_url = (os.getenv('ELASTICSEARCH_URL') or 
+              os.getenv('ELASTICSEARCH_ENDPOINT') or 
+              os.getenv('ES_URL') or 
+              os.getenv('ES_ENDPOINT'))
+    
+    es_api_key = (os.getenv('ELASTICSEARCH_API_KEY') or 
+                  os.getenv('ES_API_KEY'))
     
     if not es_url:
+        logger.warning("Elasticsearch URL environment variable is not set")
         return {
             "success": False,
-            "error": "ELASTICSEARCH_URL environment variable is not set"
+            "error": "ELASTICSEARCH_URL environment variable is not set",
+            "timestamp": datetime.utcnow().isoformat(),
+            "environment_checked": ["ELASTICSEARCH_URL", "ELASTICSEARCH_ENDPOINT", "ES_URL", "ES_ENDPOINT"]
         }
         
     if not es_api_key:
+        logger.warning("Elasticsearch API key environment variable is not set")
         return {
             "success": False,
-            "error": "ELASTICSEARCH_API_KEY environment variable is not set"
+            "error": "ELASTICSEARCH_API_KEY environment variable is not set",
+            "timestamp": datetime.utcnow().isoformat(),
+            "environment_checked": ["ELASTICSEARCH_API_KEY", "ES_API_KEY"]
         }
     
-    # Extract hostname for network tests
-    hostname = es_url.split("://")[-1].split("/")[0].split(":")[0]
+    # Validate URL format
+    try:
+        # Extract hostname for network tests
+        if "://" in es_url:
+            hostname = es_url.split("://")[-1].split("/")[0].split(":")[0]
+            if "@" in hostname:
+                # Handle case where credentials are in the URL
+                hostname = hostname.split("@")[-1]
+        else:
+            # Add http:// prefix if missing
+            es_url = f"http://{es_url}"
+            hostname = es_url.split("://")[-1].split("/")[0].split(":")[0]
+            
+        logger.info(f"Testing connection to Elasticsearch at {hostname}")
+    except Exception as e:
+        logger.error(f"Invalid Elasticsearch URL format: {str(e)}")
+        return {
+            "success": False,
+            "error": f"Invalid Elasticsearch URL format: {str(e)}",
+            "url_provided": es_url,
+            "timestamp": datetime.utcnow().isoformat()
+        }
     
-    # Run network diagnostics
-    ping_result = network_diagnostics.ping_host(hostname)
-    
-    # Test HTTP connection
-    headers = {
-        "Authorization": f"ApiKey {es_api_key}",
-        "Content-Type": "application/json"
-    }
-    
-    http_result = network_diagnostics.test_connection(
-        url=es_url,
-        headers=headers
-    )
-    
-    # Test a sample query if connection was successful
-    query_result = None
-    if http_result["success"]:
-        es_index = os.getenv('ELASTICSEARCH_INDEX', 'financial_news')
-        query_url = f"{es_url}/{es_index}/_search"
-        query = {
-            "query": {
-                "match_all": {}
-            },
-            "size": 1
+    try:
+        # Run network diagnostics
+        ping_result = network_diagnostics.ping_host(hostname)
+        
+        # Test HTTP connection
+        headers = {
+            "Authorization": f"ApiKey {es_api_key}",
+            "Content-Type": "application/json"
         }
         
-        query_result = network_diagnostics.test_connection(
-            url=query_url,
-            method="POST",
+        http_result = network_diagnostics.test_connection(
+            url=es_url,
             headers=headers,
-            data=json.dumps(query)
+            timeout=10  # Increase timeout for potentially slow connections
         )
         
-        # Parse sample document if query was successful
-        if query_result["success"] and query_result["status_code"] == 200:
-            try:
-                response_data = json.loads(query_result["response_sample"])
-                hit_count = response_data['hits']['total']['value'] if 'hits' in response_data else 0
-                query_result["hit_count"] = hit_count
-                
-                if hit_count > 0:
-                    sample_doc = response_data['hits']['hits'][0]['_source']
-                    query_result["sample_document_fields"] = list(sample_doc.keys())
-            except Exception as e:
-                query_result["parsing_error"] = str(e)
-    
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "elasticsearch_url": es_url,
-        "success": http_result["success"],
-        "ping": ping_result,
-        "connection": http_result,
-        "query": query_result,
-        "environment": {
-            "elasticsearch_url": es_url,
-            "elasticsearch_index": os.getenv('ELASTICSEARCH_INDEX', 'Not configured')
+        # Test a sample query if connection was successful
+        query_result = None
+        if http_result["success"]:
+            es_index = os.getenv('ELASTICSEARCH_INDEX', 'financial_news')
+            query_url = f"{es_url}/{es_index}/_search"
+            query = {
+                "query": {
+                    "match_all": {}
+                },
+                "size": 1
+            }
+            
+            query_result = network_diagnostics.test_connection(
+                url=query_url,
+                method="POST",
+                headers=headers,
+                data=json.dumps(query),
+                timeout=10
+            )
+            
+            # Parse sample document if query was successful
+            if query_result["success"] and query_result["status_code"] == 200:
+                try:
+                    response_data = json.loads(query_result["response_sample"])
+                    hit_count = response_data['hits']['total']['value'] if 'hits' in response_data else 0
+                    query_result["hit_count"] = hit_count
+                    
+                    if hit_count > 0:
+                        sample_doc = response_data['hits']['hits'][0]['_source']
+                        query_result["sample_document_fields"] = list(sample_doc.keys())
+                except Exception as e:
+                    query_result["parsing_error"] = str(e)
+        
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "elasticsearch_url": es_url.split('@')[-1] if '@' in es_url else es_url,  # Hide credentials
+            "success": http_result["success"],
+            "ping": ping_result,
+            "connection": http_result,
+            "query": query_result,
+            "environment": {
+                "elasticsearch_index": os.getenv('ELASTICSEARCH_INDEX', 'Not configured'),
+                "region": os.getenv('AWS_REGION', 'Not configured'),
+                "environment": os.getenv('ENVIRONMENT', 'development')
+            }
         }
-    } 
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        logger.error(f"Exception during Elasticsearch connection test: {str(e)}")
+        logger.debug(f"Error traceback: {error_trace}")
+        
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "elasticsearch_url": es_url.split('@')[-1] if '@' in es_url else es_url,  # Hide credentials
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "environment": {
+                "elasticsearch_index": os.getenv('ELASTICSEARCH_INDEX', 'Not configured'),
+                "region": os.getenv('AWS_REGION', 'Not configured'),
+                "environment": os.getenv('ENVIRONMENT', 'development')
+            }
+        } 
