@@ -169,40 +169,6 @@ const createClient = (baseURL) => {
 const apiClient = createClient(__config.endpoint);
 const fallbackApiClient = createClient(FALLBACK_ENDPOINT);
 
-// Direct ES query helper (hidden within the implementation)
-const queryElasticsearch = async (body) => {
-	try {
-		const url = `${__config.endpoint}/${__config.idx}/_search`;
-		console.log(`Executing Elasticsearch query to: ${url}`, {
-			endpoint: __config.endpoint,
-			index: __config.idx,
-			query: JSON.stringify(body).substring(0, 200) + '...'
-		});
-		
-		const response = await fetch(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `ApiKey ${__config.apiKey}`
-			},
-			body: JSON.stringify(body)
-		});
-		
-		if (!response.ok) {
-			console.error(`Elasticsearch error ${response.status} for ${url}`);
-			const error = new Error(`Search error: ${response.status}`);
-			error.response = response;
-			throw error;
-		}
-		
-		console.log(`Elasticsearch query to ${url} successful`);
-		return await safeJsonParse(response);
-	} catch (error) {
-		console.error('Elasticsearch query failed:', error);
-		throw error;
-	}
-};
-
 // Format ES results to match API response format
 const formatSearchResults = (esResults) => {
 	if (!esResults || !esResults.hits || !esResults.hits.hits) {
@@ -332,10 +298,27 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				};
 				
 				console.log('ES Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
-				const results = await queryElasticsearch(esQuery);
+				
+				// Use proxy endpoint to avoid CORS issues with direct ES access
+				const proxyEndpoint = FALLBACK_ENDPOINT;
+				const response = await fetch(`${proxyEndpoint}/es-proxy`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `ApiKey ${__config.apiKey}`,
+						'X-ES-Index': __config.idx,
+						'X-ES-Endpoint': __config.endpoint
+					},
+					body: JSON.stringify(esQuery)
+				});
+				
+				if (!response.ok) {
+					throw new Error(`Proxy search failed: ${response.status}`);
+				}
+				
+				const results = await safeJsonParse(response);
 				return { data: formatSearchResults(results) };
 			} else {
-				// Fallback to standard API approach if no ES endpoint configured
 				console.log('ES endpoint not properly configured, using fallback', __config.endpoint);
 				throw new Error('ES endpoint not configured, using fallback');
 			}
@@ -402,14 +385,16 @@ export const getArticleById = async (id) => {
 		try {
 			// Direct ES document retrieval
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
-				const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
-				console.log(`Retrieving article by ID from: ${url}`);
+				const url = `${FALLBACK_ENDPOINT}/es-proxy/${id}`;
+				console.log(`Retrieving article by ID using proxy: ${url}`);
 				
 				const response = await fetch(url, {
 					method: 'GET',
 					headers: {
 						'Content-Type': 'application/json',
-						'Authorization': `ApiKey ${__config.apiKey}`
+						'Authorization': `ApiKey ${__config.apiKey}`,
+						'X-ES-Index': __config.idx,
+						'X-ES-Endpoint': __config.endpoint
 					}
 				});
 				
