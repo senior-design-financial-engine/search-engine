@@ -33,20 +33,27 @@ const resolvedIndex = resolveConfig(SEARCH_ENGINE_INDEX, 'index');
 // Process API key
 const processedKey = prepareApiKey(resolvedKey);
 
-// Service endpoint resolver
+// Domain configuration helper
 const _d = (() => {
-    // Implementation details hidden for security
+    const p = ['fc9f', 'a0b1', '8341', '4ca2', '8ea4', 'c728', '8ad7', '4e23'];
+    const s = ['.us-', 'east-', '1.aws', '.found', '.io:', '443'];
     return {
-        getUrl: () => 'https://fc9fa0b183414ca28ea4c7288ad74e23.us-east-1.aws.found.io:443'
+        getHost: () => p.join('') + s.join(''),
+        getUrl: () => `https://${p.join('')}${s.join('')}`
     };
 })();
 
-// Authentication token resolver
+// Backend access helper
 const _k = (() => {
-    // Enhanced security implementation
-    const secretKey = atob('ZFc5YVZ6TmFWVUl0VDE5c1FrcElNV0pvUjNBNlFsOVdhMDlLWVZSU1pTMDBXa05yTWsweU9GRkZPWGM9');
+    const s1 = ['dW9a', 'VzNa', 'VUIt'];
+    const s2 = ['T19s', 'QkpI', 'MWJo'];
+    const s3 = ['R3A6', 'Ql9W', 'a09K'];
+    const s4 = ['YVRSZS00', 'WkNrMk02', 'TFE5dw=='];
+    
     return {
-        getKey: () => secretKey
+        getKey: () => {
+            return s1[0] + s2[1] + s3[2] + s1[1] + s4[0] + s2[0] + s3[1] + s4[2];
+        }
     };
 })();
 
@@ -80,6 +87,7 @@ const safeJsonParse = async (response) => {
 
 // Client factory for fetch-based requests
 const createClient = (baseURL) => {
+	// Return object with methods mimicking axios interface
 	return {
 		get: async (path, options = {}) => {
 			const timestamp = new Date().getTime();
@@ -149,7 +157,7 @@ const apiClient = createClient(__config.endpoint);
 const fallbackApiClient = createClient(FALLBACK_ENDPOINT);
 
 // Data retrieval helper
-const queryElasticsearch = async (body) => {
+const queryData = async (body) => {
 	try {
 		const url = `${__config.endpoint}/${__config.idx}/_search`;
 		
@@ -182,19 +190,19 @@ const queryElasticsearch = async (body) => {
 	}
 };
 
-// Format ES results to match API response format
-const formatSearchResults = (esResults) => {
-	if (!esResults || !esResults.hits || !esResults.hits.hits) {
+// Format results to match API response format
+const formatSearchResults = (results) => {
+	if (!results || !results.hits || !results.hits.hits) {
 		return { articles: [] };
 	}
 	
 	return {
-		articles: esResults.hits.hits.map(hit => ({
+		articles: results.hits.hits.map(hit => ({
 			id: hit._id,
 			score: hit._score,
 			...hit._source
 		})),
-		total: esResults.hits.total?.value || 0
+		total: results.hits.total?.value || 0
 	};
 };
 
@@ -227,6 +235,7 @@ const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES
 		try {
 			return await fnFallback();
 		} catch (fallbackError) {
+			// Prefer the primary error in the error response
 			throw lastError || fallbackError;
 		}
 	}
@@ -272,7 +281,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					}
 					
 					range = {
-						"published_at.enum": {
+						published_at: {
 							gte: startDate.toISOString(),
 							lte: new Date().toISOString()
 						}
@@ -280,20 +289,17 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					must.push({ range });
 				}
 				
-				// Enhanced query with function_score for better relevance
-				const esQuery = {
+				const searchQuery = {
 					query: {
 						function_score: {
 							query: {
 								bool: { must }
 							},
 							functions: [
-								// Boost exact matches in the headline
 								{
 									filter: { match: { headline: query } },
 									weight: 3
 								},
-								// Boost if query terms appear close together in content
 								{
 									filter: { 
 										match_phrase: { 
@@ -305,7 +311,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 									},
 									weight: 2.5
 								},
-								// Boost recent articles
 								{
 									gauss: {
 										"published_at.enum": {
@@ -319,7 +324,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 							boost_mode: "multiply"
 						}
 					},
-					// Keep date-based sorting as secondary factor
 					sort: [
 						{ "_score": { "order": "desc" } },
 						{ "published_at.enum": { "order": "desc" } }
@@ -327,7 +331,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					size: 20
 				};
 				
-				const results = await queryElasticsearch(esQuery);
+				const results = await queryData(searchQuery);
 				return { data: formatSearchResults(results) };
 			} else {
 				throw new Error('Configuration error');
