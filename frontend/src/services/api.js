@@ -178,14 +178,60 @@ const queryElasticsearch = async (body) => {
 			requestPayload: JSON.stringify(body).substring(0, 200) + '...'
 		});
 		
-		const response = await fetch(url, {
+		// Try with different auth header formats to debug the 401 issue
+		const authHeaders = [
+			{ format: 'ApiKey', header: `ApiKey ${__config.apiKey}` },
+			{ format: 'Basic', header: `Basic ${__config.apiKey}` },
+			{ format: 'Raw', header: `${__config.apiKey}` }
+		];
+		
+		// Log auth information for debugging (without revealing full key)
+		if (__config.apiKey) {
+			console.log(`Auth key details:`, {
+				length: __config.apiKey.length,
+				startsWithB64: __config.apiKey.startsWith('Yj'),
+				format: 'will try multiple formats'
+			});
+		} else {
+			console.log('Warning: Missing API key');
+		}
+		
+		// First attempt with ApiKey
+		console.log(`Sending request with auth format: ${authHeaders[0].format}`);
+		let response = await fetch(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Authorization': `ApiKey ${__config.apiKey}`
+				'Authorization': authHeaders[0].header
 			},
 			body: JSON.stringify(body)
 		});
+		
+		// If first attempt fails with 401, try Basic auth
+		if (response.status === 401) {
+			console.log(`First auth format failed with 401, trying alternate format: ${authHeaders[1].format}`);
+			response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': authHeaders[1].header
+				},
+				body: JSON.stringify(body)
+			});
+			
+			// If second attempt fails with 401, try Raw auth
+			if (response.status === 401) {
+				console.log(`Second auth format failed with 401, trying final format: ${authHeaders[2].format}`);
+				response = await fetch(url, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': authHeaders[2].header
+					},
+					body: JSON.stringify(body)
+				});
+			}
+		}
 		
 		console.log(`Response status: ${response.status}, ok: ${response.ok}`);
 		
@@ -409,21 +455,61 @@ export const getArticleById = async (id) => {
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
 				const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
 				console.log(`Retrieving article by ID`);
+
+				// Try with different auth header formats to debug the 401 issue
+				const authHeaders = [
+					{ format: 'ApiKey', header: `ApiKey ${__config.apiKey}` },
+					{ format: 'Basic', header: `Basic ${__config.apiKey}` },
+					{ format: 'Raw', header: `${__config.apiKey}` }
+				];
 				
-				const response = await fetch(url, {
+				// Log auth attempt without revealing sensitive details
+				console.log(`Auth attempt for retrieval`, {
+					keyLength: __config.apiKey ? __config.apiKey.length : 0,
+					strategy: 'multiple formats'
+				});
+				
+				// First attempt with ApiKey
+				console.log(`Sending request with auth format: ${authHeaders[0].format}`);
+				let response = await fetch(url, {
 					method: 'GET',
 					headers: {
 						'Content-Type': 'application/json',
-						'Authorization': `ApiKey ${__config.apiKey}`
+						'Authorization': authHeaders[0].header
 					}
 				});
+				
+				// If first attempt fails with 401, try Basic auth
+				if (response.status === 401) {
+					console.log(`First auth format failed with 401, trying alternate format: ${authHeaders[1].format}`);
+					response = await fetch(url, {
+						method: 'GET',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': authHeaders[1].header
+						}
+					});
+				}
+				
+				// If second attempt fails with 401, try Raw auth
+				if (response.status === 401) {
+					console.log(`Second auth format failed with 401, trying final format: ${authHeaders[2].format}`);
+					response = await fetch(url, {
+						method: 'GET',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': authHeaders[2].header
+						}
+					});
+				}
 				
 				console.log(`Response status: ${response.status}, ok: ${response.ok}`);
 				
 				if (!response.ok) {
 					const responseText = await response.text();
 					console.error(`Retrieval failed with status: ${response.status}`, {
-						statusText: response.statusText
+						statusText: response.statusText,
+						responseBody: responseText ? responseText.substring(0, 500) : 'empty response'
 					});
 					throw new Error(`Article retrieval failed: ${response.status}`);
 				}
