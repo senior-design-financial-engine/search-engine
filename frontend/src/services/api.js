@@ -2,7 +2,11 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Runtime configuration - injected during build/deployment
 const __config = {
-	endpoint: window.__SEARCH_ENGINE_ENDPOINT || 'api.financialnewsengine.com',
+	endpoint: window.__SEARCH_ENGINE_ENDPOINT 
+		? (window.__SEARCH_ENGINE_ENDPOINT.startsWith('http') 
+			? window.__SEARCH_ENGINE_ENDPOINT 
+			: `https://${window.__SEARCH_ENGINE_ENDPOINT}`)
+		: 'https://api.financialnewsengine.com',
 	apiKey: window.__SEARCH_ENGINE_KEY || '',
 	idx: window.__SEARCH_ENGINE_INDEX || 'financial_news',
 	version: '7.14'

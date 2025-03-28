@@ -425,18 +425,11 @@ function Results() {
       </Container>
       
       {/* Analytics side menu */}
-      <AnalyticsSideMenu isOpen={isSideMenuOpen} query={query} />
-      
-      {/* Toggle button for analytics */}
-      <Button 
-        variant="primary" 
-        className="analytics-toggle"
-        onClick={toggleSideMenu}
-        title="Toggle Analytics"
-        size="sm"
-      >
-        <i className={`bi bi-${isSideMenuOpen ? 'x-lg' : 'graph-up'}`}></i>
-      </Button>
+      <AnalyticsSideMenu 
+        isOpen={isSideMenuOpen} 
+        toggleMenu={toggleSideMenu} 
+        results={results} 
+      />
     </div>
   );
 }

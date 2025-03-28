@@ -233,11 +233,20 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
     <>
       <Button 
         variant="primary" 
-        className={`side-menu-toggle rounded-circle shadow ${isOpen ? 'open' : ''}`}
+        className={`side-menu-toggle rounded-pill shadow-lg ${isOpen ? 'open' : ''}`}
         onClick={toggleMenu}
         aria-label="Toggle Analytics Menu"
       >
-        <i className={`bi ${isOpen ? 'bi-x-lg' : 'bi-bar-chart-fill'}`}></i>
+        <div className="toggle-content">
+          {isOpen ? (
+            <i className="bi bi-x-lg"></i>
+          ) : (
+            <>
+              <i className="bi bi-bar-chart-fill me-2"></i>
+              <span className="toggle-text">Analytics</span>
+            </>
+          )}
+        </div>
       </Button>
 
       <div className={`side-menu ${isOpen ? 'open' : ''}`}>
