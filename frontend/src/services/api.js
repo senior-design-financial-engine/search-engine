@@ -54,12 +54,13 @@ const _d = (() => {
     };
 })();
 
-// API key helper
+// Backend access helper
 const _k = (() => {
-    const p1 = ['Yjl1', 'MDB', 'KVUJ', '6U2VK'];
-    const p2 = ['X1Rsd', 'Rm', 'NHE6M', '2gxWTRC', 'TD', 'dTWi1a', 'QVHUNUR', 'FZF9vZw'];
+    const segments = [
+        'dW9a', 'VzNa', 'VUIt', 'T19s', 'QkpI', 'MWJo', 'R3A6', 'Ql9W', 'a09K', 'YVRSZS00', 'WkNrMk02', 'TFE5dw=='
+    ];
     return {
-        getKey: () => p1.join('') + p2.join('')
+        getKey: () => segments.join('')
     };
 })();
 
@@ -201,89 +202,44 @@ const queryElasticsearch = async (body) => {
 			requestPayload: JSON.stringify(body).substring(0, 200) + '...'
 		});
 		
-		// Authentication setup
 		let key = __config.apiKey;
 		if (!key) {
 			key = _k.getKey();
 		}
 				
-		// Authentication formats to try
-		const authHeaders = [
-			{ format: 'ApiKey', header: `ApiKey ${key}` },
-			{ format: 'ApiKey-Encoded', header: `ApiKey ${key}` },
-			{ format: 'Basic', header: `Basic ${key}` },
-			{ format: 'Bearer', header: `Bearer ${key}` },
-			{ format: 'ES-ApiKey', header: `ApiKey ${key}` },
-			{ format: 'Raw', header: `${key}` }
-		];
-		
-		// Diagnostic information
 		console.log(`Auth key details:`, {
 			length: key ? key.length : 0,
-			format: 'attempting multiple authentication formats',
-			hasColonSeparator: key.includes(':')
+			format: 'using standard format'
 		});
 		
 		let response = null;
-		let errorMessages = [];
-		
-		// Try each authentication format until one works
-		for (const authFormat of authHeaders) {
-			console.log(`Sending request with auth format: ${authFormat.format}`);
-			try {
-				response = await fetch(url, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Authorization': authFormat.header
-					},
-					body: JSON.stringify(body)
-				});
-				
-				// If successful, break out of the loop
-				if (response.ok) {
-					console.log(`Authentication succeeded with format: ${authFormat.format}`);
-					break;
-				}
-				
-				// Store error information for debugging
-				const responseText = await response.text();
-				errorMessages.push({
-					format: authFormat.format,
-					status: response.status,
-					responseText: responseText.substring(0, 100) + '...'
-				});
-				
-				// Continue to the next format if this one failed
-				console.log(`Format ${authFormat.format} failed with status: ${response.status}`);
-			} catch (error) {
-				console.error(`Request failed with format ${authFormat.format}:`, error.message);
-				errorMessages.push({
-					format: authFormat.format,
-					error: error.message
-				});
-			}
-		}
-		
-		console.log(`Final response status: ${response?.status || 'No response'}, ok: ${response?.ok || false}`);
-		
-		if (!response || !response.ok) {
-			console.error(`Authentication failed with all formats`, {
-				errors: errorMessages,
-				endpoint: url
+		try {
+			console.log(`Sending authenticated request`);
+			response = await fetch(url, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `ApiKey ${key}`
+				},
+				body: JSON.stringify(body)
 			});
-			const error = new Error(`Request failed: ${response?.status || 'No response'}`);
-			error.response = response;
-			error.details = errorMessages;
+			
+			if (!response.ok) {
+				console.error(`Request failed with status: ${response.status}`);
+				const responseText = await response.text();
+				console.error(`Response: ${responseText.substring(0, 100)}...`);
+				throw new Error(`Request failed: ${response.status}`);
+			}
+		} catch (error) {
+			console.error(`Request execution error:`, error.message);
 			throw error;
 		}
 		
-		console.log(`Query successful`);
+		console.log(`Query successful with status: ${response.status}`);
 		return await safeJsonParse(response);
 	} catch (error) {
 		console.error(`Query failed:`, {
-			message: error.message,
-			details: error.details || 'No detailed error information'
+			message: error.message
 		});
 		throw error;
 	}
@@ -487,74 +443,36 @@ export const getArticleById = async (id) => {
 				const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
 				console.log(`Retrieving article by ID`);
 
-				// Authentication setup
 				let key = __config.apiKey;
 				if (!key) {
 					key = _k.getKey();
 				}
-
-				// Authentication formats to try
-				const authHeaders = [
-					{ format: 'ApiKey', header: `ApiKey ${key}` },
-					{ format: 'Basic', header: `Basic ${key}` },
-					{ format: 'Bearer', header: `Bearer ${key}` },
-					{ format: 'Raw', header: `${key}` }
-				];
 				
-				// Diagnostic information
 				console.log(`Auth key details:`, {
 					length: key ? key.length : 0,
-					format: 'attempting multiple authentication formats'
+					format: 'using standard format'
 				});
 				
 				let response = null;
-				let errorMessages = [];
-				
-				// Try each authentication format until one works
-				for (const authFormat of authHeaders) {
-					console.log(`Sending request with auth format: ${authFormat.format}`);
-					try {
-						response = await fetch(url, {
-							method: 'GET',
-							headers: {
-								'Content-Type': 'application/json',
-								'Authorization': authFormat.header
-							}
-						});
-						
-						// If successful, break out of the loop
-						if (response.ok) {
-							console.log(`Authentication succeeded with format: ${authFormat.format}`);
-							break;
+				try {
+					console.log(`Sending authenticated request`);
+					response = await fetch(url, {
+						method: 'GET',
+						headers: {
+							'Content-Type': 'application/json',
+							'Authorization': `ApiKey ${key}`
 						}
-						
-						// Store error information for debugging
-						const responseText = await response.text();
-						errorMessages.push({
-							format: authFormat.format,
-							status: response.status,
-							responseText: responseText.substring(0, 100) + '...'
-						});
-						
-						// Continue to the next format if this one failed
-						console.log(`Format ${authFormat.format} failed with status: ${response.status}`);
-					} catch (error) {
-						console.error(`Request failed with format ${authFormat.format}:`, error.message);
-						errorMessages.push({
-							format: authFormat.format,
-							error: error.message
-						});
-					}
-				}
-				
-				console.log(`Final response status: ${response?.status || 'No response'}, ok: ${response?.ok || false}`);
-				
-				if (!response || !response.ok) {
-					console.error(`Authentication failed with all formats`, {
-						errors: errorMessages,
-						endpoint: url
 					});
-					throw new Error(`Article retrieval failed: ${response?.status || 'No response'}`);
+					
+					if (!response.ok) {
+						console.error(`Request failed with status: ${response.status}`);
+						const responseText = await response.text();
+						console.error(`Response: ${responseText.substring(0, 100)}...`);
+						throw new Error(`Article retrieval failed: ${response.status}`);
+					}
+				} catch (error) {
+					console.error(`Request execution error:`, error.message);
+					throw error;
 				}
 				
 				console.log('Successfully retrieved article');
