@@ -348,12 +348,23 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				const must = [];
 				const should = [];
 				
-				// Content and headline matching
+				// Content and headline matching using multiple analyzers for better results
 				should.push(
-					{ match_phrase: { "headline.enum": { query: query, boost: 3.0 } } },
-					{ match_phrase: { "content.enum": { query: query, boost: 2.0 } } },
-					{ match: { "headline.enum": { query: query, boost: 1.5 } } },
-					{ match: { "content.enum": { query: query, boost: 1.0 } } }
+					// Exact phrase matches with high boost
+					{ match_phrase: { "headline": { query: query, boost: 4.0 } } },
+					{ match_phrase: { "content": { query: query, boost: 3.0 } } },
+					
+					// Keyword matches for exact terms
+					{ match: { "headline.enum": { query: query, boost: 3.0 } } },
+					{ match: { "content.enum": { query: query, boost: 2.0 } } },
+					
+					// Stemmed matches for variations
+					{ match: { "headline.stem": { query: query, boost: 2.0 } } },
+					{ match: { "content.stem": { query: query, boost: 1.5 } } },
+					
+					// Bigram matches for phrase variations
+					{ match: { "headline.joined": { query: query, boost: 1.5 } } },
+					{ match: { "content.joined": { query: query, boost: 1.0 } } }
 				);
 				
 				// Source filter - using keyword field with term query for exact matching
@@ -412,7 +423,15 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						{ "published_at.enum": { "order": "desc", "missing": "_last" } }
 					],
 					size: 20,
-					track_scores: true
+					track_scores: true,
+					highlight: {
+						fields: {
+							"headline": { number_of_fragments: 0 },
+							"content": { number_of_fragments: 3, fragment_size: 150 }
+						},
+						pre_tags: ["<mark>"],
+						post_tags: ["</mark>"]
+					}
 				};
 				
 				console.log('Query:', JSON.stringify(esQuery));
