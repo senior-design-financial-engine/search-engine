@@ -14,17 +14,15 @@ jest.mock('react-router-dom', () => ({
   Link: ({ children }) => <div>{children}</div>
 }));
 
-test('renders search engine app', () => {
+test('renders Financial Search Engine navbar', () => {
   render(<App />);
-  // Look for the app container instead of specific text
-  const appElement = document.querySelector('.app');
-  expect(appElement).toBeInTheDocument();
+  const titleElement = screen.getByText(/Financial Search Engine/i);
+  expect(titleElement).toBeInTheDocument();
 });
 
-test('renders main content area', () => {
+test('renders Bootstrap Navbar', () => {
   render(<App />);
-  // Look for the main content element
-  const mainElement = document.querySelector('main');
-  expect(mainElement).toBeInTheDocument();
-  expect(mainElement).toHaveClass('d-flex');
+  const navbarBrand = screen.getByText(/Financial Search Engine/i);
+  expect(navbarBrand).toBeInTheDocument();
+  expect(navbarBrand.tagName.toLowerCase()).toBe('a');
 });

@@ -4,38 +4,19 @@ import { searchArticles } from '../services/api';
 import { Container, Row, Col, Card, Button, Badge, Spinner, Form, Alert } from 'react-bootstrap';
 import AnalyticsSideMenu from './AnalyticsSideMenu';
 import '../styles/Results.css';
-import { Helmet } from 'react-helmet';
-
-// Available filter options
-const availableSources = ['Bloomberg', 'Reuters', 'CNBC', 'Financial Times', 'WSJ', 'MarketWatch'];
-
-const timeRanges = [
-  { value: 'all', label: 'All Time' },
-  { value: 'day', label: 'Last 24 Hours' },
-  { value: 'week', label: 'Last Week' },
-  { value: 'month', label: 'Last Month' },
-  { value: 'year', label: 'Last Year' }
-];
-
-const sentiments = [
-  { value: 'all', label: 'All Sentiments' },
-  { value: 'positive', label: 'Positive' },
-  { value: 'neutral', label: 'Neutral' },
-  { value: 'negative', label: 'Negative' }
-];
 
 function Results() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const url_params = new URLSearchParams(location.search);
+  const url_params = new URLSearchParams(location.search)
 
   // get query info
   const query = url_params.get('query');
-  
+  url_params.delete('query')
+
   // get all filters
-  const source = url_params.get('source') || '';
-  const timeRange = url_params.get('time_range') || 'all';
-  const sentiment = url_params.get('sentiment') || 'all';
+  const source = url_params.get('source')
+  const timeRange = url_params.get('time_range')
+  const sentiment = url_params.get('sentiment')
   
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,33 +30,11 @@ function Results() {
   const [sortBy, setSortBy] = useState('relevance');
   // Add side menu state
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-  const [tooltipText, setTooltipText] = useState('Open Analytics (Alt+A)');
+  const navigate = useNavigate();
 
-  // Update activeFilters when URL params change
-  useEffect(() => {
-    setActiveFilters({
-      source: url_params.get('source') || '',
-      timeRange: url_params.get('time_range') || 'all',
-      sentiment: url_params.get('sentiment') || 'all'
-    });
-  }, [location.search]);
-  
-  // Handle filter changes
-  const handleFilterChange = (filterType, value) => {
-    const newParams = new URLSearchParams(location.search);
-    
-    if (value && value !== '' && value !== 'all') {
-      newParams.set(filterType, value);
-    } else {
-      newParams.delete(filterType);
-    }
-    
-    // Make sure query is preserved
-    if (query) {
-      newParams.set('query', query);
-    }
-    
-    navigate(`/results?${newParams.toString()}`);
+  // Toggle side menu function
+  const toggleSideMenu = () => {
+    setIsSideMenuOpen(!isSideMenuOpen);
   };
 
   useEffect(() => {
@@ -106,6 +65,18 @@ function Results() {
 
   const handleBack = () => {
     navigate(-1); // Navigate back to the previous page
+  };
+  
+  const handleFilterChange = (filterType, value) => {
+    const newParams = new URLSearchParams(location.search);
+    
+    if (value && value !== 'all') {
+      newParams.set(filterType, value);
+    } else {
+      newParams.delete(filterType);
+    }
+    
+    navigate(`/results?${newParams.toString()}`);
   };
   
   const formatDate = (dateString) => {
@@ -141,9 +112,9 @@ function Results() {
   const formatRelevanceScore = (score) => {
     if (score === undefined || score === null) return 'N/A';
     
-    // Format score to one decimal place
-    const formattedScore = parseFloat(score).toFixed(1);
-    return isNaN(formattedScore) ? 'N/A' : formattedScore;
+    // Convert to percentage with one decimal place
+    const percentage = (parseFloat(score) * 100).toFixed(1);
+    return isNaN(percentage) ? 'N/A' : `${percentage}%`;
   };
 
   // Add a function to format sentiment score
@@ -209,8 +180,8 @@ function Results() {
       case 'relevance':
       default:
         return sortedResults.sort((a, b) => {
-          const scoreA = parseFloat(a.score || a.relevance_score || a.relevance || 0);
-          const scoreB = parseFloat(b.score || b.relevance_score || b.relevance || 0);
+          const scoreA = parseFloat(a.relevance_score || a.relevance || 0);
+          const scoreB = parseFloat(b.relevance_score || b.relevance || 0);
           return scoreB - scoreA; // Highest relevance first
         });
     }
@@ -222,332 +193,242 @@ function Results() {
     if (loading) {
       return (
         <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" className="mb-3" style={{ width: '3rem', height: '3rem' }} />
-          <div className="mt-3 text-secondary">Searching for results...</div>
+          <Spinner animation="border" variant="primary" />
+          <div className="mt-3">Searching for results...</div>
         </div>
       );
     }
-    
-    // If error, show alert
+
+    // If error, show error message  
     if (error) {
       return (
-        <Alert variant="danger" className="text-center my-4">
-          <i className="bi bi-exclamation-triangle me-2"></i>
+        <Alert variant="danger" className="my-4">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
           {error}
         </Alert>
       );
     }
-    
+
     // If no results, show message
-    if (!results || results.length === 0) {
+    if (results.length === 0) {
       return (
-        <div className="no-results">
-          <i className="bi bi-search mb-3 text-secondary"></i>
-          <h3>No results found</h3>
-          <p className="text-secondary">
-            Try adjusting your search terms or filters to find more results.
-          </p>
+        <div className="text-center py-5">
+          <i className="bi bi-search fs-1 text-muted mb-3 d-block"></i>
+          <h4>No results found</h4>
+          <p className="text-muted">Try adjusting your search terms or filters</p>
+        </div>
+      );
+    }
+
+    // Otherwise show sorted results
+    const sortedResults = getSortedResults();
+    
+    return sortedResults.map((article, index) => (
+      <Col md={4} key={index} className="mb-4">
+        <Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+          <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
+            <Badge bg="secondary" pill className="px-3 py-2">
+              {article.source || 'Unknown Source'}
+            </Badge>
+            <small className="text-muted">
+              <i className="bi bi-calendar-date me-1"></i>
+              {formatDate(article.published_at)}
+            </small>
+          </Card.Header>
+          <Card.Body className="p-3">
+            <Card.Title className="mb-3 fs-5 fw-bold">
+              <a 
+                href={article.url || '#'} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-decoration-none text-primary stretched-link"
+              >
+                {article.headline || 'Untitled Article'}
+              </a>
+            </Card.Title>
+            <Card.Text className="text-secondary mb-3 small">
+              {article.summary || article.snippet || (article.content && `${article.content.substring(0, 150)}...`) || 'No summary available'}
+            </Card.Text>
+            
+            <div className="mt-auto pt-2">
+              {getCompanyData(article).length > 0 && (
+                <div className="mb-2">
+                  <small className="text-muted d-block mb-1">Companies:</small>
+                  {getCompanyData(article).map((company, idx) => (
+                    <Badge 
+                      key={idx} 
+                      bg="light" 
+                      text="dark" 
+                      className="me-1 mb-1 border rounded-pill"
+                    >
+                      {company.name || company} {company.ticker && `(${company.ticker})`}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              
+              {getCategories(article).length > 0 && (
+                <div className="mb-2">
+                  <small className="text-muted d-block mb-1">Categories:</small>
+                  {getCategories(article).map((category, idx) => (
+                    <Badge 
+                      key={idx} 
+                      bg="info" 
+                      className="me-1 mb-1 rounded-pill"
+                    >
+                      {category}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card.Body>
+          <Card.Footer className="bg-white pt-0 pb-3 px-3 border-0">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <Badge 
+                bg={getSentimentBadgeVariant(article.sentiment)} 
+                className="px-3 py-2 rounded-pill"
+                title={`Sentiment score: ${article.sentiment_score || 'N/A'} (Range: -1.0 to 1.0, where negative values indicate negative sentiment and positive values indicate positive sentiment)`}
+              >
+                <i className={`bi bi-${
+                  article.sentiment === 'positive' ? 'emoji-smile' : 
+                  article.sentiment === 'negative' ? 'emoji-frown' : 
+                  'emoji-neutral'
+                } me-1`}></i>
+                {article.sentiment || 'Unknown'}
+                {formatSentimentScore(article.sentiment_score)}
+              </Badge>
+              <small className="text-muted">
+                <i className="bi bi-graph-up me-1"></i>
+                Relevance: {formatRelevanceScore(article.relevance_score || article.relevance)}
+              </small>
+            </div>
+            <div className="mt-2">
+              <Button 
+                variant="outline-primary" 
+                size="sm"
+                href={article.url || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-100 rounded-pill"
+                disabled={!article.url}
+              >
+                <i className="bi bi-box-arrow-up-right me-1"></i>
+                Read Article
+              </Button>
+            </div>
+          </Card.Footer>
+        </Card>
+      </Col>
+    ));
+  };
+
+  return (
+    <div className={`results-page ${isSideMenuOpen ? 'menu-open' : ''}`}>
+      {/* Search header */}
+      <div className="search-header">
+        <Container>
+          {/* Back button */}
           <Button 
-            variant="primary" 
-            onClick={handleBack}
-            className="mt-3"
+            variant="outline-secondary" 
+            onClick={handleBack} 
+            className="back-button rounded-pill"
           >
             <i className="bi bi-arrow-left me-2"></i>
             Back to Search
           </Button>
-        </div>
-      );
-    }
-    
-    // If we have results, show them in a grid
-    return (
-      <div className="results-grid">
-        {getSortedResults().map((article, index) => (
-          <Card key={index} className="result-card">
-            {article.image_url && (
-              <div className="card-img-container">
-                <Card.Img 
-                  variant="top" 
-                  src={article.image_url} 
-                  alt={article.title} 
-                  onError={(e) => e.target.style.display = 'none'} 
-                />
-                {article.source && (
-                  <Badge bg="dark" className="source-badge" pill>
-                    {article.source}
-                  </Badge>
-                )}
-              </div>
-            )}
-            <Card.Body>
-              <Card.Title>
-                <a 
-                  href={`/article/${article.id}`} 
-                  className="text-reset text-decoration-none"
-                >
-                  {article.title}
-                </a>
-              </Card.Title>
-              
-              <Card.Text>{article.summary || article.snippet || article.description}</Card.Text>
-              
-              <div className="article-meta mb-3">
-                <div className="date-author">
-                  <small className="text-muted">
-                    <i className="bi bi-calendar me-1"></i> 
-                    {formatDate(article.published_at)}
-                  </small>
-                  
-                  {article.author && (
-                    <small className="text-muted ms-3">
-                      <i className="bi bi-person me-1"></i>
-                      {article.author}
-                    </small>
-                  )}
-                </div>
-                
-                {article.sentiment && (
-                  <Badge 
-                    bg={getSentimentBadgeVariant(article.sentiment)} 
-                    className="mt-2"
-                    pill
-                  >
-                    {article.sentiment}
-                    {formatSentimentScore(article.sentiment_score)}
-                  </Badge>
-                )}
-              </div>
-              
-              {/* Company and category tags */}
-              <div className="article-tags">
-                {getCompanyData(article).length > 0 && (
-                  <div className="mb-2">
-                    {getCompanyData(article).slice(0, 3).map((company, idx) => {
-                      const companyName = typeof company === 'string' ? company : company.name;
-                      return (
-                        <Badge 
-                          key={idx} 
-                          bg="light" 
-                          text="dark" 
-                          className="me-1 mb-1 border"
-                        >
-                          <i className="bi bi-building me-1 text-secondary"></i>
-                          {companyName}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {getCategories(article).length > 0 && (
-                  <div>
-                    {getCategories(article).slice(0, 3).map((category, idx) => (
-                      <Badge 
-                        key={idx} 
-                        bg="light" 
-                        text="dark" 
-                        className="me-1 mb-1 border"
-                      >
-                        <i className="bi bi-tag me-1 text-secondary"></i>
-                        {category}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </Card.Body>
-            <Card.Footer>
-              <div className="d-flex justify-content-between align-items-center">
-                <small className="text-muted">
-                  <i className="bi bi-bar-chart-fill me-1"></i>
-                  Relevance: {formatRelevanceScore(article.score || article.relevance_score || article.relevance)}
-                </small>
-                
-                <Button 
-                  variant="outline-primary" 
-                  size="sm" 
-                  as="a" 
-                  href={`/article/${article.id}`}
-                >
-                  Read More
-                </Button>
-              </div>
-            </Card.Footer>
-          </Card>
-        ))}
-      </div>
-    );
-  };
-
-  // Toggle side menu function
-  const toggleSideMenu = () => {
-    setIsSideMenuOpen(!isSideMenuOpen);
-    setTooltipText(isSideMenuOpen ? 'Open Analytics (Alt+A)' : 'Close Analytics (Alt+A)');
-  };
-
-  return (
-    <div className="results-page">
-      <Helmet>
-        <title>Search Results | Advanced Search Engine</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      </Helmet>
-      <header className="search-header">
-        <Container>
-          <div className="d-flex align-items-center mb-3">
-            <Button 
-              variant="link" 
-              onClick={handleBack} 
-              className="back-button"
-            >
-              <i className="bi bi-arrow-left"></i>
-              Back
-            </Button>
-            
-            <h1 className="results-title m-0">
-              Results for <span>"{query}"</span>
-            </h1>
-          </div>
           
+          {/* Results title */}
+          <h2 className="results-title fw-bold">
+            <i className="bi bi-search text-primary me-2"></i>
+            Results for "<span className="text-primary">{query}</span>"
+          </h2>
+          
+          {/* Filters row */}
           <div className="filter-row">
-            <Col xs={12} sm={6} md={3} lg={2} className="filter-col">
-              <Form.Select
-                size="sm"
-                value={activeFilters.source || ''}
-                onChange={(e) => handleFilterChange('source', e.target.value)}
-                className="filter-select"
-                aria-label="Filter by source"
-              >
-                <option value="">All Sources</option>
-                {availableSources.map((source, index) => (
-                  <option key={index} value={source}>{source}</option>
-                ))}
-              </Form.Select>
-            </Col>
-            
-            <Col xs={12} sm={6} md={3} lg={2} className="filter-col">
-              <Form.Select
-                size="sm"
-                value={activeFilters.timeRange || 'all'}
-                onChange={(e) => handleFilterChange('time_range', e.target.value)}
-                className="filter-select"
-                aria-label="Filter by time range"
-              >
-                {timeRanges.map((range, index) => (
-                  <option key={index} value={range.value}>{range.label}</option>
-                ))}
-              </Form.Select>
-            </Col>
-            
-            <Col xs={12} sm={6} md={3} lg={2} className="filter-col">
-              <Form.Select
-                size="sm"
-                value={activeFilters.sentiment || 'all'}
-                onChange={(e) => handleFilterChange('sentiment', e.target.value)}
-                className="filter-select"
-                aria-label="Filter by sentiment"
-              >
-                {sentiments.map((sentiment, index) => (
-                  <option key={index} value={sentiment.value}>{sentiment.label}</option>
-                ))}
-              </Form.Select>
-            </Col>
-            
-            <Col xs={12} sm={6} md={3} lg={2} className="filter-col">
-              <Form.Select
-                size="sm"
-                value={sortBy}
-                onChange={(e) => handleSort(e.target.value)}
-                className="filter-select"
-                aria-label="Sort results"
-              >
-                <option value="relevance">Sort by Relevance</option>
-                <option value="date">Sort by Date</option>
-                <option value="sentiment">Sort by Sentiment</option>
-              </Form.Select>
-            </Col>
-          </div>
-          
-          {/* Display applied filters as badges */}
-          <div className="d-flex flex-wrap mt-2">
-            {activeFilters.source && (
-              <Badge 
-                bg="primary" 
-                className="me-2 mb-2 filter-badge" 
-                pill
-              >
-                Source: {activeFilters.source}
-                <span 
-                  className="ms-2 cursor-pointer" 
-                  onClick={() => handleFilterChange('source', '')}
-                  aria-label="Remove source filter"
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Source</Form.Label>
+                <Form.Select 
+                  value={source || ''}
+                  onChange={(e) => handleFilterChange('source', e.target.value)}
+                  className="rounded-3"
                 >
-                  &times;
-                </span>
-              </Badge>
-            )}
+                  <option value="">All Sources</option>
+                  <option value="Bloomberg">Bloomberg</option>
+                  <option value="Reuters">Reuters</option>
+                  <option value="CNBC">CNBC</option>
+                  <option value="Financial Times">Financial Times</option>
+                  <option value="Wall Street Journal">Wall Street Journal</option>
+                  <option value="MarketWatch">MarketWatch</option>
+                  <option value="Barron's">Barron's</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
             
-            {activeFilters.timeRange && activeFilters.timeRange !== 'all' && (
-              <Badge 
-                bg="info" 
-                className="me-2 mb-2 filter-badge" 
-                pill
-              >
-                Time: {timeRanges.find(t => t.value === activeFilters.timeRange)?.label}
-                <span 
-                  className="ms-2 cursor-pointer" 
-                  onClick={() => handleFilterChange('time_range', 'all')}
-                  aria-label="Remove time range filter"
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Time Range</Form.Label>
+                <Form.Select 
+                  value={timeRange || 'all'}
+                  onChange={(e) => handleFilterChange('time_range', e.target.value)}
+                  className="rounded-3"
                 >
-                  &times;
-                </span>
-              </Badge>
-            )}
+                  <option value="all">All Time</option>
+                  <option value="1d">Last 24 Hours</option>
+                  <option value="7d">Last Week</option>
+                  <option value="30d">Last Month</option>
+                  <option value="90d">Last 3 Months</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
             
-            {activeFilters.sentiment && activeFilters.sentiment !== 'all' && (
-              <Badge 
-                bg={getSentimentBadgeVariant(activeFilters.sentiment)} 
-                className="me-2 mb-2 filter-badge" 
-                pill
-              >
-                Sentiment: {activeFilters.sentiment}
-                <span 
-                  className="ms-2 cursor-pointer" 
-                  onClick={() => handleFilterChange('sentiment', 'all')}
-                  aria-label="Remove sentiment filter"
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Sentiment</Form.Label>
+                <Form.Select 
+                  value={sentiment || 'all'}
+                  onChange={(e) => handleFilterChange('sentiment', e.target.value)}
+                  className="rounded-3"
                 >
-                  &times;
-                </span>
-              </Badge>
-            )}
+                  <option value="all">All Sentiments</option>
+                  <option value="positive">Positive</option>
+                  <option value="neutral">Neutral</option>
+                  <option value="negative">Negative</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
+            
+            <div className="filter-col">
+              <Form.Group>
+                <Form.Label className="fw-bold">Sort By</Form.Label>
+                <Form.Select 
+                  value={sortBy}
+                  onChange={(e) => handleSort(e.target.value)}
+                  className="rounded-3"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="date">Date (Newest)</option>
+                  <option value="sentiment">Sentiment</option>
+                </Form.Select>
+              </Form.Group>
+            </div>
           </div>
         </Container>
-      </header>
-      
-      <Container className="main-results-area">
-        {renderResults()}
+      </div>
+
+      {/* Main content */}
+      <Container className="py-4 main-results-area">
+        <Row>
+          {renderResults()}
+        </Row>
       </Container>
       
-      {/* Analytics Toggle Button */}
-      <Button
-        variant="primary"
-        className={`analytics-toggle ${isSideMenuOpen ? 'open' : ''}`}
-        onClick={toggleSideMenu}
-        aria-expanded={isSideMenuOpen}
-        aria-controls="analytics-side-menu"
-      >
-        <div className="toggle-content" data-tooltip={tooltipText}>
-          <i className={`bi ${isSideMenuOpen ? 'bi-chevron-right' : 'bi-graph-up'}`}></i>
-          <span className="visually-hidden">
-            {isSideMenuOpen ? 'Close Analytics' : 'Open Analytics'}
-          </span>
-        </div>
-      </Button>
-      
-      {/* Analytics Side Menu */}
+      {/* Analytics side menu */}
       <AnalyticsSideMenu 
         isOpen={isSideMenuOpen} 
         toggleMenu={toggleSideMenu} 
-        results={results}
+        results={results} 
       />
     </div>
   );
