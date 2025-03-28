@@ -52,8 +52,13 @@
 }
 
 .side-menu-toggle .toggle-content i {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   transition: transform 0.3s ease;
+  color: white !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .side-menu-toggle .toggle-content::after {
