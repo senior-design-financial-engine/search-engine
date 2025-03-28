@@ -7,7 +7,7 @@ import '../styles/Results.css';
 import { Helmet } from 'react-helmet';
 
 // Available filter options
-const availableSources = ['ap', 'bbc', 'cnbc', 'cnn', 'npr', 'reddit'];
+const availableSources = ['Bloomberg', 'Reuters', 'CNBC', 'Financial Times', 'WSJ', 'MarketWatch'];
 
 const timeRanges = [
   { value: 'all', label: 'All Time' },
@@ -26,16 +26,16 @@ const sentiments = [
 
 function Results() {
   const location = useLocation();
-  const url_params = new URLSearchParams(location.search)
+  const navigate = useNavigate();
+  const url_params = new URLSearchParams(location.search);
 
   // get query info
   const query = url_params.get('query');
-  url_params.delete('query')
-
+  
   // get all filters
-  const source = url_params.get('source')
-  const timeRange = url_params.get('time_range')
-  const sentiment = url_params.get('sentiment')
+  const source = url_params.get('source') || '';
+  const timeRange = url_params.get('time_range') || 'all';
+  const sentiment = url_params.get('sentiment') || 'all';
   
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,12 +50,32 @@ function Results() {
   // Add side menu state
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
   const [tooltipText, setTooltipText] = useState('Open Analytics (Alt+A)');
-  const navigate = useNavigate();
 
-  // Toggle side menu function
-  const toggleSideMenu = () => {
-    setIsSideMenuOpen(!isSideMenuOpen);
-    setTooltipText(isSideMenuOpen ? 'Open Analytics (Alt+A)' : 'Close Analytics (Alt+A)');
+  // Update activeFilters when URL params change
+  useEffect(() => {
+    setActiveFilters({
+      source: url_params.get('source') || '',
+      timeRange: url_params.get('time_range') || 'all',
+      sentiment: url_params.get('sentiment') || 'all'
+    });
+  }, [location.search]);
+  
+  // Handle filter changes
+  const handleFilterChange = (filterType, value) => {
+    const newParams = new URLSearchParams(location.search);
+    
+    if (value && value !== '' && value !== 'all') {
+      newParams.set(filterType, value);
+    } else {
+      newParams.delete(filterType);
+    }
+    
+    // Make sure query is preserved
+    if (query) {
+      newParams.set('query', query);
+    }
+    
+    navigate(`/results?${newParams.toString()}`);
   };
 
   useEffect(() => {
@@ -86,18 +106,6 @@ function Results() {
 
   const handleBack = () => {
     navigate(-1); // Navigate back to the previous page
-  };
-  
-  const handleFilterChange = (filterType, value) => {
-    const newParams = new URLSearchParams(location.search);
-    
-    if (value && value !== 'all') {
-      newParams.set(filterType, value);
-    } else {
-      newParams.delete(filterType);
-    }
-    
-    navigate(`/results?${newParams.toString()}`);
   };
   
   const formatDate = (dateString) => {
@@ -369,6 +377,12 @@ function Results() {
         ))}
       </div>
     );
+  };
+
+  // Toggle side menu function
+  const toggleSideMenu = () => {
+    setIsSideMenuOpen(!isSideMenuOpen);
+    setTooltipText(isSideMenuOpen ? 'Open Analytics (Alt+A)' : 'Close Analytics (Alt+A)');
   };
 
   return (

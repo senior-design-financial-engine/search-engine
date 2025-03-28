@@ -201,26 +201,22 @@
 
 /* Analytics toggle button */
 .analytics-toggle {
-  position: fixed !important;
-  bottom: 30px !important;
-  right: 30px !important;
-  width: 60px !important;
-  height: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
-  border-radius: var(--radius-md) !important;
-  padding: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  z-index: 1020 !important;
-  box-shadow: var(--shadow) !important;
-  overflow: hidden !important;
-  background-color: var(--primary) !important;
-  border: none !important;
-  transition: all var(--transition-normal) !important;
-  transform: translateZ(0) !important;
-  backdrop-filter: blur(5px) !important;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1000;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.analytics-toggle.open {
+  right: 320px; /* Adjust based on sidebar width */
 }
 
 .analytics-toggle::before {
@@ -325,26 +321,19 @@
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin: 1.25rem 0 0.75rem;
-  align-items: center;
-  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 15px;
 }
 
 .filter-col {
-  margin-bottom: 0.5rem;
-  flex: 0 0 auto;
-  min-width: 180px;
-  max-width: 200px;
+  min-width: 200px;
 }
 
 .filter-select {
-  border-radius: var(--radius-md);
-  border-color: var(--border);
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
-  height: 38px;
-  font-size: 0.9rem;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  color: #333;
+  font-weight: 500;
 }
 
 .filter-select:focus {
@@ -415,12 +404,14 @@
   
   /* Ensure analytics toggle is still visible on mobile */
   .analytics-toggle {
-    bottom: 20px !important;
-    right: 20px !important;
-    width: 54px !important;
-    height: 54px !important;
-    min-width: 54px !important;
-    max-width: 54px !important;
+    bottom: 70px;
+    right: 15px;
+    width: 45px;
+    height: 45px;
+  }
+  
+  .analytics-toggle.open {
+    right: 15px;
   }
   
   .results-title {
@@ -439,11 +430,12 @@
   height: 100%;
   transition: all var(--transition-normal);
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(0, 0, 0, 0.125);
   overflow: hidden;
-  background-color: var(--card-bg);
+  background-color: #fff;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .result-card:hover {
@@ -524,38 +516,21 @@
 }
 
 .result-card .card-footer {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: #fff;
   border-top: 1px solid var(--border);
   padding: 0.85rem 1.25rem;
 }
 
 /* Standardize filter badge appearance */
 .filter-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.5em 0.85em;
-  font-weight: 500;
-  font-size: 0.85rem;
-  line-height: 1;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  padding: 8px 12px;
 }
 
 .filter-badge span {
   cursor: pointer;
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.2);
-  margin-left: 0.5rem;
-  transition: all var(--transition-fast);
-}
-
-.filter-badge span:hover {
-  background-color: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  font-weight: bold;
+  margin-left: 5px;
 }
 
 /* Dark mode adjustments for results cards */
@@ -643,4 +618,28 @@
   .filter-section .filter-title {
     margin-bottom: 0.5rem;
   }
+}
+
+/* Improve text contrast */
+.results-title span,
+.card-title a,
+.article-meta,
+.badge {
+  color: #000 !important;
+  text-shadow: none;
+}
+
+.text-muted {
+  color: #555 !important;
+}
+
+.result-card {
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.result-card .card-body,
+.result-card .card-footer {
+  background-color: #fff;
 }

@@ -70,8 +70,8 @@ body {
   font-family: 'Inter', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--light);
-  color: var(--dark);
+  background-color: #f8f9fa;
+  color: #333;
   line-height: 1.5;
   transition: background-color var(--transition-normal);
 }
@@ -92,11 +92,11 @@ h5, .h5 { font-size: clamp(1rem, 1.5vw, 1.25rem); }
 a {
   transition: all var(--transition-fast);
   text-decoration: none;
-  color: var(--primary);
+  color: #0056b3;
 }
 
 a:hover {
-  color: var(--primary-hover);
+  color: #003d82;
 }
 
 /* Button hover effects */
@@ -161,18 +161,23 @@ a:hover {
 
 /* Card styles for consistent look */
 .card {
-  border: none;
+  border: 1px solid rgba(0, 0, 0, 0.125);
   box-shadow: var(--shadow);
   margin-bottom: 1.5rem;
   transition: all var(--transition-normal);
   border-radius: var(--radius-md);
   overflow: hidden;
+  background-color: #fff;
 }
 
 .card-header {
   font-weight: 600;
   background-color: transparent;
   border-bottom: 1px solid var(--border);
+}
+
+.card-title {
+  color: #212529;
 }
 
 /* Rounded corners utility classes */
@@ -537,4 +542,62 @@ footer {
   .side-menu-toggle .toggle-text {
     display: none;
   }
+}
+
+/* Improved general contrast */
+h1, h2, h3, h4, h5, h6 {
+  color: #212529;
+}
+
+.text-muted {
+  color: #555 !important;
+}
+
+/* Sidebar improvements */
+.side-menu {
+  background-color: #fff;
+  color: #333;
+  width: 320px;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.side-menu-header {
+  border-bottom: 1px solid #e5e5e5;
+  background-color: #f8f9fa;
+  padding: 15px;
+}
+
+.side-menu-content {
+  padding: 15px;
+}
+
+.analytics-row {
+  margin-bottom: 20px;
+}
+
+.analytics-card {
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 0.25rem;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.analytics-card h4 {
+  font-size: 1rem;
+  margin-bottom: 15px;
+  color: #212529;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+.chart-container {
+  height: 250px;
+  position: relative;
+}
+
+/* Fix menu backdrop */
+.menu-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
 }
