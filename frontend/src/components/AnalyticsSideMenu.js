@@ -24,7 +24,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState({});
-  const [collapsedSections, setCollapsedSections] = useState({});
 
   const sideMenuRef = useRef(null);
   const [tooltipText, setTooltipText] = useState('Open Analytics');
@@ -51,19 +50,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   useEffect(() => {
     setTooltipText(isOpen ? 'Close Analytics (Alt+A)' : 'Open Analytics (Alt+A)');
   }, [isOpen]);
-
-  // Toggle section collapse state
-  const toggleSection = (sectionId) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [sectionId]: !prev[sectionId]
-    }));
-  };
-
-  // Check if a section is collapsed
-  const isSectionCollapsed = (sectionId) => {
-    return collapsedSections[sectionId] === true;
-  };
 
   useEffect(() => {
     if (results && results.length > 0) {
@@ -192,13 +178,44 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   // Calculate total for percentages
   const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
   
-  // Prepare chart data
+  // Prepare chart options with more accessible colors and reduced padding
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          boxWidth: 12,
+          padding: 8,
+          font: {
+            size: 11
+          }
+        }
+      },
+      tooltip: {
+        enabled: true,
+        intersect: false,
+        mode: 'index'
+      }
+    },
+    layout: {
+      padding: {
+        left: 5,
+        right: 5,
+        top: 5,
+        bottom: 5
+      }
+    }
+  };
+  
+  // Prepare chart data with accessible colors
   const sentimentChartData = {
     labels: ['Positive', 'Neutral', 'Negative'],
     datasets: [
       {
         data: [sentimentCounts.positive, sentimentCounts.neutral, sentimentCounts.negative],
-        backgroundColor: ['rgba(40, 167, 69, 0.7)', 'rgba(23, 162, 184, 0.7)', 'rgba(220, 53, 69, 0.7)'],
+        backgroundColor: ['rgba(40, 167, 69, 0.8)', 'rgba(23, 162, 184, 0.8)', 'rgba(220, 53, 69, 0.8)'],
         borderColor: ['rgba(40, 167, 69, 1)', 'rgba(23, 162, 184, 1)', 'rgba(220, 53, 69, 1)'],
         borderWidth: 1,
       },
@@ -211,8 +228,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       {
         label: 'Articles',
         data: Object.values(sourceCounts).slice(0, 5),
-        backgroundColor: 'rgba(13, 110, 253, 0.7)',
-        borderColor: 'rgba(13, 110, 253, 1)',
+        backgroundColor: 'rgba(67, 97, 238, 0.7)',
+        borderColor: 'rgba(67, 97, 238, 1)',
         borderWidth: 1,
       },
     ],
@@ -258,30 +275,51 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       },
     ],
   };
+
+  // Empty state component
+  const EmptyState = ({ icon, message }) => (
+    <div className="empty-state">
+      <i className={`bi ${icon}`} aria-hidden="true"></i>
+      <p className="text-muted mb-0 text-center">{message}</p>
+    </div>
+  );
   
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-      },
-    },
+  // Function to render badge items
+  const renderBadges = (items, colorClass) => {
+    if (!items || items.length === 0) {
+      return <EmptyState icon="bi-tag" message="No data available" />;
+    }
+    
+    return (
+      <div className="d-flex flex-wrap">
+        {items.map((item, index) => (
+          <Badge 
+            key={index} 
+            bg={colorClass} 
+            text={colorClass === 'light' ? 'dark' : 'white'} 
+            className="me-2 mb-2 border-0 rounded-pill py-1 px-2"
+          >
+            {item.name} <span className="opacity-75">({item.count})</span>
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   return (
     <>
       <Button 
         variant="primary" 
-        className={`side-menu-toggle shadow-lg ${isOpen ? 'open' : ''}`}
+        className={`side-menu-toggle shadow ${isOpen ? 'open' : ''}`}
         onClick={toggleMenu}
         aria-label={`${isOpen ? 'Close' : 'Open'} Analytics Menu`}
+        aria-expanded={isOpen}
       >
         <div className="toggle-content" data-tooltip={tooltipText}>
           {isOpen ? (
-            <i className="bi bi-chevron-right"></i>
+            <i className="bi bi-chevron-right" aria-hidden="true"></i>
           ) : (
-            <i className="bi bi-graph-up-arrow" aria-hidden="false"></i>
+            <i className="bi bi-graph-up-arrow" aria-hidden="true"></i>
           )}
         </div>
       </Button>
@@ -291,21 +329,22 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         ref={sideMenuRef}
         role="complementary"
         aria-label="Analytics Sidebar"
+        tabIndex={isOpen ? 0 : -1}
       >
         <div className="side-menu-resize-handle" title="Drag to resize"></div>
         <div className="side-menu-header">
-          <h4 className="mb-0">
-            <i className="bi bi-graph-up-arrow me-2 text-primary"></i>
-            Results Analytics
+          <h4 className="mb-0 d-flex align-items-center">
+            <i className="bi bi-graph-up-arrow me-2 text-primary" aria-hidden="true"></i>
+            <span>Analytics</span>
           </h4>
           <div className="d-flex align-items-center">
-            <small className="text-muted me-3 d-none d-md-block">Press ESC to close</small>
+            <small className="text-muted me-2 d-none d-md-block">ESC to close</small>
             <button 
               className="side-menu-close" 
               onClick={toggleMenu}
               aria-label="Close Analytics Menu"
             >
-              <i className="bi bi-x-lg"></i>
+              <i className="bi bi-x-lg" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -313,160 +352,112 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         {results && results.length > 0 ? (
           <>
             {/* Sentiment Distribution */}
-            <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header 
-                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleSection('sentiment')}
-              >
+            <Card className="analytics-card primary shadow-sm mb-3">
+              <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-emoji-smile me-2 text-primary"></i>
-                  Sentiment Distribution
+                  <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
+                  <span>Sentiment Distribution</span>
                 </h5>
-                <i className={`bi bi-chevron-${isSectionCollapsed('sentiment') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              {!isSectionCollapsed('sentiment') && (
-                <Card.Body>
-                  <div className="chart-container mb-3">
+              <Card.Body>
+                {totalSentiments > 0 ? (
+                  <div className="chart-container mb-1">
                     <Pie data={sentimentChartData} options={chartOptions} />
                   </div>
-                </Card.Body>
-              )}
+                ) : (
+                  <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
+                )}
+              </Card.Body>
             </Card>
 
             {/* Source Distribution */}
-            <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header 
-                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleSection('sources')}
-              >
+            <Card className="analytics-card shadow-sm mb-3">
+              <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-newspaper me-2 text-primary"></i>
-                  Top Sources
+                  <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
+                  <span>Top Sources</span>
                 </h5>
-                <i className={`bi bi-chevron-${isSectionCollapsed('sources') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              {!isSectionCollapsed('sources') && (
-                <Card.Body>
-                  <div className="chart-container mb-3">
+              <Card.Body>
+                {Object.keys(sourceCounts).length > 0 ? (
+                  <div className="chart-container mb-1">
                     <Bar data={sourceChartData} options={chartOptions} />
                   </div>
-                </Card.Body>
-              )}
+                ) : (
+                  <EmptyState icon="bi-newspaper" message="No source data available" />
+                )}
+              </Card.Body>
             </Card>
 
             {/* Top Companies */}
-            <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header 
-                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleSection('companies')}
-              >
+            <Card className="analytics-card shadow-sm mb-3">
+              <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-building me-2 text-primary"></i>
-                  Top Companies Mentioned
+                  <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
+                  <span>Top Companies</span>
                 </h5>
-                <i className={`bi bi-chevron-${isSectionCollapsed('companies') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              {!isSectionCollapsed('companies') && (
-                <Card.Body>
-                  <div className="d-flex flex-wrap">
-                    {topCompanies.length > 0 ? (
-                      topCompanies.map((company, index) => (
-                        <Badge 
-                          key={index} 
-                          bg="light" 
-                          text="dark" 
-                          className="me-2 mb-2 border rounded-pill py-2 px-3"
-                        >
-                          {company.name} ({company.count})
-                        </Badge>
-                      ))
-                    ) : (
-                      <p className="text-muted">No company data available</p>
-                    )}
-                  </div>
-                </Card.Body>
-              )}
+              <Card.Body>
+                {renderBadges(topCompanies, 'light')}
+              </Card.Body>
             </Card>
 
             {/* Top Categories */}
-            <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header 
-                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleSection('categories')}
-              >
+            <Card className="analytics-card shadow-sm mb-3">
+              <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-tags me-2 text-primary"></i>
-                  Top Categories
+                  <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
+                  <span>Top Categories</span>
                 </h5>
-                <i className={`bi bi-chevron-${isSectionCollapsed('categories') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              {!isSectionCollapsed('categories') && (
-                <Card.Body>
-                  <div className="d-flex flex-wrap">
-                    {topCategories.length > 0 ? (
-                      topCategories.map((category, index) => (
-                        <Badge 
-                          key={index} 
-                          bg="info" 
-                          className="me-2 mb-2 rounded-pill py-2 px-3"
-                        >
-                          {category.name} ({category.count})
-                        </Badge>
-                      ))
-                    ) : (
-                      <p className="text-muted">No category data available</p>
-                    )}
-                  </div>
-                </Card.Body>
-              )}
+              <Card.Body>
+                {renderBadges(topCategories, 'info')}
+              </Card.Body>
             </Card>
 
             {/* Publication Timeline */}
-            <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header 
-                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleSection('timeline')}
-              >
+            <Card className="analytics-card shadow-sm mb-3">
+              <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-calendar-date me-2 text-primary"></i>
-                  Publication Timeline
+                  <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
+                  <span>Publication Timeline</span>
                 </h5>
-                <i className={`bi bi-chevron-${isSectionCollapsed('timeline') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              {!isSectionCollapsed('timeline') && (
-                <Card.Body>
-                  <div className="chart-container mb-3">
+              <Card.Body>
+                {Object.keys(timeDistribution).length > 0 ? (
+                  <div className="chart-container mb-1">
                     <Line data={timelineChartData} options={chartOptions} />
                   </div>
-                </Card.Body>
-              )}
+                ) : (
+                  <EmptyState icon="bi-calendar" message="No timeline data available" />
+                )}
+              </Card.Body>
             </Card>
             
             {/* Sentiment Trends */}
             <Card className="analytics-card shadow-sm">
-              <Card.Header 
-                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleSection('trends')}
-              >
+              <Card.Header className="bg-white">
                 <h5 className="mb-0">
-                  <i className="bi bi-graph-up me-2 text-primary"></i>
-                  Sentiment Trends
+                  <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
+                  <span>Sentiment Trends</span>
                 </h5>
-                <i className={`bi bi-chevron-${isSectionCollapsed('trends') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              {!isSectionCollapsed('trends') && (
-                <Card.Body>
-                  <div className="chart-container mb-3">
+              <Card.Body>
+                {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
+                  <div className="chart-container mb-1">
                     <Line data={sentimentTrendChartData} options={chartOptions} />
                   </div>
-                </Card.Body>
-              )}
+                ) : (
+                  <EmptyState icon="bi-graph-up" message="No trend data available" />
+                )}
+              </Card.Body>
             </Card>
           </>
         ) : (
-          <div className="text-center py-5">
-            <i className="bi bi-bar-chart text-muted display-1"></i>
-            <p className="mt-3 text-muted">No data available for analytics</p>
+          <div className="text-center py-4">
+            <i className="bi bi-bar-chart text-muted" style={{fontSize: "2.5rem", opacity: 0.4}} aria-hidden="true"></i>
+            <p className="mt-2 text-muted">No data available for analytics</p>
+            <small className="text-muted d-block">Search for results to see analysis</small>
           </div>
         )}
       </div>
