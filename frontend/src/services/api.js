@@ -378,17 +378,17 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						bool: { 
 							must,
 							should: [
-								{ match_phrase: { title: { query: query, boost: 3.0 } } },
+								{ match_phrase: { headline: { query: query, boost: 3.0 } } },
 								{ match_phrase: { content: { query: query, boost: 2.0 } } },
-								{ match: { title: { query: query, boost: 1.5 } } },
-								{ match: { content: { query: query, boost: 1.0 } } }
+								{ match: { "headline.enum": { query: query, boost: 1.5 } } },
+								{ match: { "content.enum": { query: query, boost: 1.0 } } }
 							],
 							minimum_should_match: 1
 						}
 					},
 					sort: [
 						{ "_score": { "order": "desc" } },
-						{ "published_at.keyword": { "order": "desc", "missing": "_last" } }
+						{ "published_at.enum": { "order": "desc", "missing": "_last" } }
 					],
 					size: 20,
 					track_scores: true
@@ -401,17 +401,47 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					results = await queryElasticsearch(esQuery);
 				} catch (error) {
 					console.error('Elasticsearch query failed:', error);
-					// If the error is related to fielddata, try without sorting
-					if (error.message.includes('fielddata')) {
+					// If the error is related to mapping, try without date sorting
+					if (error.message.includes('No mapping found') || error.message.includes('fielddata')) {
 						console.log('Retrying without date sorting...');
-						delete esQuery.sort[1]; // Remove date sort
+						esQuery.sort = [{ "_score": { "order": "desc" } }]; // Only sort by score
 						results = await queryElasticsearch(esQuery);
 					} else {
 						throw error;
 					}
 				}
 				
-				return { data: formatSearchResults(results) };
+				// Format the results
+				const formattedResults = formatSearchResults(results);
+
+				// Add source filtering if needed
+				if (source && source !== 'All Sources') {
+					formattedResults.articles = formattedResults.articles.filter(
+						article => article.source && article.source.toLowerCase() === source.toLowerCase()
+					);
+				}
+
+				// Add time range filtering if needed
+				if (time_range && time_range !== 'All Time') {
+					const now = new Date();
+					let startDate;
+					
+					switch (time_range) {
+						case '1d': startDate = new Date(now.setDate(now.getDate() - 1)); break;
+						case '7d': startDate = new Date(now.setDate(now.getDate() - 7)); break;
+						case '30d': startDate = new Date(now.setDate(now.getDate() - 30)); break;
+						case '90d': startDate = new Date(now.setDate(now.getDate() - 90)); break;
+						default: startDate = new Date(now.setDate(now.getDate() - 30));
+					}
+
+					formattedResults.articles = formattedResults.articles.filter(article => {
+						if (!article.published_at) return false;
+						const articleDate = new Date(article.published_at);
+						return articleDate >= startDate && articleDate <= now;
+					});
+				}
+				
+				return { data: formattedResults };
 			} else {
 				console.log('Configuration error, using fallback', __config.endpoint);
 				throw new Error('Configuration error');
