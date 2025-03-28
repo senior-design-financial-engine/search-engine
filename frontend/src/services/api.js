@@ -364,12 +364,50 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					must.push({ range });
 				}
 				
+				// Enhanced query with function_score for better relevance
 				const esQuery = {
 					query: {
-						bool: { must }
+						function_score: {
+							query: {
+								bool: { must }
+							},
+							functions: [
+								// Boost exact matches in the headline
+								{
+									filter: { match: { headline: query } },
+									weight: 3
+								},
+								// Boost if query terms appear close together in content
+								{
+									filter: { 
+										match_phrase: { 
+											content: {
+												query: query,
+												slop: 2
+											} 
+										} 
+									},
+									weight: 2.5
+								},
+								// Boost recent articles
+								{
+									gauss: {
+										"published_at.enum": {
+											scale: "30d"
+										}
+									},
+									weight: 1.5
+								}
+							],
+							score_mode: "sum",
+							boost_mode: "multiply"
+						}
 					},
-					// Use the correct enum field for sorting based on the mapping
-					sort: [{ "published_at.enum": { order: "desc" } }],
+					// Keep date-based sorting as secondary factor
+					sort: [
+						{ "_score": { "order": "desc" } },
+						{ "published_at.enum": { "order": "desc" } }
+					],
 					size: 20
 				};
 				
