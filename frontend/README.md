@@ -1,4 +1,4 @@
-# Financial News Engine Frontend
+# Financial News Search Engine Frontend
 
 This directory contains the React.js frontend application for the Financial News Engine project.
 
@@ -28,26 +28,75 @@ npm run build
 
 ## Environment Configuration
 
-The application uses environment variables for configuration:
+### API Configuration
+This application requires connection to an Elasticsearch instance to function properly. Configuration is provided through environment variables.
 
-### Development
-In `.env.development`:
-```
-REACT_APP_API_URL=https://api.financialnewsengine.com
-REACT_APP_API_FALLBACK_URL=https://direct-api.financialnewsengine.com
-REACT_APP_ENV=development
-```
+#### Development Setup
 
-### Production
-In `.env.production`:
+1. Create a `.env.api` file in the frontend directory with these values:
 ```
-REACT_APP_API_URL=https://api.financialnewsengine.com
-REACT_APP_API_FALLBACK_URL=https://direct-api.financialnewsengine.com
-REACT_APP_ENV=production
-GENERATE_SOURCEMAP=false
+REACT_APP_SEARCH_ENGINE_ENDPOINT=your-elasticsearch-endpoint 
+REACT_APP_SEARCH_ENGINE_KEY=your-api-key
+REACT_APP_SEARCH_ENGINE_INDEX=your-index-name
+REACT_APP_USE_ENV_API=true
 ```
 
-The application uses a fallback API URL when the primary API endpoint is unreachable, providing enhanced reliability.
+2. Run the application with the API configuration:
+```
+npm run start:api
+```
+
+#### Handling CORS Issues
+
+If you encounter CORS errors when connecting to Elasticsearch, you should:
+
+1. Configure your Elasticsearch server to allow CORS requests from your application domain
+2. Set up a reverse proxy in production to forward requests to Elasticsearch
+3. Use a browser extension like CORS Unblock for development
+
+#### CI/CD Environment Setup
+
+For automated deployments, the application uses a CI/CD script that automatically generates environment variables from deployment settings.
+
+The CI/CD pipeline should set these environment variables:
+- `ELASTICSEARCH_URL`: The Elasticsearch endpoint
+- `ELASTICSEARCH_API_KEY`: The API key for authentication
+- `ELASTICSEARCH_INDEX`: The name of the index to use
+
+These will be automatically mapped to the corresponding React environment variables during the build process.
+
+## Available Scripts
+
+In the project directory, you can run:
+
+### `npm start`
+
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+
+### `npm run start:api`
+
+Runs the app using the configuration from `.env.api`
+
+### `npm test`
+
+Launches the test runner in the interactive watch mode.
+
+### `npm run build`
+
+Builds the app for production to the `build` folder.
+
+### `npm run build:api`
+
+Builds the app using the configuration from `.env.api`
+
+## How Environment Variables Work
+
+This project uses React's built-in environment variable system, which requires variables to be prefixed with `REACT_APP_` to be accessible in the frontend code.
+
+The application accesses these variables directly using `process.env.REACT_APP_*` in the source code, which are substituted at build time.
+
+No environment variables are injected at runtime - all environment values are baked into the build when you run `npm run build` or `npm run build:api`.
 
 ## Mock API Mode
 

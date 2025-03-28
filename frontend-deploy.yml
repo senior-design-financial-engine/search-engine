@@ -6,8 +6,6 @@ phases:
       nodejs: 16
     commands:
       - "echo \"Running frontend deployment...\""
-      - "echo \"Checking workspace contents\""
-      - "ls -la"
       - "echo \"Checking frontend directory\""
       - "ls -la frontend || echo \"No frontend directory found\""
       - "npm install -g cross-env"
@@ -15,8 +13,6 @@ phases:
   pre_build:
     commands:
       - echo "Preparing for deployment..."
-      - find . -name "build" -type d | sort
-      - find . -name "package.json" -type f | sort
       - |
         cat > detect_build.sh << 'EOF'
         #!/bin/bash
@@ -30,81 +26,57 @@ phases:
           echo "frontend"
         elif [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
           cd frontend
-          # Setup environment using CI script
           npm install
-          mkdir -p scripts
-          if [ ! -f "scripts/ci-env-setup.js" ]; then
-            echo "CI environment setup script not found, creating it..."
-            # Create basic script to extract environment variables
-            echo "
-            const fs = require('fs');
-            const path = require('path');
+          
+          # Generate environment configuration
+          if [ -n "$ELASTICSEARCH_URL" ] && [ -n "$ELASTICSEARCH_INDEX" ]; then
+            echo "Generating .env.api file with environment variables"
+            mkdir -p scripts
+            mkdir -p build
             
-            const rootDir = path.resolve(__dirname, '..');
-            const envApiPath = path.join(rootDir, '.env.api');
+            # Create environment settings
+            env_file=".env.api"
+            echo "# Environment configuration" > $env_file
+            echo "REACT_APP_SEARCH_ENGINE_ENDPOINT=$ELASTICSEARCH_URL" >> $env_file
+            echo "REACT_APP_SEARCH_ENGINE_INDEX=$ELASTICSEARCH_INDEX" >> $env_file
             
-            let envContent = '# Environment variables for Financial News Engine\\n';
-            envContent += '# Generated during deployment\\n\\n';
+            if [ -n "$ELASTICSEARCH_API_KEY" ]; then
+              echo "REACT_APP_SEARCH_ENGINE_KEY=$ELASTICSEARCH_API_KEY" >> $env_file
+            fi
             
-            const mapping = {
-              'ELASTICSEARCH_URL': 'REACT_APP_SEARCH_ENGINE_ENDPOINT',
-              'ELASTICSEARCH_API_KEY': 'REACT_APP_SEARCH_ENGINE_KEY',
-              'ELASTICSEARCH_INDEX': 'REACT_APP_SEARCH_ENGINE_INDEX'
-            };
-            
-            Object.entries(mapping).forEach(([ciVar, reactVar]) => {
-              const value = process.env[ciVar] || '';
-              envContent += \`\${reactVar}=\${value}\\n\`;
-            });
-            
-            fs.writeFileSync(envApiPath, envContent);
-            console.log('.env.api file created successfully');
-            " > scripts/ci-env-setup.js
+            echo "REACT_APP_USE_ENV_API=true" >> $env_file
+            echo "Environment configuration generated (not displaying values for security reasons)"
           fi
           
-          echo "Setting up environment variables for build..."
-          node scripts/ci-env-setup.js
-          
+          # Build the application
           echo "Building frontend..."
           npm run build:api
           cd ..
           echo "frontend/build"
         elif [ -f "package.json" ]; then
-          # Setup environment using CI script
           npm install
-          mkdir -p scripts
-          if [ ! -f "scripts/ci-env-setup.js" ]; then
-            echo "CI environment setup script not found, creating it..."
-            # Create basic script to extract environment variables
-            echo "
-            const fs = require('fs');
-            const path = require('path');
+          
+          # Generate environment configuration
+          if [ -n "$ELASTICSEARCH_URL" ] && [ -n "$ELASTICSEARCH_INDEX" ]; then
+            echo "Generating .env.api file with environment variables"
+            mkdir -p scripts
+            mkdir -p build
             
-            const rootDir = path.resolve(__dirname, '..');
-            const envApiPath = path.join(rootDir, '.env.api');
+            # Create environment settings
+            env_file=".env.api"
+            echo "# Environment configuration" > $env_file
+            echo "REACT_APP_SEARCH_ENGINE_ENDPOINT=$ELASTICSEARCH_URL" >> $env_file
+            echo "REACT_APP_SEARCH_ENGINE_INDEX=$ELASTICSEARCH_INDEX" >> $env_file
             
-            let envContent = '# Environment variables for Financial News Engine\\n';
-            envContent += '# Generated during deployment\\n\\n';
+            if [ -n "$ELASTICSEARCH_API_KEY" ]; then
+              echo "REACT_APP_SEARCH_ENGINE_KEY=$ELASTICSEARCH_API_KEY" >> $env_file
+            fi
             
-            const mapping = {
-              'ELASTICSEARCH_URL': 'REACT_APP_SEARCH_ENGINE_ENDPOINT',
-              'ELASTICSEARCH_API_KEY': 'REACT_APP_SEARCH_ENGINE_KEY',
-              'ELASTICSEARCH_INDEX': 'REACT_APP_SEARCH_ENGINE_INDEX'
-            };
-            
-            Object.entries(mapping).forEach(([ciVar, reactVar]) => {
-              const value = process.env[ciVar] || '';
-              envContent += \`\${reactVar}=\${value}\\n\`;
-            });
-            
-            fs.writeFileSync(envApiPath, envContent);
-            console.log('.env.api file created successfully');
-            " > scripts/ci-env-setup.js
+            echo "REACT_APP_USE_ENV_API=true" >> $env_file
+            echo "Environment configuration generated (not displaying values for security reasons)"
           fi
           
-          echo "Setting up environment variables for build..."
-          node scripts/ci-env-setup.js
-          
+          # Build the application
           echo "Building frontend..."
           npm run build:api
           echo "build"
@@ -120,8 +92,6 @@ phases:
   build:
     commands:
       - echo "Preparing deployment artifacts..."
-      - echo "Listing contents of current directory"
-      - ls -la
       - echo "Using build directory $BUILD_DIR"
   
   post_build:

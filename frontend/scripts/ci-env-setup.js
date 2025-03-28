@@ -30,8 +30,7 @@ console.log('Setting up environment for CI/CD build...');
 // Check for required environment variables
 const missingVars = requiredVars.filter(varName => !process.env[varName]);
 if (missingVars.length > 0) {
-  console.warn(`WARNING: The following environment variables are missing: ${missingVars.join(', ')}`);
-  console.warn('The application may not function correctly without these variables.');
+  console.log(`Some environment variables are not set: ${missingVars.join(', ')}`);
 }
 
 // Create .env.api content
@@ -44,27 +43,30 @@ Object.entries(envMapping).forEach(([ciVar, reactVar]) => {
   envContent += `${reactVar}=${value}\n`;
 });
 
+// Set USE_ENV_API flag
+envContent += 'REACT_APP_USE_ENV_API=true\n';
+
 // Create additional environment variables if needed
 if (process.env.ADDITIONAL_ENV_VARS) {
   envContent += '\n# Additional environment variables\n';
-  const additionalVars = JSON.parse(process.env.ADDITIONAL_ENV_VARS);
-  Object.entries(additionalVars).forEach(([key, value]) => {
-    if (key.startsWith('REACT_APP_')) {
-      envContent += `${key}=${value}\n`;
-    } else {
-      envContent += `REACT_APP_${key}=${value}\n`;
-    }
-  });
+  try {
+    const additionalVars = JSON.parse(process.env.ADDITIONAL_ENV_VARS);
+    Object.entries(additionalVars).forEach(([key, value]) => {
+      if (key.startsWith('REACT_APP_')) {
+        envContent += `${key}=${value}\n`;
+      } else {
+        envContent += `REACT_APP_${key}=${value}\n`;
+      }
+    });
+  } catch (e) {
+    console.log('Note: Could not parse ADDITIONAL_ENV_VARS, skipping additional variables');
+  }
 }
 
 // Write .env.api file
 fs.writeFileSync(envApiPath, envContent);
 
-console.log('.env.api file created successfully');
-console.log('Environment variables set:');
-console.log(Object.values(envMapping)
-  .map(varName => `- ${varName}${process.env[varName] ? ' ✓' : ' ✗'}`)
-  .join('\n'));
+console.log('Environment files created successfully');
 
-// Load the .env.api file for the build
+// Load the environment
 require('./load-env'); 

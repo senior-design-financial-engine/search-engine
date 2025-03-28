@@ -23,9 +23,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "start:api": "node scripts/load-env.js && cross-env react-scripts start",
+    "start:api": "node scripts/load-env.js && cross-env REACT_APP_USE_ENV_API=true react-scripts start",
     "build": "react-scripts build",
-    "build:api": "node scripts/load-env.js && cross-env react-scripts build",
+    "build:api": "node scripts/load-env.js && cross-env REACT_APP_USE_ENV_API=true react-scripts build",
     "test": "react-scripts test --transformIgnorePatterns \"node_modules/(?!axios)/\"",
     "eject": "react-scripts eject",
     "clean-install": "rm -rf node_modules package-lock.json && npm install"
