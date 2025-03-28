@@ -24,10 +24,43 @@ const resolveConfig = (envValue, configKey) => {
 	}
 };
 
+// Attempt to re-encode API key if needed
+const prepareApiKey = (key) => {
+	if (!key) return '';
+	
+	// Check if key already appears to be base64
+	const base64Regex = /^[A-Za-z0-9+/=]+$/;
+	const isBase64 = base64Regex.test(key) && key.length % 4 === 0;
+	
+	if (isBase64) {
+		console.log('Key appears to be properly encoded');
+		return key;
+	}
+	
+	// Try to decode and re-encode
+	try {
+		const decoded = atob(key);
+		console.log('Successfully decoded key');
+		return key; // Return original if decode successful
+	} catch (e) {
+		// Not valid base64, try to encode it
+		try {
+			console.log('Attempting to encode key');
+			return btoa(key);
+		} catch (e) {
+			console.log('Unable to encode key');
+			return key;
+		}
+	}
+};
+
 // Resolve configuration
 const resolvedEndpoint = resolveConfig(SEARCH_ENGINE_ENDPOINT, 'endpoint');
 const resolvedKey = resolveConfig(SEARCH_ENGINE_KEY, 'key');
 const resolvedIndex = resolveConfig(SEARCH_ENGINE_INDEX, 'index');
+
+// Process API key
+const processedKey = prepareApiKey(resolvedKey);
 
 // Log environment information
 console.log('Environment information:', {
@@ -35,7 +68,7 @@ console.log('Environment information:', {
 	origin: window.location.origin,
 	searchEngineEndpoint: resolvedEndpoint || 'not set',
 	searchEngineIndex: resolvedIndex || 'not set',
-	hasApiKey: !!resolvedKey,
+	hasApiKey: !!processedKey,
 	userAgent: navigator.userAgent,
 	nodeEnv: process.env.NODE_ENV
 });
@@ -47,7 +80,7 @@ const __config = {
 			? resolvedEndpoint 
 			: `https://${resolvedEndpoint}`)
 		: 'https://api.financialnewsengine.com',
-	apiKey: resolvedKey || '',
+	apiKey: processedKey || '',
 	idx: resolvedIndex || 'financial_news',
 	version: '7.14'
 };
@@ -59,7 +92,7 @@ if (hasMissingConfig) {
 	console.error('WARNING: Missing configuration:', {
 		endpoint: resolvedEndpoint || 'missing',
 		idx: resolvedIndex || 'missing',
-		hasApiKey: !!resolvedKey
+		hasApiKey: !!processedKey
 	});
 }
 
@@ -178,72 +211,95 @@ const queryElasticsearch = async (body) => {
 			requestPayload: JSON.stringify(body).substring(0, 200) + '...'
 		});
 		
-		// Try with different auth header formats to debug the 401 issue
+		// Extract key components if it appears to have a colon
+		let id = '', key = __config.apiKey;
+		if (__config.apiKey.includes(':')) {
+			const parts = __config.apiKey.split(':');
+			id = parts[0];
+			key = parts[1];
+			console.log('Key appears to be in id:key format');
+		}
+		
+		// Generate potential encodings
+		let encodedCredentials = __config.apiKey;
+		try {
+			if (id && key) {
+				encodedCredentials = btoa(`${id}:${key}`);
+				console.log('Generated combined encoding');
+			}
+		} catch (e) {
+			console.log('Encoding failed, using original');
+		}
+		
+		// Attempt with various authentication formats
 		const authHeaders = [
 			{ format: 'ApiKey', header: `ApiKey ${__config.apiKey}` },
+			{ format: 'ApiKey-Encoded', header: `ApiKey ${encodedCredentials}` },
 			{ format: 'Basic', header: `Basic ${__config.apiKey}` },
+			{ format: 'Basic-Encoded', header: `Basic ${encodedCredentials}` },
+			{ format: 'Bearer', header: `Bearer ${__config.apiKey}` },
+			{ format: 'ES-ApiKey', header: `ApiKey ${key}` },
 			{ format: 'Raw', header: `${__config.apiKey}` }
 		];
 		
-		// Log auth information for debugging (without revealing full key)
-		if (__config.apiKey) {
-			console.log(`Auth key details:`, {
-				length: __config.apiKey.length,
-				startsWithB64: __config.apiKey.startsWith('Yj'),
-				format: 'will try multiple formats'
-			});
-		} else {
-			console.log('Warning: Missing API key');
-		}
-		
-		// First attempt with ApiKey
-		console.log(`Sending request with auth format: ${authHeaders[0].format}`);
-		let response = await fetch(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': authHeaders[0].header
-			},
-			body: JSON.stringify(body)
+		// Diagnostic information
+		console.log(`Auth key details:`, {
+			length: __config.apiKey ? __config.apiKey.length : 0,
+			format: 'attempting multiple authentication formats',
+			hasColonSeparator: __config.apiKey.includes(':')
 		});
 		
-		// If first attempt fails with 401, try Basic auth
-		if (response.status === 401) {
-			console.log(`First auth format failed with 401, trying alternate format: ${authHeaders[1].format}`);
-			response = await fetch(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': authHeaders[1].header
-				},
-				body: JSON.stringify(body)
-			});
-			
-			// If second attempt fails with 401, try Raw auth
-			if (response.status === 401) {
-				console.log(`Second auth format failed with 401, trying final format: ${authHeaders[2].format}`);
+		let response = null;
+		let errorMessages = [];
+		
+		// Try each authentication format until one works
+		for (const authFormat of authHeaders) {
+			console.log(`Sending request with auth format: ${authFormat.format}`);
+			try {
 				response = await fetch(url, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
-						'Authorization': authHeaders[2].header
+						'Authorization': authFormat.header
 					},
 					body: JSON.stringify(body)
+				});
+				
+				// If successful, break out of the loop
+				if (response.ok) {
+					console.log(`Authentication succeeded with format: ${authFormat.format}`);
+					break;
+				}
+				
+				// Store error information for debugging
+				const responseText = await response.text();
+				errorMessages.push({
+					format: authFormat.format,
+					status: response.status,
+					responseText: responseText.substring(0, 100) + '...'
+				});
+				
+				// Continue to the next format if this one failed
+				console.log(`Format ${authFormat.format} failed with status: ${response.status}`);
+			} catch (error) {
+				console.error(`Request failed with format ${authFormat.format}:`, error.message);
+				errorMessages.push({
+					format: authFormat.format,
+					error: error.message
 				});
 			}
 		}
 		
-		console.log(`Response status: ${response.status}, ok: ${response.ok}`);
+		console.log(`Final response status: ${response?.status || 'No response'}, ok: ${response?.ok || false}`);
 		
-		if (!response.ok) {
-			const responseText = await response.text();
-			console.error(`Error ${response.status} for ${url}`, {
-				statusText: response.statusText,
-				responseBody: responseText ? responseText.substring(0, 500) : 'empty response'
+		if (!response || !response.ok) {
+			console.error(`Authentication failed with all formats`, {
+				errors: errorMessages,
+				endpoint: url
 			});
-			const error = new Error(`Search error: ${response.status}`);
+			const error = new Error(`Request failed: ${response?.status || 'No response'}`);
 			error.response = response;
-			error.responseText = responseText;
+			error.details = errorMessages;
 			throw error;
 		}
 		
@@ -251,8 +307,8 @@ const queryElasticsearch = async (body) => {
 		return await safeJsonParse(response);
 	} catch (error) {
 		console.error(`Query failed:`, {
-			message: error.message, 
-			responseText: error.responseText ? error.responseText.substring(0, 500) : 'none'
+			message: error.message,
+			details: error.details || 'No detailed error information'
 		});
 		throw error;
 	}
@@ -456,62 +512,68 @@ export const getArticleById = async (id) => {
 				const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
 				console.log(`Retrieving article by ID`);
 
-				// Try with different auth header formats to debug the 401 issue
+				// Attempt with various authentication formats
 				const authHeaders = [
 					{ format: 'ApiKey', header: `ApiKey ${__config.apiKey}` },
 					{ format: 'Basic', header: `Basic ${__config.apiKey}` },
+					{ format: 'Bearer', header: `Bearer ${__config.apiKey}` },
 					{ format: 'Raw', header: `${__config.apiKey}` }
 				];
 				
-				// Log auth attempt without revealing sensitive details
-				console.log(`Auth attempt for retrieval`, {
-					keyLength: __config.apiKey ? __config.apiKey.length : 0,
-					strategy: 'multiple formats'
+				// Diagnostic information
+				console.log(`Auth key details:`, {
+					length: __config.apiKey ? __config.apiKey.length : 0,
+					format: 'attempting multiple authentication formats'
 				});
 				
-				// First attempt with ApiKey
-				console.log(`Sending request with auth format: ${authHeaders[0].format}`);
-				let response = await fetch(url, {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json',
-						'Authorization': authHeaders[0].header
+				let response = null;
+				let errorMessages = [];
+				
+				// Try each authentication format until one works
+				for (const authFormat of authHeaders) {
+					console.log(`Sending request with auth format: ${authFormat.format}`);
+					try {
+						response = await fetch(url, {
+							method: 'GET',
+							headers: {
+								'Content-Type': 'application/json',
+								'Authorization': authFormat.header
+							}
+						});
+						
+						// If successful, break out of the loop
+						if (response.ok) {
+							console.log(`Authentication succeeded with format: ${authFormat.format}`);
+							break;
+						}
+						
+						// Store error information for debugging
+						const responseText = await response.text();
+						errorMessages.push({
+							format: authFormat.format,
+							status: response.status,
+							responseText: responseText.substring(0, 100) + '...'
+						});
+						
+						// Continue to the next format if this one failed
+						console.log(`Format ${authFormat.format} failed with status: ${response.status}`);
+					} catch (error) {
+						console.error(`Request failed with format ${authFormat.format}:`, error.message);
+						errorMessages.push({
+							format: authFormat.format,
+							error: error.message
+						});
 					}
-				});
-				
-				// If first attempt fails with 401, try Basic auth
-				if (response.status === 401) {
-					console.log(`First auth format failed with 401, trying alternate format: ${authHeaders[1].format}`);
-					response = await fetch(url, {
-						method: 'GET',
-						headers: {
-							'Content-Type': 'application/json',
-							'Authorization': authHeaders[1].header
-						}
-					});
 				}
 				
-				// If second attempt fails with 401, try Raw auth
-				if (response.status === 401) {
-					console.log(`Second auth format failed with 401, trying final format: ${authHeaders[2].format}`);
-					response = await fetch(url, {
-						method: 'GET',
-						headers: {
-							'Content-Type': 'application/json',
-							'Authorization': authHeaders[2].header
-						}
-					});
-				}
+				console.log(`Final response status: ${response?.status || 'No response'}, ok: ${response?.ok || false}`);
 				
-				console.log(`Response status: ${response.status}, ok: ${response.ok}`);
-				
-				if (!response.ok) {
-					const responseText = await response.text();
-					console.error(`Retrieval failed with status: ${response.status}`, {
-						statusText: response.statusText,
-						responseBody: responseText ? responseText.substring(0, 500) : 'empty response'
+				if (!response || !response.ok) {
+					console.error(`Authentication failed with all formats`, {
+						errors: errorMessages,
+						endpoint: url
 					});
-					throw new Error(`Article retrieval failed: ${response.status}`);
+					throw new Error(`Article retrieval failed: ${response?.status || 'No response'}`);
 				}
 				
 				console.log('Successfully retrieved article');
