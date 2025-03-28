@@ -1,37 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Button, Container, Row, Col, Card, Alert, Badge, ListGroup } from 'react-bootstrap';
+import { availableSources, timeRanges, sentiments } from '../constants';
 
 // Environment settings
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
 const USE_MOCK_API = process.env.REACT_APP_USE_MOCK_API === 'true';
-
-// Sample sources from our mock data for the dropdown
-const availableSources = [
-	'AP',
-	'BBC',
-	'CNBC',
-	'CNN',
-	'NPR',
-	'Reddit'
-];
-
-// Sample time ranges
-const timeRanges = [
-	{ value: 'all', label: 'All Time' },
-	{ value: '1d', label: 'Last 24 Hours' },
-	{ value: '7d', label: 'Last Week' },
-	{ value: '30d', label: 'Last Month' },
-	{ value: '90d', label: 'Last 3 Months' }
-];
-
-// Sample sentiment options
-const sentiments = [
-	{ value: 'all', label: 'All Sentiments' },
-	{ value: 'positive', label: 'Positive', color: 'success' },
-	{ value: 'negative', label: 'Negative', color: 'danger' },
-	{ value: 'neutral', label: 'Neutral', color: 'info' }
-];
 
 // Sample search examples organized by category
 const searchExamples = {

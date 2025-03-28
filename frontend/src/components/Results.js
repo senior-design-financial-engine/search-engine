@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { searchArticles } from '../services/api';
 import { Container, Row, Col, Card, Button, Badge, Spinner, Form, Alert } from 'react-bootstrap';
 import AnalyticsSideMenu from './AnalyticsSideMenu';
+import { availableSources } from '../constants';
 import '../styles/Results.css';
 
 function Results() {
