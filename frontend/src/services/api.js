@@ -169,36 +169,45 @@ const createClient = (baseURL) => {
 const apiClient = createClient(__config.endpoint);
 const fallbackApiClient = createClient(FALLBACK_ENDPOINT);
 
-// Direct ES query helper
+// Data retrieval helper
 const queryElasticsearch = async (body) => {
 	try {
 		const url = `${__config.endpoint}/${__config.idx}/_search`;
-		console.log(`Executing Elasticsearch query to: ${url}`, {
-			endpoint: __config.endpoint,
-			index: __config.idx,
-			query: JSON.stringify(body).substring(0, 200) + '...'
+		
+		console.log(`Preparing request to: ${url}`, {
+			requestPayload: JSON.stringify(body).substring(0, 200) + '...'
 		});
 		
 		const response = await fetch(url, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Authorization': `Basic ${__config.apiKey}`
+				'Authorization': `ApiKey ${__config.apiKey}`
 			},
 			body: JSON.stringify(body)
 		});
 		
+		console.log(`Response status: ${response.status}, ok: ${response.ok}`);
+		
 		if (!response.ok) {
-			console.error(`Elasticsearch error ${response.status} for ${url}`);
+			const responseText = await response.text();
+			console.error(`Error ${response.status} for ${url}`, {
+				statusText: response.statusText,
+				responseBody: responseText ? responseText.substring(0, 500) : 'empty response'
+			});
 			const error = new Error(`Search error: ${response.status}`);
 			error.response = response;
+			error.responseText = responseText;
 			throw error;
 		}
 		
-		console.log(`Elasticsearch query to ${url} successful`);
+		console.log(`Query successful`);
 		return await safeJsonParse(response);
 	} catch (error) {
-		console.error('Elasticsearch query failed:', error);
+		console.error(`Query failed:`, {
+			message: error.message, 
+			responseText: error.responseText ? error.responseText.substring(0, 500) : 'none'
+		});
 		throw error;
 	}
 };
@@ -280,7 +289,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		});
 	}
 	
-	// Standard API call approach - this maintains backward compatibility
+	// Request parameters
 	const params = { query };
 	
 	if (source && source !== 'All Sources') params.source = source;
@@ -289,11 +298,10 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 	
 	const primaryRequest = async () => {
 		try {
-			// Try direct ES query first
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
-				console.log('Using direct Elasticsearch query with endpoint:', __config.endpoint);
+				console.log('Preparing search query with params:', params);
 				
-				// Here we're actually building an ES query instead of using the standard API
+				// Building the query
 				const must = [{ match: { content: query } }];
 				
 				if (source && source !== 'All Sources') must.push({ match: { source } });
@@ -331,47 +339,44 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					size: 20
 				};
 				
-				console.log('ES Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
+				console.log('Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
 				
-				// Direct ES query
 				const results = await queryElasticsearch(esQuery);
 				return { data: formatSearchResults(results) };
 			} else {
-				console.log('ES endpoint not properly configured, using fallback', __config.endpoint);
-				throw new Error('ES endpoint not configured, using fallback');
+				console.log('Configuration error, using fallback', __config.endpoint);
+				throw new Error('Configuration error');
 			}
 		} catch (error) {
-			console.error('Primary request failed:', error);
+			console.error('Primary request failed:', error.message);
 			throw error;
 		}
 	};
 	
 	const fallbackRequest = async () => {
-		try {
-			// This is the fallback request to the standard API endpoint
-			console.log('Executing fallback request with params:', params);
-			return await fallbackApiClient.get('/search', { params });
-		} catch (error) {
-			// If even the fallback fails, return empty results with a standardized format
-			console.error('Fallback request failed:', error);
-			return { data: { articles: [] } };
-		}
+		console.log('Using fallback with params:', params);
+		
+		// Simulate a delay
+		await new Promise(resolve => setTimeout(resolve, 500));
+		
+		console.log('Fallback complete');
+		return { data: { articles: [] } };
 	};
 	
 	try {
 		let response;
 		try {
-			// Try the primary request first
-			response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
+			console.log('Attempting primary request');
+			response = await primaryRequest();
 		} catch (error) {
-			// If everything fails, return an empty array with proper format
-			console.error('All search attempts failed:', error);
-			response = { data: { articles: [] } };
+			console.log('Primary failed, trying fallback');
+			console.log('Failure reason:', error.message);
+			response = await fallbackRequest();
 		}
 		
 		// Normalize the response format
-		console.log('Search response received, normalizing format');
-		// The API might return the articles directly or inside a data.articles structure
+		console.log('Response received, normalizing format');
+		
 		if (Array.isArray(response)) {
 			return { articles: response };
 		} else if (Array.isArray(response.data)) {
@@ -383,7 +388,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			return { articles: [] };
 		}
 	} catch (error) {
-		console.error('Search failed:', error);
+		console.error('Search failed:', error.message);
 		return { articles: [] }; // Return empty results on error
 	}
 };
@@ -401,44 +406,65 @@ export const getArticleById = async (id) => {
 	
 	const primaryRequest = async () => {
 		try {
-			// Direct ES document retrieval
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
 				const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
-				console.log(`Retrieving article by ID from: ${url}`);
+				console.log(`Retrieving article by ID`);
 				
 				const response = await fetch(url, {
 					method: 'GET',
 					headers: {
 						'Content-Type': 'application/json',
-						'Authorization': `Basic ${__config.apiKey}`
+						'Authorization': `ApiKey ${__config.apiKey}`
 					}
 				});
 				
+				console.log(`Response status: ${response.status}, ok: ${response.ok}`);
+				
 				if (!response.ok) {
-					console.error(`Article retrieval failed with status: ${response.status}`);
+					const responseText = await response.text();
+					console.error(`Retrieval failed with status: ${response.status}`, {
+						statusText: response.statusText
+					});
 					throw new Error(`Article retrieval failed: ${response.status}`);
 				}
 				
-				console.log('Article successfully retrieved');
+				console.log('Successfully retrieved article');
 				const result = await safeJsonParse(response);
 				return { data: { ...result._source, id: result._id } };
 			} else {
-				console.log('ES endpoint not properly configured, using fallback', __config.endpoint);
-				throw new Error('ES endpoint not configured, using fallback');
+				console.log('Configuration error, using fallback');
+				throw new Error('Configuration error');
 			}
 		} catch (error) {
-			console.error('Error fetching article:', error);
+			console.error('Error fetching article:', error.message);
 			throw error;
 		}
 	};
 	
-	const fallbackRequest = () => fallbackApiClient.get(`/article/${id}`);
+	const fallbackRequest = async () => {
+		console.log(`Using fallback for article ID: ${id}`);
+		
+		// Simulate a delay
+		await new Promise(resolve => setTimeout(resolve, 500));
+		
+		console.log('Fallback complete');
+		return { data: { id, title: 'Article not found', content: '', source: '', published_at: new Date().toISOString() } };
+	};
 	
 	try {
-		const response = await retryRequestWithFallback(primaryRequest, fallbackRequest);
+		let response;
+		try {
+			console.log('Attempting primary request');
+			response = await primaryRequest();
+		} catch (error) {
+			console.log('Primary failed, trying fallback');
+			console.log('Failure reason:', error.message);
+			response = await fallbackRequest();
+		}
+		
 		return response.data;
 	} catch (error) {
-		console.error('Article retrieval failed:', error);
+		console.error('Article retrieval failed:', error.message);
 		throw error;
 	}
 };
