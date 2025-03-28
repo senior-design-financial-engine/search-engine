@@ -39,10 +39,10 @@
 
 /* Card styling */
 .card {
-  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
-  border-radius: var(--radius-md);
+  background-color: #ffffff;
   border: none;
-  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  border-radius: var(--radius-md);
   overflow: hidden;
   height: 100%;
   display: flex;
@@ -50,8 +50,8 @@
 }
 
 .card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow) !important;
+  transform: translateY(-4px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
 }
 
 .card-title {
@@ -66,19 +66,22 @@
 }
 
 .card-text {
-  color: var(--secondary);
+  color: #6c757d;
   font-size: 0.9rem;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-bottom: 1rem;
+  line-height: 1.5;
 }
 
 .card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
 }
 
 .card-footer {
@@ -91,13 +94,17 @@
 /* Badge styling */
 .badge {
   font-weight: 500;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.3px;
   padding: 0.4em 0.7em;
   transition: all var(--transition-fast);
 }
 
 .badge.rounded-pill {
   border-radius: var(--radius-pill);
+}
+
+.badge.bg-primary {
+  background-color: var(--primary) !important;
 }
 
 /* Filter badges */
@@ -168,11 +175,14 @@
 
 /* Results page structure */
 .results-page {
+  background-color: #f8f9fa;
+  min-height: 100vh;
   position: relative;
-  min-height: calc(100vh - 70px);
 }
 
 .main-results-area {
+  padding-top: 2rem;
+  padding-bottom: 3rem;
   transition: width var(--transition-normal);
   padding: 0 1rem;
 }
@@ -248,10 +258,11 @@
 
 /* Search header */
 .search-header {
-  box-shadow: var(--shadow-sm);
+  background-color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   z-index: 1010;
   padding: 1.25rem 0;
-  background-color: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   position: sticky;
@@ -260,6 +271,10 @@
 
 /* Fix for filter overlapping */
 .filter-row {
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
   margin-top: 20px;
   margin-bottom: 15px;
   display: flex;
@@ -382,4 +397,39 @@
   .filter-select {
     height: 45px;
   }
+}
+
+/* Card Content Styling */
+.card-body {
+  position: relative;
+  z-index: 1;
+}
+
+.card-title a {
+  font-weight: 600;
+}
+
+/* Hover Effects */
+.hover-lift {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out !important;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Search Header Enhancement */
+.search-header {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Filter Section Enhancement */
+.filter-row {
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
 }

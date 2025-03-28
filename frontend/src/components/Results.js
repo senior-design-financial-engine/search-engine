@@ -64,7 +64,7 @@ function Results() {
   }, [query, source, timeRange, sentiment]);
 
   const handleBack = () => {
-    navigate(-1); // Navigate back to the previous page
+    navigate('/'); // Navigate to homepage instead of previous page
   };
   
   const handleFilterChange = (filterType, value) => {
@@ -225,9 +225,13 @@ function Results() {
     
     return sortedResults.map((article, index) => (
       <Col md={4} key={index} className="mb-4">
-        <Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+        <Card className="h-100 shadow hover-lift border-0 rounded-3" style={{
+          backgroundColor: '#ffffff',
+          boxShadow: '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)',
+          transition: 'all 0.2s ease-in-out'
+        }}>
           <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
-            <Badge bg="secondary" pill className="px-3 py-2">
+            <Badge bg="primary" pill className="px-3 py-2">
               {article.source || 'Unknown Source'}
             </Badge>
             <small className="text-muted">
@@ -241,7 +245,8 @@ function Results() {
                 href={article.url || '#'} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-decoration-none text-primary stretched-link"
+                className="text-decoration-none text-dark stretched-link hover-primary"
+                style={{ transition: 'color 0.2s ease-in-out' }}
               >
                 {article.headline || 'Untitled Article'}
               </a>

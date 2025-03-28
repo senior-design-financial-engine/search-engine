@@ -375,14 +375,23 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				
 				const esQuery = {
 					query: {
-						bool: { must }
+						bool: { 
+							must,
+							should: [
+								{ match_phrase: { title: { query: query, boost: 3.0 } } },
+								{ match_phrase: { content: { query: query, boost: 2.0 } } },
+								{ match: { title: { query: query, boost: 1.5 } } },
+								{ match: { content: { query: query, boost: 1.0 } } }
+							]
+						}
 					},
-					// Sort by relevance score first, then by date
+					// Improved sorting with score boosting
 					sort: [
-						"_score",
-						{ "published_at.enum": { order: "desc" } }
+						{ "_score": { "order": "desc" } },
+						{ "published_at": { "order": "desc" } }
 					],
-					size: 20
+					size: 20,
+					track_scores: true
 				};
 				
 				console.log('Query:', JSON.stringify(esQuery).substring(0, 200) + '...');

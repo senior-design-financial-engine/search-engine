@@ -190,33 +190,70 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           padding: 8,
           font: {
             size: 11
-          }
+          },
+          color: '#495057'
         }
       },
       tooltip: {
         enabled: true,
         intersect: false,
-        mode: 'index'
+        mode: 'index',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        titleColor: '#495057',
+        bodyColor: '#495057',
+        borderColor: '#dee2e6',
+        borderWidth: 1
       }
     },
     layout: {
       padding: {
-        left: 5,
-        right: 5,
-        top: 5,
-        bottom: 5
+        left: 10,
+        right: 10,
+        top: 10,
+        bottom: 10
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: '#f0f0f0'
+        },
+        ticks: {
+          color: '#495057'
+        }
+      },
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          color: '#495057'
+        }
       }
     }
   };
   
-  // Prepare chart data with accessible colors
+  // Prepare chart data with accessible colors and proper data handling
   const sentimentChartData = {
     labels: ['Positive', 'Neutral', 'Negative'],
     datasets: [
       {
-        data: [sentimentCounts.positive, sentimentCounts.neutral, sentimentCounts.negative],
-        backgroundColor: ['rgba(40, 167, 69, 0.8)', 'rgba(23, 162, 184, 0.8)', 'rgba(220, 53, 69, 0.8)'],
-        borderColor: ['rgba(40, 167, 69, 1)', 'rgba(23, 162, 184, 1)', 'rgba(220, 53, 69, 1)'],
+        data: [
+          sentimentCounts.positive || 0,
+          sentimentCounts.neutral || 0,
+          sentimentCounts.negative || 0
+        ],
+        backgroundColor: [
+          'rgba(40, 167, 69, 0.8)',
+          'rgba(108, 117, 125, 0.8)',
+          'rgba(220, 53, 69, 0.8)'
+        ],
+        borderColor: [
+          'rgba(40, 167, 69, 1)',
+          'rgba(108, 117, 125, 1)',
+          'rgba(220, 53, 69, 1)'
+        ],
         borderWidth: 1,
       },
     ],
@@ -228,9 +265,11 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       {
         label: 'Articles',
         data: Object.values(sourceCounts).slice(0, 5),
-        backgroundColor: 'rgba(67, 97, 238, 0.7)',
-        borderColor: 'rgba(67, 97, 238, 1)',
+        backgroundColor: Array(5).fill('rgba(67, 97, 238, 0.7)'),
+        borderColor: Array(5).fill('rgba(67, 97, 238, 1)'),
         borderWidth: 1,
+        barThickness: 'flex',
+        maxBarThickness: 50
       },
     ],
   };
@@ -240,11 +279,14 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
     datasets: [
       {
         label: 'Articles',
-        data: Object.values(monthlyTrends).map(month => month.articles),
-        borderColor: 'rgba(108, 117, 125, 1)',
-        backgroundColor: 'rgba(108, 117, 125, 0.2)',
+        data: Object.values(monthlyTrends).map(month => month.articles || 0),
+        borderColor: 'rgba(67, 97, 238, 1)',
+        backgroundColor: 'rgba(67, 97, 238, 0.1)',
         tension: 0.3,
         fill: true,
+        pointBackgroundColor: 'rgba(67, 97, 238, 1)',
+        pointRadius: 3,
+        pointHoverRadius: 5
       },
     ],
   };
@@ -254,24 +296,33 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
     datasets: [
       {
         label: 'Positive',
-        data: Object.values(monthlyTrends).map(month => month.positive),
+        data: Object.values(monthlyTrends).map(month => month.positive || 0),
         borderColor: 'rgba(40, 167, 69, 1)',
         backgroundColor: 'rgba(40, 167, 69, 0.1)',
         tension: 0.3,
+        pointBackgroundColor: 'rgba(40, 167, 69, 1)',
+        pointRadius: 3,
+        pointHoverRadius: 5
       },
       {
         label: 'Neutral',
-        data: Object.values(monthlyTrends).map(month => month.neutral),
-        borderColor: 'rgba(23, 162, 184, 1)',
-        backgroundColor: 'rgba(23, 162, 184, 0.1)',
+        data: Object.values(monthlyTrends).map(month => month.neutral || 0),
+        borderColor: 'rgba(108, 117, 125, 1)',
+        backgroundColor: 'rgba(108, 117, 125, 0.1)',
         tension: 0.3,
+        pointBackgroundColor: 'rgba(108, 117, 125, 1)',
+        pointRadius: 3,
+        pointHoverRadius: 5
       },
       {
         label: 'Negative',
-        data: Object.values(monthlyTrends).map(month => month.negative),
+        data: Object.values(monthlyTrends).map(month => month.negative || 0),
         borderColor: 'rgba(220, 53, 69, 1)',
         backgroundColor: 'rgba(220, 53, 69, 0.1)',
         tension: 0.3,
+        pointBackgroundColor: 'rgba(220, 53, 69, 1)',
+        pointRadius: 3,
+        pointHoverRadius: 5
       },
     ],
   };
