@@ -183,7 +183,7 @@ const queryElasticsearch = async (body) => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Authorization': `ApiKey ${__config.apiKey}`
+				'Authorization': `Basic ${__config.apiKey}`
 			},
 			body: JSON.stringify(body)
 		});
@@ -410,7 +410,7 @@ export const getArticleById = async (id) => {
 					method: 'GET',
 					headers: {
 						'Content-Type': 'application/json',
-						'Authorization': `ApiKey ${__config.apiKey}`
+						'Authorization': `Basic ${__config.apiKey}`
 					}
 				});
 				
