@@ -345,16 +345,23 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				console.log('Preparing search query with params:', params);
 				
 				// Building the query
-				const must = [{ match: { content: query } }];
+				const must = [];
+				const should = [];
 				
-				// Source filter - using keyword field and case-insensitive match
+				// Content and headline matching
+				should.push(
+					{ match_phrase: { "headline.enum": { query: query, boost: 3.0 } } },
+					{ match_phrase: { "content.enum": { query: query, boost: 2.0 } } },
+					{ match: { "headline.enum": { query: query, boost: 1.5 } } },
+					{ match: { "content.enum": { query: query, boost: 1.0 } } }
+				);
+				
+				// Source filter - using keyword field with term query for exact matching
 				if (source && source !== 'All Sources') {
 					must.push({
-						match: {
+						term: {
 							"source.enum": {
-								query: source,
-								operator: "or",
-								fuzziness: 0,
+								value: source,
 								case_insensitive: true
 							}
 						}
@@ -380,11 +387,13 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						default: startDate = new Date(now.setDate(now.getDate() - 30));
 					}
 					
+					// Convert dates to ISO strings for exact matching with the enum field
 					must.push({
 						range: {
 							"published_at.enum": {
 								gte: startDate.toISOString(),
-								lte: new Date().toISOString()
+								lte: new Date().toISOString(),
+								format: "strict_date_time"
 							}
 						}
 					});
@@ -394,12 +403,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					query: {
 						bool: { 
 							must,
-							should: [
-								{ match_phrase: { "headline.enum": { query: query, boost: 3.0 } } },
-								{ match_phrase: { "content.enum": { query: query, boost: 2.0 } } },
-								{ match: { "headline.enum": { query: query, boost: 1.5 } } },
-								{ match: { "content.enum": { query: query, boost: 1.0 } } }
-							],
+							should,
 							minimum_should_match: 1
 						}
 					},
@@ -411,7 +415,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					track_scores: true
 				};
 				
-				console.log('Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
+				console.log('Query:', JSON.stringify(esQuery));
 				
 				let results;
 				try {
