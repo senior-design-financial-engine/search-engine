@@ -22,7 +22,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:api": "cp .env.api .env && react-scripts start",
     "build": "react-scripts build",
+    "build:api": "cp .env.api .env && react-scripts build",
     "test": "react-scripts test --transformIgnorePatterns \"node_modules/(?!axios)/\"",
     "eject": "react-scripts eject",
     "clean-install": "rm -rf node_modules package-lock.json && npm install"

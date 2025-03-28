@@ -10,7 +10,7 @@ console.log('Environment information:', {
 	userAgent: navigator.userAgent
 });
 
-// Runtime configuration - injected during build/deployment
+// Runtime configuration from environment variables
 const __config = {
 	endpoint: window.__SEARCH_ENGINE_ENDPOINT 
 		? (window.__SEARCH_ENGINE_ENDPOINT.startsWith('http') 
@@ -22,16 +22,14 @@ const __config = {
 	version: '7.14'
 };
 
-// Check for placeholder values
-const hasPlaceholders = (
-	__config.endpoint.includes('placeholder') || 
-	__config.endpoint.includes('PLACEHOLDER') || 
-	__config.idx.includes('placeholder') || 
-	__config.idx.includes('PLACEHOLDER')
+// Check for invalid environment variables
+const hasInvalidConfig = (
+	__config.endpoint.includes('%REACT_APP_') || 
+	__config.idx.includes('%REACT_APP_')
 );
 
-if (hasPlaceholders) {
-	console.error('WARNING: Placeholder values detected in configuration:', {
+if (hasInvalidConfig) {
+	console.error('WARNING: Environment variables not properly loaded:', {
 		endpoint: __config.endpoint,
 		idx: __config.idx
 	});

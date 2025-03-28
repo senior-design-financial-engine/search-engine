@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # This script injects the Elasticsearch configuration values into the built HTML files
+# It can also generate a .env.api file for environment-based configuration
 # It should be run after the frontend build and before deployment to S3
 
 set -e
@@ -11,6 +12,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Default locations
 BUILD_DIR="frontend/build"
 INDEX_FILE="$BUILD_DIR/index.html"
+ENV_API_FILE="frontend/.env.api"
 
 # Check if custom build directory is provided
 if [ $# -ge 1 ]; then
@@ -52,20 +54,37 @@ if [ -z "$ES_API_KEY" ]; then
   ES_API_KEY=""
 fi
 
-echo "Injecting configuration values into $INDEX_FILE"
+# Create a .env.api file for environment-based configuration (preferred method)
+echo "Creating .env.api file at $ENV_API_FILE"
+mkdir -p $(dirname "$ENV_API_FILE")
+cat > "$ENV_API_FILE" << EOL
+# Elasticsearch configuration
+REACT_APP_SEARCH_ENGINE_ENDPOINT=$ES_ENDPOINT
+REACT_APP_SEARCH_ENGINE_KEY=$ES_API_KEY
+REACT_APP_SEARCH_ENGINE_INDEX=$ES_INDEX
+EOL
 
-# Replace placeholder values in the index.html file
-# Using sed with different syntax for macOS and Linux
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  # macOS
-  sed -i '' "s|PLACEHOLDER_ENDPOINT|$ES_ENDPOINT|g" "$INDEX_FILE"
-  sed -i '' "s|PLACEHOLDER_KEY|$ES_API_KEY|g" "$INDEX_FILE"
-  sed -i '' "s|PLACEHOLDER_INDEX|$ES_INDEX|g" "$INDEX_FILE"
+# Also inject values into index.html for backward compatibility
+if [ -f "$INDEX_FILE" ]; then
+  echo "Also injecting configuration values into $INDEX_FILE (for backward compatibility)"
+
+  # Replace placeholder values in the index.html file
+  # Using sed with different syntax for macOS and Linux
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s|%REACT_APP_SEARCH_ENGINE_ENDPOINT%|$ES_ENDPOINT|g" "$INDEX_FILE"
+    sed -i '' "s|%REACT_APP_SEARCH_ENGINE_KEY%|$ES_API_KEY|g" "$INDEX_FILE"
+    sed -i '' "s|%REACT_APP_SEARCH_ENGINE_INDEX%|$ES_INDEX|g" "$INDEX_FILE"
+  else
+    # Linux
+    sed -i "s|%REACT_APP_SEARCH_ENGINE_ENDPOINT%|$ES_ENDPOINT|g" "$INDEX_FILE"
+    sed -i "s|%REACT_APP_SEARCH_ENGINE_KEY%|$ES_API_KEY|g" "$INDEX_FILE"
+    sed -i "s|%REACT_APP_SEARCH_ENGINE_INDEX%|$ES_INDEX|g" "$INDEX_FILE"
+  fi
+
+  echo "Configuration values successfully injected into $INDEX_FILE"
 else
-  # Linux
-  sed -i "s|PLACEHOLDER_ENDPOINT|$ES_ENDPOINT|g" "$INDEX_FILE"
-  sed -i "s|PLACEHOLDER_KEY|$ES_API_KEY|g" "$INDEX_FILE"
-  sed -i "s|PLACEHOLDER_INDEX|$ES_INDEX|g" "$INDEX_FILE"
+  echo "Index file not found at $INDEX_FILE, skipping HTML injection"
 fi
 
-echo "Configuration values successfully injected into $INDEX_FILE" 
+echo "Configuration setup completed" 
