@@ -162,6 +162,32 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
 }
 
+.analytics-card .card-header {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.analytics-card .card-header:hover {
+  background-color: #f8f9fa !important;
+}
+
+.analytics-card .card-header i.bi-chevron-up,
+.analytics-card .card-header i.bi-chevron-down {
+  transition: transform 0.3s ease;
+}
+
+.analytics-card .card-header:hover i.bi-chevron-up {
+  transform: translateY(-2px);
+}
+
+.analytics-card .card-header:hover i.bi-chevron-down {
+  transform: translateY(2px);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
 .chart-container {
   height: 200px;
   margin-bottom: 15px;

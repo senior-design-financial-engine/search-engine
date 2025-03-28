@@ -24,6 +24,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState({});
+  const [collapsedSections, setCollapsedSections] = useState({});
 
   const sideMenuRef = useRef(null);
   const [tooltipText, setTooltipText] = useState('Open Analytics');
@@ -50,6 +51,19 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   useEffect(() => {
     setTooltipText(isOpen ? 'Close Analytics (Alt+A)' : 'Open Analytics (Alt+A)');
   }, [isOpen]);
+
+  // Toggle section collapse state
+  const toggleSection = (sectionId) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
+
+  // Check if a section is collapsed
+  const isSectionCollapsed = (sectionId) => {
+    return collapsedSections[sectionId] === true;
+  };
 
   useEffect(() => {
     if (results && results.length > 0) {
@@ -267,7 +281,9 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           {isOpen ? (
             <i className="bi bi-chevron-right"></i>
           ) : (
-            <i className="bi bi-chevron-left"></i>
+            <>
+              <i className="bi bi-graph-up-arrow"></i>
+            </>
           )}
         </div>
       </Button>
@@ -300,117 +316,153 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           <>
             {/* Sentiment Distribution */}
             <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header className="bg-white">
+              <Card.Header 
+                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
+                onClick={() => toggleSection('sentiment')}
+              >
                 <h5 className="mb-0">
                   <i className="bi bi-emoji-smile me-2 text-primary"></i>
                   Sentiment Distribution
                 </h5>
+                <i className={`bi bi-chevron-${isSectionCollapsed('sentiment') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              <Card.Body>
-                <div className="chart-container mb-3">
-                  <Pie data={sentimentChartData} options={chartOptions} />
-                </div>
-              </Card.Body>
+              {!isSectionCollapsed('sentiment') && (
+                <Card.Body>
+                  <div className="chart-container mb-3">
+                    <Pie data={sentimentChartData} options={chartOptions} />
+                  </div>
+                </Card.Body>
+              )}
             </Card>
 
             {/* Source Distribution */}
             <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header className="bg-white">
+              <Card.Header 
+                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
+                onClick={() => toggleSection('sources')}
+              >
                 <h5 className="mb-0">
                   <i className="bi bi-newspaper me-2 text-primary"></i>
                   Top Sources
                 </h5>
+                <i className={`bi bi-chevron-${isSectionCollapsed('sources') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              <Card.Body>
-                <div className="chart-container mb-3">
-                  <Bar data={sourceChartData} options={chartOptions} />
-                </div>
-              </Card.Body>
+              {!isSectionCollapsed('sources') && (
+                <Card.Body>
+                  <div className="chart-container mb-3">
+                    <Bar data={sourceChartData} options={chartOptions} />
+                  </div>
+                </Card.Body>
+              )}
             </Card>
 
             {/* Top Companies */}
             <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header className="bg-white">
+              <Card.Header 
+                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
+                onClick={() => toggleSection('companies')}
+              >
                 <h5 className="mb-0">
                   <i className="bi bi-building me-2 text-primary"></i>
                   Top Companies Mentioned
                 </h5>
+                <i className={`bi bi-chevron-${isSectionCollapsed('companies') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              <Card.Body>
-                <div className="d-flex flex-wrap">
-                  {topCompanies.length > 0 ? (
-                    topCompanies.map((company, index) => (
-                      <Badge 
-                        key={index} 
-                        bg="light" 
-                        text="dark" 
-                        className="me-2 mb-2 border rounded-pill py-2 px-3"
-                      >
-                        {company.name} ({company.count})
-                      </Badge>
-                    ))
-                  ) : (
-                    <p className="text-muted">No company data available</p>
-                  )}
-                </div>
-              </Card.Body>
+              {!isSectionCollapsed('companies') && (
+                <Card.Body>
+                  <div className="d-flex flex-wrap">
+                    {topCompanies.length > 0 ? (
+                      topCompanies.map((company, index) => (
+                        <Badge 
+                          key={index} 
+                          bg="light" 
+                          text="dark" 
+                          className="me-2 mb-2 border rounded-pill py-2 px-3"
+                        >
+                          {company.name} ({company.count})
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-muted">No company data available</p>
+                    )}
+                  </div>
+                </Card.Body>
+              )}
             </Card>
 
             {/* Top Categories */}
             <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header className="bg-white">
+              <Card.Header 
+                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
+                onClick={() => toggleSection('categories')}
+              >
                 <h5 className="mb-0">
                   <i className="bi bi-tags me-2 text-primary"></i>
                   Top Categories
                 </h5>
+                <i className={`bi bi-chevron-${isSectionCollapsed('categories') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              <Card.Body>
-                <div className="d-flex flex-wrap">
-                  {topCategories.length > 0 ? (
-                    topCategories.map((category, index) => (
-                      <Badge 
-                        key={index} 
-                        bg="info" 
-                        className="me-2 mb-2 rounded-pill py-2 px-3"
-                      >
-                        {category.name} ({category.count})
-                      </Badge>
-                    ))
-                  ) : (
-                    <p className="text-muted">No category data available</p>
-                  )}
-                </div>
-              </Card.Body>
+              {!isSectionCollapsed('categories') && (
+                <Card.Body>
+                  <div className="d-flex flex-wrap">
+                    {topCategories.length > 0 ? (
+                      topCategories.map((category, index) => (
+                        <Badge 
+                          key={index} 
+                          bg="info" 
+                          className="me-2 mb-2 rounded-pill py-2 px-3"
+                        >
+                          {category.name} ({category.count})
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-muted">No category data available</p>
+                    )}
+                  </div>
+                </Card.Body>
+              )}
             </Card>
 
             {/* Publication Timeline */}
             <Card className="analytics-card shadow-sm mb-4">
-              <Card.Header className="bg-white">
+              <Card.Header 
+                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
+                onClick={() => toggleSection('timeline')}
+              >
                 <h5 className="mb-0">
                   <i className="bi bi-calendar-date me-2 text-primary"></i>
                   Publication Timeline
                 </h5>
+                <i className={`bi bi-chevron-${isSectionCollapsed('timeline') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              <Card.Body>
-                <div className="chart-container mb-3">
-                  <Line data={timelineChartData} options={chartOptions} />
-                </div>
-              </Card.Body>
+              {!isSectionCollapsed('timeline') && (
+                <Card.Body>
+                  <div className="chart-container mb-3">
+                    <Line data={timelineChartData} options={chartOptions} />
+                  </div>
+                </Card.Body>
+              )}
             </Card>
             
             {/* Sentiment Trends */}
             <Card className="analytics-card shadow-sm">
-              <Card.Header className="bg-white">
+              <Card.Header 
+                className="bg-white d-flex justify-content-between align-items-center cursor-pointer"
+                onClick={() => toggleSection('trends')}
+              >
                 <h5 className="mb-0">
                   <i className="bi bi-graph-up me-2 text-primary"></i>
                   Sentiment Trends
                 </h5>
+                <i className={`bi bi-chevron-${isSectionCollapsed('trends') ? 'down' : 'up'}`}></i>
               </Card.Header>
-              <Card.Body>
-                <div className="chart-container mb-3">
-                  <Line data={sentimentTrendChartData} options={chartOptions} />
-                </div>
-              </Card.Body>
+              {!isSectionCollapsed('trends') && (
+                <Card.Body>
+                  <div className="chart-container mb-3">
+                    <Line data={sentimentTrendChartData} options={chartOptions} />
+                  </div>
+                </Card.Body>
+              )}
             </Card>
           </>
         ) : (
