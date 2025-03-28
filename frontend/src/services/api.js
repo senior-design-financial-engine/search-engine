@@ -251,10 +251,19 @@ const formatSearchResults = (esResults) => {
 		return { articles: [] };
 	}
 	
+	// Log scoring information for debugging
+	if (esResults.hits.hits.length > 0) {
+		console.log('Raw ES scores:', esResults.hits.hits.slice(0, 3).map(hit => ({
+			id: hit._id,
+			score: hit._score,
+			title: hit._source.title?.substring(0, 30)
+		})));
+	}
+	
 	return {
 		articles: esResults.hits.hits.map(hit => ({
 			id: hit._id,
-			score: hit._score,
+			score: hit._score || 0, // Ensure score is never undefined
 			...hit._source
 		})),
 		total: esResults.hits.total?.value || 0
@@ -368,8 +377,11 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					query: {
 						bool: { must }
 					},
-					// Use the correct enum field for sorting based on the mapping
-					sort: [{ "published_at.enum": { order: "desc" } }],
+					// Sort by relevance score first, then by date
+					sort: [
+						"_score",
+						{ "published_at.enum": { order: "desc" } }
+					],
 					size: 20
 				};
 				
@@ -411,16 +423,28 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		// Normalize the response format
 		console.log('Response received, normalizing format');
 		
+		let normalizedResponse;
 		if (Array.isArray(response)) {
-			return { articles: response };
+			normalizedResponse = { articles: response };
 		} else if (Array.isArray(response.data)) {
-			return { articles: response.data };
+			normalizedResponse = { articles: response.data };
 		} else if (response.data && response.data.articles) {
-			return response.data;
+			normalizedResponse = response.data;
 		} else {
 			console.log('No valid articles in response, returning empty array');
-			return { articles: [] };
+			normalizedResponse = { articles: [] };
 		}
+		
+		// Log the scores to verify they're being passed through
+		if (normalizedResponse.articles && normalizedResponse.articles.length > 0) {
+			console.log('First 3 article scores:', normalizedResponse.articles.slice(0, 3).map(a => ({
+				id: a.id,
+				title: a.title?.substring(0, 30),
+				score: a.score
+			})));
+		}
+		
+		return normalizedResponse;
 	} catch (error) {
 		console.error('Search failed:', error.message);
 		return { articles: [] }; // Return empty results on error
