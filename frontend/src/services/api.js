@@ -1,5 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 
+// Log environment information
+console.log('Environment information:', {
+	hostname: window.location.hostname,
+	origin: window.location.origin,
+	searchEngineEndpoint: window.__SEARCH_ENGINE_ENDPOINT || 'not set',
+	searchEngineIndex: window.__SEARCH_ENGINE_INDEX || 'not set',
+	hasApiKey: !!window.__SEARCH_ENGINE_KEY,
+	userAgent: navigator.userAgent
+});
+
 // Runtime configuration - injected during build/deployment
 const __config = {
 	endpoint: window.__SEARCH_ENGINE_ENDPOINT 
@@ -11,6 +21,29 @@ const __config = {
 	idx: window.__SEARCH_ENGINE_INDEX || 'financial_news',
 	version: '7.14'
 };
+
+// Check for placeholder values
+const hasPlaceholders = (
+	__config.endpoint.includes('placeholder') || 
+	__config.endpoint.includes('PLACEHOLDER') || 
+	__config.idx.includes('placeholder') || 
+	__config.idx.includes('PLACEHOLDER')
+);
+
+if (hasPlaceholders) {
+	console.error('WARNING: Placeholder values detected in configuration:', {
+		endpoint: __config.endpoint,
+		idx: __config.idx
+	});
+}
+
+// Log configuration on initialization
+console.log('Search Engine Config:', {
+	endpoint: __config.endpoint,
+	idx: __config.idx,
+	apiKeyPresent: !!__config.apiKey,
+	version: __config.version
+});
 
 // Constants
 const MAX_RETRIES = 3;
@@ -44,6 +77,8 @@ const createClient = (baseURL) => {
 			
 			const url = `${baseURL}${path}${queryString ? `?${queryString}` : ''}`;
 			
+			console.log(`Sending GET request to: ${url}`);
+			
 			try {
 				const response = await fetch(url, {
 					method: 'GET',
@@ -55,11 +90,13 @@ const createClient = (baseURL) => {
 				});
 				
 				if (!response.ok) {
+					console.error(`HTTP error ${response.status} for ${url}`);
 					const error = new Error(`HTTP error ${response.status}`);
 					error.response = response;
 					throw error;
 				}
 				
+				console.log(`Request to ${url} successful`);
 				const data = await safeJsonParse(response);
 				return { data };
 			} catch (error) {
@@ -70,6 +107,8 @@ const createClient = (baseURL) => {
 		
 		post: async (path, body, options = {}) => {
 			const url = `${baseURL}${path}`;
+			
+			console.log(`Sending POST request to: ${url}`, { body: JSON.stringify(body).substring(0, 200) + '...' });
 			
 			try {
 				const response = await fetch(url, {
@@ -83,11 +122,13 @@ const createClient = (baseURL) => {
 				});
 				
 				if (!response.ok) {
+					console.error(`HTTP error ${response.status} for ${url}`);
 					const error = new Error(`HTTP error ${response.status}`);
 					error.response = response;
 					throw error;
 				}
 				
+				console.log(`Request to ${url} successful`);
 				const data = await safeJsonParse(response);
 				return { data };
 			} catch (error) {
@@ -102,49 +143,15 @@ const createClient = (baseURL) => {
 const apiClient = createClient(__config.endpoint);
 const fallbackApiClient = createClient(FALLBACK_ENDPOINT);
 
-// Helper function to retry failed requests with fallback
-const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES, delay = RETRY_DELAY) => {
-	let lastError;
-	
-	// Try primary endpoint with retries
-	for (let i = 0; i < maxRetries; i++) {
-		try {
-			return await fn();
-		} catch (error) {
-			lastError = error;
-			console.log(`Attempt ${i+1} failed:`, error.message);
-			
-			// If server responded, don't retry (it's not a connection issue)
-			if (error.response && error.response.status !== 503 && error.response.status !== 504) {
-				break;
-			}
-			
-			// Wait before retry
-			if (i < maxRetries - 1) {
-				await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
-			}
-		}
-	}
-	
-	// If primary endpoint failed and fallback is enabled, try fallback
-	if (FALLBACK_ENABLED && fnFallback) {
-		console.log('Trying fallback endpoint...');
-		try {
-			return await fnFallback();
-		} catch (fallbackError) {
-			console.error('Fallback request failed:', fallbackError.message);
-			// Prefer the primary error in the error response
-			throw lastError || fallbackError;
-		}
-	}
-	
-	throw lastError;
-};
-
 // Direct ES query helper (hidden within the implementation)
 const queryElasticsearch = async (body) => {
 	try {
 		const url = `${__config.endpoint}/${__config.idx}/_search`;
+		console.log(`Executing Elasticsearch query to: ${url}`, {
+			endpoint: __config.endpoint,
+			index: __config.idx,
+			query: JSON.stringify(body).substring(0, 200) + '...'
+		});
 		
 		const response = await fetch(url, {
 			method: 'POST',
@@ -156,11 +163,13 @@ const queryElasticsearch = async (body) => {
 		});
 		
 		if (!response.ok) {
+			console.error(`Elasticsearch error ${response.status} for ${url}`);
 			const error = new Error(`Search error: ${response.status}`);
 			error.response = response;
 			throw error;
 		}
 		
+		console.log(`Elasticsearch query to ${url} successful`);
 		return await safeJsonParse(response);
 	} catch (error) {
 		console.error('Elasticsearch query failed:', error);
@@ -184,10 +193,65 @@ const formatSearchResults = (esResults) => {
 	};
 };
 
+// Helper function to retry failed requests with fallback
+const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES, delay = RETRY_DELAY) => {
+	let lastError;
+	
+	// Try primary endpoint with retries
+	for (let i = 0; i < maxRetries; i++) {
+		try {
+			console.log(`Attempt ${i+1}/${maxRetries} for primary endpoint`);
+			return await fn();
+		} catch (error) {
+			lastError = error;
+			console.log(`Attempt ${i+1}/${maxRetries} failed:`, error.message);
+			
+			// If server responded, don't retry (it's not a connection issue)
+			if (error.response && error.response.status !== 503 && error.response.status !== 504) {
+				console.log(`Server responded with status ${error.response.status}, not retrying`);
+				break;
+			}
+			
+			// Wait before retry
+			if (i < maxRetries - 1) {
+				const waitTime = delay * (i + 1);
+				console.log(`Waiting ${waitTime}ms before retry ${i+2}/${maxRetries}`);
+				await new Promise(resolve => setTimeout(resolve, waitTime));
+			}
+		}
+	}
+	
+	// If primary endpoint failed and fallback is enabled, try fallback
+	if (FALLBACK_ENABLED && fnFallback) {
+		console.log('Primary endpoint failed. Trying fallback endpoint...');
+		try {
+			return await fnFallback();
+		} catch (fallbackError) {
+			console.error('Fallback request failed:', fallbackError.message);
+			// Prefer the primary error in the error response
+			throw lastError || fallbackError;
+		}
+	}
+	
+	console.error('All attempts failed, no more retries');
+	throw lastError;
+};
+
 // Public API methods
 export const searchArticles = async (query, source, time_range, sentiment) => {
+	console.log('searchArticles called with:', { query, source, time_range, sentiment });
+	
 	if (!query || query.trim() === '') {
+		console.log('Empty query, returning empty results');
 		return { articles: [] };
+	}
+	
+	// Validate configuration
+	if (__config.endpoint.includes('placeholder') || __config.idx.includes('PLACEHOLDER')) {
+		console.error('Invalid configuration detected:', { 
+			endpoint: __config.endpoint,
+			idx: __config.idx
+		});
 	}
 	
 	// Standard API call approach - this maintains backward compatibility
@@ -201,6 +265,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		try {
 			// Try direct ES query first
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
+				console.log('Using direct Elasticsearch query with endpoint:', __config.endpoint);
+				
 				// Here we're actually building an ES query instead of using the standard API
 				const must = [{ match: { content: query } }];
 				
@@ -239,10 +305,12 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					size: 20
 				};
 				
+				console.log('ES Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
 				const results = await queryElasticsearch(esQuery);
 				return { data: formatSearchResults(results) };
 			} else {
 				// Fallback to standard API approach if no ES endpoint configured
+				console.log('ES endpoint not properly configured, using fallback', __config.endpoint);
 				throw new Error('ES endpoint not configured, using fallback');
 			}
 		} catch (error) {
@@ -254,6 +322,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 	const fallbackRequest = async () => {
 		try {
 			// This is the fallback request to the standard API endpoint
+			console.log('Executing fallback request with params:', params);
 			return await fallbackApiClient.get('/search', { params });
 		} catch (error) {
 			// If even the fallback fails, return empty results with a standardized format
@@ -274,6 +343,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		}
 		
 		// Normalize the response format
+		console.log('Search response received, normalizing format');
 		// The API might return the articles directly or inside a data.articles structure
 		if (Array.isArray(response)) {
 			return { articles: response };
@@ -282,6 +352,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		} else if (response.data && response.data.articles) {
 			return response.data;
 		} else {
+			console.log('No valid articles in response, returning empty array');
 			return { articles: [] };
 		}
 	} catch (error) {
@@ -291,11 +362,23 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 };
 
 export const getArticleById = async (id) => {
+	console.log('getArticleById called with id:', id);
+	
+	// Validate configuration
+	if (__config.endpoint.includes('placeholder') || __config.idx.includes('PLACEHOLDER')) {
+		console.error('Invalid configuration detected:', { 
+			endpoint: __config.endpoint,
+			idx: __config.idx
+		});
+	}
+	
 	const primaryRequest = async () => {
 		try {
 			// Direct ES document retrieval
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
 				const url = `${__config.endpoint}/${__config.idx}/_doc/${id}`;
+				console.log(`Retrieving article by ID from: ${url}`);
+				
 				const response = await fetch(url, {
 					method: 'GET',
 					headers: {
@@ -305,12 +388,15 @@ export const getArticleById = async (id) => {
 				});
 				
 				if (!response.ok) {
+					console.error(`Article retrieval failed with status: ${response.status}`);
 					throw new Error(`Article retrieval failed: ${response.status}`);
 				}
 				
+				console.log('Article successfully retrieved');
 				const result = await safeJsonParse(response);
 				return { data: { ...result._source, id: result._id } };
 			} else {
+				console.log('ES endpoint not properly configured, using fallback', __config.endpoint);
 				throw new Error('ES endpoint not configured, using fallback');
 			}
 		} catch (error) {
