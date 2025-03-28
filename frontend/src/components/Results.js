@@ -110,11 +110,8 @@ function Results() {
   };
   
   const formatRelevanceScore = (score) => {
-    if (score === undefined || score === null) return 'N/A';
-    
-    // Convert to percentage with one decimal place
-    const percentage = (parseFloat(score) * 100).toFixed(1);
-    return isNaN(percentage) ? 'N/A' : `${percentage}%`;
+    if (!score) return '';
+    return ` (${score}%)`;
   };
 
   // Add a function to format sentiment score
@@ -161,30 +158,27 @@ function Results() {
   const getSortedResults = () => {
     if (!results || results.length === 0) return [];
     
-    const sortedResults = [...results];
+    let sortedResults = [...results];
     
     switch (sortBy) {
       case 'date':
-        return sortedResults.sort((a, b) => {
+        sortedResults.sort((a, b) => {
           const dateA = new Date(a.published_at || 0);
           const dateB = new Date(b.published_at || 0);
-          return dateB - dateA; // Most recent first
+          return dateB - dateA;
         });
-      case 'sentiment':
-        return sortedResults.sort((a, b) => {
-          const sentimentOrder = { positive: 3, neutral: 2, negative: 1, undefined: 0 };
-          const sentimentA = sentimentOrder[a.sentiment?.toLowerCase()] || 0;
-          const sentimentB = sentimentOrder[b.sentiment?.toLowerCase()] || 0;
-          return sentimentB - sentimentA;
-        });
+        break;
       case 'relevance':
+        sortedResults.sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0));
+        break;
+      case 'sentiment':
+        sortedResults.sort((a, b) => (b.sentiment_score || 0) - (a.sentiment_score || 0));
+        break;
       default:
-        return sortedResults.sort((a, b) => {
-          const scoreA = parseFloat(a.relevance_score || a.relevance || 0);
-          const scoreB = parseFloat(b.relevance_score || b.relevance || 0);
-          return scoreB - scoreA; // Highest relevance first
-        });
+        break;
     }
+    
+    return sortedResults;
   };
 
   // Add a function to display the main content
@@ -305,7 +299,7 @@ function Results() {
               </Badge>
               <small className="text-muted">
                 <i className="bi bi-graph-up me-1"></i>
-                Relevance: {formatRelevanceScore(article.relevance_score || article.relevance)}
+                Relevance{formatRelevanceScore(article.relevance_score)}
               </small>
             </div>
             <div className="mt-2">

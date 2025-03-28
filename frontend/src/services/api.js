@@ -256,14 +256,15 @@ const formatSearchResults = (esResults) => {
 		console.log('Raw ES scores:', esResults.hits.hits.slice(0, 3).map(hit => ({
 			id: hit._id,
 			score: hit._score,
-			title: hit._source.title?.substring(0, 30)
+			headline: hit._source.headline?.substring(0, 30)
 		})));
 	}
 	
 	return {
 		articles: esResults.hits.hits.map(hit => ({
 			id: hit._id,
-			score: hit._score || 0, // Ensure score is never undefined
+			relevance_score: hit._score ? (hit._score / Math.max(...esResults.hits.hits.map(h => h._score)) * 100).toFixed(1) : 0, // Normalize score to percentage
+			score: hit._score || 0,
 			...hit._source
 		})),
 		total: esResults.hits.total?.value || 0
