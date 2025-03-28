@@ -368,8 +368,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					query: {
 						bool: { must }
 					},
-					// Modify sort to handle potential fielddata issues
-					sort: [{ "published_at.keyword": { order: "desc" } }],
+					// Use the correct enum field for sorting based on the mapping
+					sort: [{ "published_at.enum": { order: "desc" } }],
 					size: 20
 				};
 				
