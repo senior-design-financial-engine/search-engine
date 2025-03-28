@@ -382,13 +382,13 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 								{ match_phrase: { content: { query: query, boost: 2.0 } } },
 								{ match: { title: { query: query, boost: 1.5 } } },
 								{ match: { content: { query: query, boost: 1.0 } } }
-							]
+							],
+							minimum_should_match: 1
 						}
 					},
-					// Improved sorting with score boosting
 					sort: [
 						{ "_score": { "order": "desc" } },
-						{ "published_at": { "order": "desc" } }
+						{ "published_at.keyword": { "order": "desc", "missing": "_last" } }
 					],
 					size: 20,
 					track_scores: true
@@ -396,7 +396,21 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				
 				console.log('Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
 				
-				const results = await queryElasticsearch(esQuery);
+				let results;
+				try {
+					results = await queryElasticsearch(esQuery);
+				} catch (error) {
+					console.error('Elasticsearch query failed:', error);
+					// If the error is related to fielddata, try without sorting
+					if (error.message.includes('fielddata')) {
+						console.log('Retrying without date sorting...');
+						delete esQuery.sort[1]; // Remove date sort
+						results = await queryElasticsearch(esQuery);
+					} else {
+						throw error;
+					}
+				}
+				
 				return { data: formatSearchResults(results) };
 			} else {
 				console.log('Configuration error, using fallback', __config.endpoint);
