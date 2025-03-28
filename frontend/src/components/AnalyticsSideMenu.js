@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, ProgressBar, Badge } from 'react-bootstrap';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement } from 'chart.js';
 import { Pie, Bar, Line } from 'react-chartjs-2';
@@ -24,6 +24,32 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState({});
+
+  const sideMenuRef = useRef(null);
+  const [tooltipText, setTooltipText] = useState('Open Analytics');
+  
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Toggle sidebar with Alt+A
+      if (e.altKey && e.key === 'a') {
+        toggleMenu();
+      }
+      
+      // Close sidebar with Escape key
+      if (e.key === 'Escape' && isOpen) {
+        toggleMenu();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, toggleMenu]);
+  
+  // Update tooltip text based on sidebar state
+  useEffect(() => {
+    setTooltipText(isOpen ? 'Close Analytics (Alt+A)' : 'Open Analytics (Alt+A)');
+  }, [isOpen]);
 
   useEffect(() => {
     if (results && results.length > 0) {
@@ -233,35 +259,41 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
     <>
       <Button 
         variant="primary" 
-        className={`side-menu-toggle rounded-pill shadow-lg ${isOpen ? 'open' : ''}`}
+        className={`side-menu-toggle shadow-lg ${isOpen ? 'open' : ''}`}
         onClick={toggleMenu}
-        aria-label="Toggle Analytics Menu"
+        aria-label={`${isOpen ? 'Close' : 'Open'} Analytics Menu`}
       >
-        <div className="toggle-content">
+        <div className="toggle-content" data-tooltip={tooltipText}>
           {isOpen ? (
-            <i className="bi bi-x-lg"></i>
+            <i className="bi bi-chevron-right"></i>
           ) : (
-            <>
-              <i className="bi bi-bar-chart-fill me-2"></i>
-              <span className="toggle-text">Analytics</span>
-            </>
+            <i className="bi bi-chevron-left"></i>
           )}
         </div>
       </Button>
 
-      <div className={`side-menu ${isOpen ? 'open' : ''}`}>
+      <div 
+        className={`side-menu ${isOpen ? 'open' : ''}`} 
+        ref={sideMenuRef}
+        role="complementary"
+        aria-label="Analytics Sidebar"
+      >
+        <div className="side-menu-resize-handle" title="Drag to resize"></div>
         <div className="side-menu-header">
           <h4 className="mb-0">
             <i className="bi bi-graph-up-arrow me-2 text-primary"></i>
             Results Analytics
           </h4>
-          <button 
-            className="side-menu-close" 
-            onClick={toggleMenu}
-            aria-label="Close Analytics Menu"
-          >
-            <i className="bi bi-x-lg"></i>
-          </button>
+          <div className="d-flex align-items-center">
+            <small className="text-muted me-3 d-none d-md-block">Press ESC to close</small>
+            <button 
+              className="side-menu-close" 
+              onClick={toggleMenu}
+              aria-label="Close Analytics Menu"
+            >
+              <i className="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
 
         {results && results.length > 0 ? (
