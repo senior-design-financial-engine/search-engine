@@ -6,6 +6,24 @@ import AnalyticsSideMenu from './AnalyticsSideMenu';
 import '../styles/Results.css';
 import { Helmet } from 'react-helmet';
 
+// Available filter options
+const availableSources = ['ap', 'bbc', 'cnbc', 'cnn', 'npr', 'reddit'];
+
+const timeRanges = [
+  { value: 'all', label: 'All Time' },
+  { value: 'day', label: 'Last 24 Hours' },
+  { value: 'week', label: 'Last Week' },
+  { value: 'month', label: 'Last Month' },
+  { value: 'year', label: 'Last Year' }
+];
+
+const sentiments = [
+  { value: 'all', label: 'All Sentiments' },
+  { value: 'positive', label: 'Positive' },
+  { value: 'neutral', label: 'Neutral' },
+  { value: 'negative', label: 'Negative' }
+];
+
 function Results() {
   const location = useLocation();
   const url_params = new URLSearchParams(location.search)
@@ -31,11 +49,13 @@ function Results() {
   const [sortBy, setSortBy] = useState('relevance');
   // Add side menu state
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [tooltipText, setTooltipText] = useState('Open Analytics (Alt+A)');
   const navigate = useNavigate();
 
   // Toggle side menu function
   const toggleSideMenu = () => {
     setIsSideMenuOpen(!isSideMenuOpen);
+    setTooltipText(isSideMenuOpen ? 'Open Analytics (Alt+A)' : 'Close Analytics (Alt+A)');
   };
 
   useEffect(() => {
