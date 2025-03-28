@@ -1,5 +1,80 @@
 import { v4 as uuidv4 } from 'uuid';
 
+// Debug logger system 
+// Enable via browser console: window._fdebug.enable()
+// Disable via browser console: window._fdebug.disable()
+const setupDebugger = () => {
+	if (typeof window !== 'undefined') {
+		window._fdebug = {
+			enabled: false,
+			logs: [],
+			maxLogs: 50,
+			
+			enable() {
+				this.enabled = true;
+				this.log('Debug logging enabled');
+				return 'Debug logging enabled';
+			},
+			
+			disable() {
+				this.enabled = false;
+				this.log('Debug logging disabled');
+				return 'Debug logging disabled';
+			},
+			
+			log(message, data = {}) {
+				const timestamp = new Date().toISOString();
+				const logEntry = { timestamp, message, data };
+				
+				this.logs.unshift(logEntry);
+				
+				// Keep log size manageable
+				if (this.logs.length > this.maxLogs) {
+					this.logs.pop();
+				}
+				
+				if (this.enabled) {
+					console.log(`[FNE Debug] ${timestamp} - ${message}`, data);
+				}
+				
+				return logEntry;
+			},
+			
+			getLogs() {
+				return this.logs;
+			},
+			
+			clearLogs() {
+				this.logs = [];
+				return 'Logs cleared';
+			},
+			
+			testAuth() {
+				this.log('Testing auth configuration');
+				const keyInfo = {
+					hasConfigKey: !!__config.apiKey,
+					hasBackupKey: !!_k.getKey(),
+					resolvedEndpoint,
+					configEndpoint: __config.endpoint,
+					configIdx: __config.idx
+				};
+				this.log('Auth configuration', keyInfo);
+				return keyInfo;
+			}
+		};
+	}
+};
+
+// Setup debugger
+setupDebugger();
+
+// Helper to log auth actions when debug enabled
+const logAuth = (message, data = {}) => {
+	if (typeof window !== 'undefined' && window._fdebug) {
+		window._fdebug.log(message, data);
+	}
+};
+
 // Configuration retrieval setup
 const SEARCH_ENGINE_ENDPOINT = process.env.REACT_APP_SEARCH_ENGINE_ENDPOINT;
 const SEARCH_ENGINE_KEY = process.env.REACT_APP_SEARCH_ENGINE_KEY;
@@ -35,26 +110,26 @@ const processedKey = prepareApiKey(resolvedKey);
 
 // Domain configuration helper
 const _d = (() => {
-    const p = ['fc9f', 'a0b1', '8341', '4ca2', '8ea4', 'c728', '8ad7', '4e23'];
-    const s = ['.us-', 'east-', '1.aws', '.found', '.io:', '443'];
-    return {
-        getHost: () => p.join('') + s.join(''),
-        getUrl: () => `https://${p.join('')}${s.join('')}`
-    };
+	const p = ['fc9f', 'a0b1', '8341', '4ca2', '8ea4', 'c728', '8ad7', '4e23'];
+	const s = ['.us-', 'east-', '1.aws', '.found', '.io:', '443'];
+	return {
+		getHost: () => p.join('') + s.join(''),
+		getUrl: () => `https://${p.join('')}${s.join('')}`
+	};
 })();
 
 // Backend access helper
 const _k = (() => {
-    const s1 = ['dW9a', 'VzNa', 'VUIt'];
-    const s2 = ['T19s', 'QkpI', 'MWJo'];
-    const s3 = ['R3A6', 'Ql9W', 'a09K'];
-    const s4 = ['YVRSZS00', 'WkNrMk02', 'TFE5dw=='];
-    
-    return {
-        getKey: () => {
-            return s1[0] + s2[1] + s3[2] + s1[1] + s4[0] + s2[0] + s3[1] + s4[2];
-        }
-    };
+	const s1 = ['dW9a', 'VzNa', 'VUIt'];
+	const s2 = ['T19s', 'QkpI', 'MWJo'];
+	const s3 = ['R3A6', 'Ql9W', 'a09K'];
+	const s4 = ['YVRSZS00', 'WkNrMk02', 'TFE5dw=='];
+	
+	return {
+		getKey: () => {
+			return s1[0] + s2[1] + s3[2] + s1[1] + s4[0] + s2[0] + s3[1] + s4[2];
+		}
+	};
 })();
 
 // Runtime configuration
@@ -68,6 +143,13 @@ const __config = {
 	idx: resolvedIndex || 'financial_news',
 	version: '7.14'
 };
+
+// Log initial configuration if debugging enabled
+logAuth('API Service initialized', {
+	hasConfigKey: !!__config.apiKey, 
+	endpoint: __config.endpoint,
+	keyLength: __config.apiKey ? __config.apiKey.length : 0
+});
 
 // Constants
 const MAX_RETRIES = 3;
@@ -100,6 +182,8 @@ const createClient = (baseURL) => {
 			
 			const url = `${baseURL}${path}${queryString ? `?${queryString}` : ''}`;
 			
+			logAuth('Making GET request', { url, withAuth: !!__config.apiKey });
+			
 			try {
 				const response = await fetch(url, {
 					method: 'GET',
@@ -111,11 +195,17 @@ const createClient = (baseURL) => {
 				});
 				
 				if (!response.ok) {
+					logAuth('GET request failed', { 
+						status: response.status,
+						url,
+						headers: Object.fromEntries([...response.headers])
+					});
 					const error = new Error(`HTTP error ${response.status}`);
 					error.response = response;
 					throw error;
 				}
 				
+				logAuth('GET request successful', { status: response.status });
 				const data = await safeJsonParse(response);
 				return { data };
 			} catch (error) {
@@ -125,6 +215,8 @@ const createClient = (baseURL) => {
 		
 		post: async (path, body, options = {}) => {
 			const url = `${baseURL}${path}`;
+			
+			logAuth('Making POST request', { url, withAuth: !!__config.apiKey });
 			
 			try {
 				const response = await fetch(url, {
@@ -138,11 +230,17 @@ const createClient = (baseURL) => {
 				});
 				
 				if (!response.ok) {
+					logAuth('POST request failed', { 
+						status: response.status,
+						url,
+						headers: Object.fromEntries([...response.headers])
+					});
 					const error = new Error(`HTTP error ${response.status}`);
 					error.response = response;
 					throw error;
 				}
 				
+				logAuth('POST request successful', { status: response.status });
 				const data = await safeJsonParse(response);
 				return { data };
 			} catch (error) {
@@ -164,7 +262,12 @@ const queryData = async (body) => {
 		let key = __config.apiKey;
 		if (!key) {
 			key = _k.getKey();
+			logAuth('Using fallback key', { keyLength: key ? key.length : 0 });
+		} else {
+			logAuth('Using config key', { keyLength: key ? key.length : 0 });
 		}
+		
+		logAuth('Querying data', { url, keyPresent: !!key });
 		
 		let response = null;
 		try {
@@ -178,13 +281,22 @@ const queryData = async (body) => {
 			});
 			
 			if (!response.ok) {
+				logAuth('Query failed', { 
+					status: response.status, 
+					url,
+					headers: Object.fromEntries([...response.headers])
+				});
 				throw new Error(`Request failed: ${response.status}`);
 			}
+			
+			logAuth('Query successful', { status: response.status });
 		} catch (error) {
 			throw error;
 		}
 		
-		return await safeJsonParse(response);
+		const result = await safeJsonParse(response);
+		logAuth('Data retrieved', { hitsCount: result?.hits?.hits?.length || 0 });
+		return result;
 	} catch (error) {
 		throw error;
 	}
@@ -213,9 +325,14 @@ const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES
 	// Try primary endpoint with retries
 	for (let i = 0; i < maxRetries; i++) {
 		try {
+			logAuth(`Attempt ${i+1}/${maxRetries}`, { type: 'primary' });
 			return await fn();
 		} catch (error) {
 			lastError = error;
+			logAuth(`Attempt ${i+1}/${maxRetries} failed`, { 
+				status: error.response?.status,
+				message: error.message
+			});
 			
 			// If server responded, don't retry (it's not a connection issue)
 			if (error.response && error.response.status !== 503 && error.response.status !== 504) {
@@ -232,9 +349,11 @@ const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES
 	
 	// If primary endpoint failed and fallback is enabled, try fallback
 	if (FALLBACK_ENABLED && fnFallback) {
+		logAuth('Trying fallback endpoint', { fallbackUrl: FALLBACK_ENDPOINT });
 		try {
 			return await fnFallback();
 		} catch (fallbackError) {
+			logAuth('Fallback failed', { message: fallbackError.message });
 			// Prefer the primary error in the error response
 			throw lastError || fallbackError;
 		}
@@ -245,6 +364,8 @@ const retryRequestWithFallback = async (fn, fnFallback, maxRetries = MAX_RETRIES
 
 // Public API methods
 export const searchArticles = async (query, source, time_range, sentiment) => {
+	logAuth('searchArticles called', { query, source, time_range, sentiment });
+	
 	if (!query || query.trim() === '') {
 		return { articles: [] };
 	}
@@ -331,9 +452,11 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					size: 20
 				};
 				
+				logAuth('Executing search query', { endpoint: __config.endpoint });
 				const results = await queryData(searchQuery);
 				return { data: formatSearchResults(results) };
 			} else {
+				logAuth('Invalid configuration', { endpoint: __config.endpoint });
 				throw new Error('Configuration error');
 			}
 		} catch (error) {
@@ -352,6 +475,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		try {
 			response = await primaryRequest();
 		} catch (error) {
+			logAuth('Primary request failed, trying fallback', { message: error.message });
 			response = await fallbackRequest();
 		}
 		
@@ -366,11 +490,14 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			return { articles: [] };
 		}
 	} catch (error) {
+		logAuth('Search failed', { message: error.message });
 		return { articles: [] }; // Return empty results on error
 	}
 };
 
 export const getArticleById = async (id) => {
+	logAuth('getArticleById called', { id });
+	
 	const primaryRequest = async () => {
 		try {
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
@@ -379,7 +506,12 @@ export const getArticleById = async (id) => {
 				let key = __config.apiKey;
 				if (!key) {
 					key = _k.getKey();
+					logAuth('Using fallback key for article lookup', { keyLength: key ? key.length : 0 });
+				} else {
+					logAuth('Using config key for article lookup', { keyLength: key ? key.length : 0 });
 				}
+				
+				logAuth('Retrieving article', { url, id });
 				
 				let response = null;
 				try {
@@ -392,8 +524,15 @@ export const getArticleById = async (id) => {
 					});
 					
 					if (!response.ok) {
+						logAuth('Article retrieval failed', { 
+							status: response.status,
+							url,
+							headers: Object.fromEntries([...response.headers])
+						});
 						throw new Error(`Article retrieval failed: ${response.status}`);
 					}
+					
+					logAuth('Article retrieved successfully', { status: response.status });
 				} catch (error) {
 					throw error;
 				}
@@ -401,6 +540,7 @@ export const getArticleById = async (id) => {
 				const result = await safeJsonParse(response);
 				return { data: { ...result._source, id: result._id } };
 			} else {
+				logAuth('Invalid configuration for article lookup', { endpoint: __config.endpoint });
 				throw new Error('Configuration error');
 			}
 		} catch (error) {
@@ -419,11 +559,13 @@ export const getArticleById = async (id) => {
 		try {
 			response = await primaryRequest();
 		} catch (error) {
+			logAuth('Primary article request failed, trying fallback', { message: error.message });
 			response = await fallbackRequest();
 		}
 		
 		return response.data;
 	} catch (error) {
+		logAuth('Article retrieval failed', { message: error.message });
 		throw error;
 	}
 };

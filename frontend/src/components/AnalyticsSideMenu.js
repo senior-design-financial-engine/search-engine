@@ -281,9 +281,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           {isOpen ? (
             <i className="bi bi-chevron-right"></i>
           ) : (
-            <>
-              <i className="bi bi-graph-up-arrow"></i>
-            </>
+            <i className="bi bi-graph-up-arrow" aria-hidden="false"></i>
           )}
         </div>
       </Button>
