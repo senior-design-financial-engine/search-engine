@@ -19,10 +19,10 @@ const availableSources = [
 // Sample time ranges
 const timeRanges = [
 	{ value: 'all', label: 'All Time' },
-	{ value: 'day', label: 'Last 24 Hours' },
-	{ value: 'week', label: 'Last Week' },
-	{ value: 'month', label: 'Last Month' },
-	{ value: 'year', label: 'Last Year' }
+	{ value: '1d', label: 'Last 24 Hours' },
+	{ value: '7d', label: 'Last Week' },
+	{ value: '30d', label: 'Last Month' },
+	{ value: '90d', label: 'Last 3 Months' }
 ];
 
 // Sample sentiment options
@@ -281,6 +281,13 @@ function Home() {
 	};
 
 	const handleAdvancedChange = (field, value) => {
+		// Normalize source case to match the available sources
+		if (field === 'source' && value) {
+			const normalizedSource = availableSources.find(
+				s => s.toLowerCase() === value.toLowerCase()
+			);
+			value = normalizedSource || value;
+		}
 		setAdvancedQueries(prevState => ({...prevState, [field]: value}));
 	};
 

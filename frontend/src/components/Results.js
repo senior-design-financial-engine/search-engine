@@ -13,8 +13,9 @@ function Results() {
   const query = url_params.get('query');
   url_params.delete('query')
 
-  // get all filters
-  const source = url_params.get('source')
+  // get all filters and normalize source case
+  const rawSource = url_params.get('source');
+  const source = rawSource ? availableSources.find(s => s.toLowerCase() === rawSource.toLowerCase()) || rawSource : null;
   const timeRange = url_params.get('time_range')
   const sentiment = url_params.get('sentiment')
   
@@ -71,6 +72,13 @@ function Results() {
     const newParams = new URLSearchParams(location.search);
     
     if (value && value !== 'all') {
+      // Normalize source case if it's a source filter
+      if (filterType === 'source') {
+        const normalizedSource = availableSources.find(
+          s => s.toLowerCase() === value.toLowerCase()
+        );
+        value = normalizedSource || value;
+      }
       newParams.set(filterType, value);
     } else {
       newParams.delete(filterType);
@@ -354,12 +362,9 @@ function Results() {
                   className="rounded-3"
                 >
                   <option value="">All Sources</option>
-                  <option value="AP">AP</option>
-                  <option value="BBC">BBC</option>
-                  <option value="CNBC">CNBC</option>
-                  <option value="CNN">CNN</option>
-                  <option value="NPR">NPR</option>
-                  <option value="Reddit">Reddit</option>
+                  {availableSources.map(src => (
+                    <option key={src} value={src}>{src}</option>
+                  ))}
                 </Form.Select>
               </Form.Group>
             </div>

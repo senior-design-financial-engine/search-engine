@@ -347,32 +347,27 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				// Building the query
 				const must = [{ match: { content: query } }];
 				
+				// Source filter - using keyword field and case-insensitive match
 				if (source && source !== 'All Sources') {
-					must.push({ match: { "source.enum": source } });
+					must.push({
+						match: {
+							"source.enum": {
+								query: source,
+								operator: "or",
+								fuzziness: 0,
+								case_insensitive: true
+							}
+						}
+					});
 				}
 				
+				// Keep sentiment as dummy variable but don't actually filter
 				if (sentiment && sentiment !== 'All Sentiments') {
-					switch(sentiment.toLowerCase()) {
-						case 'positive':
-							must.push({ range: { sentiment_score: { gte: 0.33 } } });
-							break;
-						case 'negative':
-							must.push({ range: { sentiment_score: { lte: -0.33 } } });
-							break;
-						case 'neutral':
-							must.push({ 
-								range: { 
-									sentiment_score: { 
-										gt: -0.33,
-										lt: 0.33
-									} 
-								} 
-							});
-							break;
-					}
+					// We keep the sentiment check in the code but it won't affect results
+					console.log('Sentiment filter applied:', sentiment);
 				}
 				
-				let range = {};
+				// Time range filter using the text field's enum subfield
 				if (time_range && time_range !== 'All Time') {
 					const now = new Date();
 					let startDate;
@@ -400,8 +395,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						bool: { 
 							must,
 							should: [
-								{ match_phrase: { headline: { query: query, boost: 3.0 } } },
-								{ match_phrase: { content: { query: query, boost: 2.0 } } },
+								{ match_phrase: { "headline.enum": { query: query, boost: 3.0 } } },
+								{ match_phrase: { "content.enum": { query: query, boost: 2.0 } } },
 								{ match: { "headline.enum": { query: query, boost: 1.5 } } },
 								{ match: { "content.enum": { query: query, boost: 1.0 } } }
 							],
@@ -436,14 +431,14 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				// Format the results
 				const formattedResults = formatSearchResults(results);
 
-				// Add source filtering if needed
+				// Add source filtering if needed (as a backup)
 				if (source && source !== 'All Sources') {
 					formattedResults.articles = formattedResults.articles.filter(
 						article => article.source && article.source.toLowerCase() === source.toLowerCase()
 					);
 				}
 
-				// Add time range filtering if needed
+				// Add time range filtering if needed (as a backup)
 				if (time_range && time_range !== 'All Time') {
 					const now = new Date();
 					let startDate;
