@@ -3,15 +3,15 @@
   position: fixed;
   top: 0;
   right: -100%;
-  width: 320px;
+  width: 340px;
   height: 100vh;
-  background-color: #fff;
-  box-shadow: -2px 0 20px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  background-color: var(--card-bg);
+  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1030;
   overflow-y: auto;
-  padding: 16px;
-  border-left: 1px solid #e9ecef;
+  padding: 1.5rem;
+  border-left: 1px solid var(--border);
   resize: horizontal;
   max-width: 600px;
   min-width: 280px;
@@ -21,31 +21,26 @@
   right: 0;
 }
 
-/* Toggle button with improved visibility */
+/* Improved toggle button with better visibility */
 .side-menu-toggle {
   position: fixed;
   top: 80px;
   right: 0;
   z-index: 1031;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   min-width: auto !important;
-  width: 48px !important;
-  height: 48px !important;
+  width: 52px !important;
+  height: 52px !important;
   padding: 0 !important;
   color: white !important;
-  background-color: #4361ee !important;
+  background-color: var(--primary) !important;
   border: none !important;
-  border-radius: 8px 0 0 8px !important;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2) !important;
+  border-radius: 10px 0 0 10px !important;
+  box-shadow: -3px 0 12px rgba(0, 0, 0, 0.2) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   outline: none !important;
-}
-
-.side-menu-toggle:focus-visible {
-  outline: 2px solid #fff !important;
-  outline-offset: 2px !important;
 }
 
 .side-menu-toggle .toggle-content {
@@ -57,23 +52,127 @@
   position: relative;
 }
 
-/* Enhanced icon styling with fallback text */
+/* Enhanced icon styling */
 .side-menu-toggle .toggle-content i {
   font-size: 1.25rem;
   line-height: 1;
+  transition: transform 0.2s ease;
 }
 
-/* Add a fallback icon character for when icon fonts fail to load */
-.side-menu-toggle .toggle-content i.bi-graph-up::before {
-  content: "📈";
-  display: inline-block;
+.side-menu-toggle:hover .toggle-content i {
+  transform: scale(1.1);
 }
 
-.side-menu-toggle .toggle-content i.bi-chevron-right::before {
-  content: "›";
-  display: inline-block;
-  font-size: 1.5rem;
-  font-weight: bold;
+.side-menu-toggle:focus-visible {
+  outline: 2px solid white !important;
+  outline-offset: 2px !important;
+}
+
+.side-menu-toggle:hover {
+  background-color: var(--primary-hover) !important;
+  box-shadow: -3px 0 15px rgba(59, 91, 219, 0.35) !important;
+  transform: translateX(-4px);
+}
+
+.side-menu-toggle.open {
+  right: 340px;
+  background-color: var(--primary-hover) !important;
+}
+
+.side-menu-toggle.open:hover {
+  transform: translateX(4px);
+}
+
+/* Consistent header styling */
+.side-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-menu-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--secondary);
+  transition: all 0.2s ease;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.side-menu-close:hover {
+  color: var(--danger);
+  background-color: rgba(224, 49, 49, 0.1);
+}
+
+/* Improved analytics card styling */
+.analytics-card {
+  margin-bottom: 1.5rem;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+  background-color: var(--card-bg);
+}
+
+.analytics-card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-3px);
+}
+
+.analytics-card.primary {
+  border-left: 4px solid var(--primary);
+}
+
+.analytics-card .card-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.analytics-card .card-body {
+  padding: 1rem;
+}
+
+.analytics-card .card-header h5 {
+  font-weight: 600;
+  margin-bottom: 0;
+  font-size: 1rem;
+  color: var(--dark);
+}
+
+/* Consistent chart dimensions */
+.chart-container {
+  height: 180px;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+/* Section titles in analytics */
+.section-title {
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  color: var(--dark);
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+.section-title i {
+  margin-right: 0.5rem;
+  font-size: 1.1rem;
+  color: var(--primary);
 }
 
 .visually-hidden {
@@ -95,8 +194,8 @@
   transform: translateX(-50%);
   background-color: rgba(0, 0, 0, 0.8);
   color: white;
-  padding: 5px 10px;
-  border-radius: 4px;
+  padding: 6px 12px;
+  border-radius: 5px;
   font-size: 12px;
   white-space: nowrap;
   opacity: 0;
@@ -104,6 +203,7 @@
   transition: opacity 0.3s ease, visibility 0.3s ease;
   pointer-events: none;
   z-index: 1032;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
 }
 
 .side-menu-toggle:hover .toggle-content::after,
@@ -114,54 +214,6 @@
 
 .side-menu-toggle .toggle-text {
   display: none;
-}
-
-.side-menu-toggle:hover {
-  background-color: #3a56d4 !important;
-  box-shadow: -2px 0 15px rgba(67, 97, 238, 0.35) !important;
-  transform: translateX(-4px);
-}
-
-.side-menu-toggle.open {
-  right: 320px;
-  background-color: #3a56d4 !important;
-}
-
-@media (min-width: 1400px) {
-  .side-menu-toggle.open {
-    right: 360px;
-  }
-  
-  .side-menu {
-    width: 360px;
-  }
-}
-
-@media (max-width: 991px) {
-  .side-menu-toggle.open {
-    right: 300px;
-  }
-  
-  .side-menu {
-    width: 300px;
-  }
-}
-
-.side-menu-toggle.open:hover {
-  transform: translateX(4px);
-}
-
-.side-menu-toggle.open .toggle-content i {
-  transform: scale(1.1);
-}
-
-.side-menu-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #eee;
 }
 
 .side-menu-resize-handle {
@@ -178,87 +230,6 @@
 
 .side-menu:hover .side-menu-resize-handle {
   opacity: 1;
-}
-
-.side-menu-close {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  cursor: pointer;
-  color: #6c757d;
-  transition: all 0.2s ease;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  outline: none;
-}
-
-.side-menu-close:hover {
-  color: #dc3545;
-  background-color: rgba(220, 53, 69, 0.1);
-  transform: rotate(90deg);
-}
-
-.side-menu-close:focus-visible {
-  outline: 2px solid #4361ee;
-  outline-offset: 2px;
-}
-
-/* Card styles with reduced spacing */
-.analytics-card {
-  margin-bottom: 10px;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: all 0.2s ease;
-  border: none !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
-}
-
-.analytics-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-}
-
-.analytics-card.primary {
-  border-left: 3px solid #4361ee !important;
-}
-
-.analytics-card .card-header {
-  padding: 10px 12px;
-  background-color: #fff;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
-}
-
-.analytics-card .card-body {
-  padding: 10px 12px;
-}
-
-.analytics-card .card-header h5 {
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.chart-container {
-  height: 180px;
-  margin-bottom: 8px;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  color: #6c757d;
-}
-
-.empty-state i {
-  font-size: 2rem;
-  margin-bottom: 8px;
-  opacity: 0.6;
 }
 
 /* Active state styles */

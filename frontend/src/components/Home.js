@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Form, Button, Container, Row, Col, Card, Alert, Badge, ListGroup } from 'react-bootstrap';
+import { Helmet } from 'react-helmet';
 
 // Environment settings
 const IS_PRODUCTION = process.env.REACT_APP_ENV === 'production';
@@ -200,6 +201,7 @@ function Home() {
 		time_range: 'all',
 		sentiment: 'all'
 	});
+	const [selectedCategory, setSelectedCategory] = useState('Companies');
 	const navigate = useNavigate();
 
 	const saveRecentQuery = (searchQuery) => {
@@ -375,305 +377,301 @@ function Home() {
 	};
 
 	return (
-		<Container className="pt-5">
-			<Row className="justify-content-center mb-5">
-				<Col md={8} className="text-center">
-					<h1 className="display-4 mb-3 fw-bold">Financial Search Engine</h1>
-					<p className="lead text-secondary">
-						Search for financial news across multiple sources with advanced filtering
+		<div className="home-page">
+			<Helmet>
+				<title>Advanced Search Engine</title>
+				<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+			</Helmet>
+			<Container>
+				<section className="hero-section">
+					<h1 className="hero-title">Financial News Search</h1>
+					<p className="hero-subtitle">
+						Search through thousands of financial articles from top sources to find the information you need
 					</p>
-					{IS_PRODUCTION && USE_MOCK_API && (
-						<Alert variant="info" className="mt-3">
-							<small>Running with mock data in production environment</small>
-						</Alert>
-					)}
-				</Col>
-			</Row>
-			
-			<Row className="justify-content-center">
-				<Col md={10}>
-					<Card className="shadow-lg border-0 rounded-4">
-						<Card.Body className="p-4">
-							<Form onSubmit={handleSearch}>
-								<Row className="align-items-center mb-3">
-									<Col>
-										<div className="search-input-wrapper position-relative">
-											<i className="bi bi-search position-absolute start-0 top-50 translate-middle-y ms-3 text-secondary"></i>
-											<Form.Control
-												type="text"
-												placeholder="Enter your search query (e.g. 'Apple' or 'AI')"
-												value={query}
-												onChange={(e) => setQuery(e.target.value)}
-												className="form-control-lg rounded-pill ps-5"
-												required
-											/>
-										</div>
+				</section>
+
+				<section className="search-section">
+					<Form className="search-form" onSubmit={handleSearch}>
+						<div className="search-wrapper">
+							<i className="bi bi-search search-icon"></i>
+							<Form.Control
+								type="text"
+								placeholder="Search for financial news, companies, or topics..."
+								className="input"
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+								aria-label="Search query"
+							/>
+						</div>
+						<div className="d-flex flex-wrap justify-content-center">
+							<Button 
+								type="submit" 
+								variant="primary" 
+								className="button primary-button"
+								disabled={!query.trim()}
+							>
+								<i className="bi bi-search me-2"></i>
+								Search
+							</Button>
+							<Button 
+								type="button" 
+								variant="light" 
+								className="button secondary-button"
+								onClick={() => setShowAdvanced(!showAdvanced)}
+								aria-expanded={showAdvanced}
+								aria-controls="advanced-search-options"
+							>
+								<i className={`bi ${showAdvanced ? 'bi-chevron-up' : 'bi-sliders'} me-2`}></i>
+								{showAdvanced ? 'Hide Filters' : 'Advanced Search'}
+							</Button>
+						</div>
+
+						{showAdvanced && (
+							<div id="advanced-search-options" className="advancedQuery mt-4">
+								<div className="advancedQueryTitle">Refine Your Search</div>
+								<Row>
+									<Col md={4}>
+										<Form.Group className="mb-3">
+											<Form.Label className="queryLabel">Source</Form.Label>
+											<Form.Select 
+												className="queryInput"
+												value={advancedQueries.source}
+												onChange={(e) => handleAdvancedChange('source', e.target.value)}
+												aria-label="Select news source"
+											>
+												<option value="">All Sources</option>
+												{availableSources.map((source, index) => (
+													<option key={index} value={source}>{source}</option>
+												))}
+											</Form.Select>
+										</Form.Group>
 									</Col>
-									<Col xs="auto">
-										<Button type="submit" variant="primary" size="lg" className="rounded-pill px-4">
-											<i className="bi bi-search me-1"></i> Search
-										</Button>
+									<Col md={4}>
+										<Form.Group className="mb-3">
+											<Form.Label className="queryLabel">Time Range</Form.Label>
+											<Form.Select 
+												className="queryInput"
+												value={advancedQueries.time_range}
+												onChange={(e) => handleAdvancedChange('time_range', e.target.value)}
+												aria-label="Select time range"
+											>
+												{timeRanges.map((range, index) => (
+													<option key={index} value={range.value}>{range.label}</option>
+												))}
+											</Form.Select>
+										</Form.Group>
+									</Col>
+									<Col md={4}>
+										<Form.Group className="mb-3">
+											<Form.Label className="queryLabel">Sentiment</Form.Label>
+											<Form.Select 
+												className="queryInput"
+												value={advancedQueries.sentiment}
+												onChange={(e) => handleAdvancedChange('sentiment', e.target.value)}
+												aria-label="Select sentiment"
+											>
+												{sentiments.map((sentiment, index) => (
+													<option key={index} value={sentiment.value}>{sentiment.label}</option>
+												))}
+											</Form.Select>
+										</Form.Group>
 									</Col>
 								</Row>
-								
-								{/* Recent Queries Component */}
-								<RecentQueries onSelectQuery={handleRecentQuerySelect} />
-								
-								<div className="d-flex justify-content-end mb-3">
-									<Button 
-										variant="link" 
-										onClick={() => setShowAdvanced(!showAdvanced)}
-										className="text-decoration-none"
-									>
-										<i className={`bi bi-sliders me-1 ${showAdvanced ? 'text-primary' : ''}`}></i>
-										{showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options'}
-									</Button>
-								</div>
+							</div>
+						)}
+					</Form>
+					
+					<RecentQueries onSelectQuery={handleRecentQuerySelect} />
+				</section>
 
-								{showAdvanced && (
-									<Card className="bg-light mb-3 border-0 rounded-3">
-										<Card.Body>
-											<Row>
-												<Col md={4}>
-													<Form.Group className="mb-3">
-														<Form.Label>Source</Form.Label>
-														<Form.Select
-															value={advancedQueries.source}
-															onChange={(e) => handleAdvancedChange('source', e.target.value)}
-															className="rounded-3"
-														>
-															<option value="">All Sources</option>
-															{availableSources.map(source => (
-																<option key={source} value={source}>{source}</option>
-															))}
-														</Form.Select>
-													</Form.Group>
-												</Col>
-												<Col md={4}>
-													<Form.Group className="mb-3">
-														<Form.Label>Time Range</Form.Label>
-														<Form.Select
-															value={advancedQueries.time_range}
-															onChange={(e) => handleAdvancedChange('time_range', e.target.value)}
-															className="rounded-3"
-														>
-															{timeRanges.map(range => (
-																<option key={range.value} value={range.value}>{range.label}</option>
-															))}
-														</Form.Select>
-													</Form.Group>
-												</Col>
-												<Col md={4}>
-													<Form.Group className="mb-3">
-														<Form.Label>Sentiment</Form.Label>
-														<Form.Select
-															value={advancedQueries.sentiment}
-															onChange={(e) => handleAdvancedChange('sentiment', e.target.value)}
-															className="rounded-3"
-														>
-															{sentiments.map(sentiment => (
-																<option key={sentiment.value} value={sentiment.value}>{sentiment.label}</option>
-															))}
-														</Form.Select>
-													</Form.Group>
-												</Col>
-											</Row>
-										</Card.Body>
-									</Card>
-								)}
-							</Form>
-						</Card.Body>
-					</Card>
-				</Col>
-			</Row>
-
-			<Row className="mt-5">
-				<Col>
-					<h3 className="text-center mb-4 fw-bold">
-						<i className="bi bi-lightning-charge text-primary me-2"></i>
-						Quick Search Examples
-					</h3>
-					<div className="d-flex justify-content-center flex-wrap">
-						{['Apple', 'Tesla', 'AI', 'Market', 'Earnings'].map((term) => (
-							<Button 
-								key={term}
-								variant="outline-primary" 
-								className="m-1 rounded-pill px-4"
-								onClick={() => handleExampleSearch(term)}
-							>
-								{term}
-							</Button>
-						))}
-					</div>
-				</Col>
-			</Row>
-			
-			<Row className="mt-5">
-				<Col>
-					<h3 className="text-center mb-4 fw-bold">
-						<i className="bi bi-filter text-primary me-2"></i>
-						Advanced Search & Filter Demos
-					</h3>
-					<Row>
-						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
-								<Card.Header className="bg-primary text-white border-0 rounded-top-3">
-									<i className="bi bi-newspaper me-2"></i>
-									Source Filtering
-								</Card.Header>
-								<Card.Body>
-									<p className="card-text">See how results change when filtered by source</p>
-									<div className="mb-3">
-										<Button 
-											variant="outline-secondary" 
-											size="sm"
-											className="m-1 rounded-pill"
-											onClick={() => handleExampleWithFilters('Tesla', {source: 'Bloomberg'})}
-										>
-											Tesla in Bloomberg
-										</Button>
-										<Button 
-											variant="outline-secondary" 
-											size="sm"
-											className="m-1 rounded-pill"
-											onClick={() => handleExampleWithFilters('Tesla', {source: 'Reuters'})}
-										>
-											Tesla in Reuters
-										</Button>
-									</div>
-								</Card.Body>
-							</Card>
-						</Col>
-						
-						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
-								<Card.Header className="bg-success text-white border-0 rounded-top-3">
-									<i className="bi bi-emoji-smile me-2"></i>
-									Sentiment Analysis
-								</Card.Header>
-								<Card.Body>
-									<p className="card-text">Filter results by positive, negative, or neutral sentiment</p>
-									<div className="mb-3">
-										{sentiments.filter(s => s.value !== 'all').map(sentiment => (
+				<Row className="mt-5">
+					<Col>
+						<h3 className="text-center mb-4 fw-bold">
+							<i className="bi bi-lightning-charge text-primary me-2"></i>
+							Quick Search Examples
+						</h3>
+						<div className="d-flex justify-content-center flex-wrap">
+							{['Apple', 'Tesla', 'AI', 'Market', 'Earnings'].map((term) => (
+								<Button 
+									key={term}
+									variant="outline-primary" 
+									className="m-1 rounded-pill px-4"
+									onClick={() => handleExampleSearch(term)}
+								>
+									{term}
+								</Button>
+							))}
+						</div>
+					</Col>
+				</Row>
+				
+				<Row className="mt-5">
+					<Col>
+						<h3 className="text-center mb-4 fw-bold">
+							<i className="bi bi-filter text-primary me-2"></i>
+							Advanced Search & Filter Demos
+						</h3>
+						<Row>
+							<Col md={6} lg={3} className="mb-4">
+								<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+									<Card.Header className="bg-primary text-white border-0 rounded-top-3">
+										<i className="bi bi-newspaper me-2"></i>
+										Source Filtering
+									</Card.Header>
+									<Card.Body>
+										<p className="card-text">See how results change when filtered by source</p>
+										<div className="mb-3">
 											<Button 
-												key={sentiment.value}
-												variant={`outline-${sentiment.color}`}
+												variant="outline-secondary" 
 												size="sm"
 												className="m-1 rounded-pill"
-												onClick={() => handleExampleWithFilters('Apple', {sentiment: sentiment.value})}
+												onClick={() => handleExampleWithFilters('Tesla', {source: 'Bloomberg'})}
 											>
-												Apple ({sentiment.label})
+												Tesla in Bloomberg
 											</Button>
-										))}
-									</div>
-								</Card.Body>
-							</Card>
-						</Col>
-						
-						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
-								<Card.Header className="bg-info text-white border-0 rounded-top-3">
-									<i className="bi bi-calendar-event me-2"></i>
-									Time Range Filtering
-								</Card.Header>
-								<Card.Body>
-									<p className="card-text">See how results change when filtered by time periods</p>
-									<div className="mb-3">
-										<Button 
-											variant="outline-secondary" 
-											size="sm"
-											className="m-1 rounded-pill"
-											onClick={() => handleExampleWithFilters('Market', {time_range: 'day'})}
-										>
-											Market (24h)
-										</Button>
-										<Button 
-											variant="outline-secondary" 
-											size="sm"
-											className="m-1 rounded-pill"
-											onClick={() => handleExampleWithFilters('Market', {time_range: 'week'})}
-										>
-											Market (Week)
-										</Button>
-									</div>
-								</Card.Body>
-							</Card>
-						</Col>
-						
-						<Col md={6} lg={3} className="mb-4">
-							<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
-								<Card.Header className="bg-warning text-dark border-0 rounded-top-3">
-									<i className="bi bi-layers me-2"></i>
-									Combined Filters
-								</Card.Header>
-								<Card.Body>
-									<p className="card-text">Try searches with multiple filters applied</p>
-									<div className="mb-3">
-										<Button 
-											variant="outline-secondary" 
-											size="sm"
-											className="m-1 rounded-pill"
-											onClick={() => handleExampleWithFilters('Earnings', {
-												source: 'Financial Times',
-												sentiment: 'positive'
-											})}
-										>
-											Positive Earnings in FT
-										</Button>
-										<Button 
-											variant="outline-secondary" 
-											size="sm"
-											className="m-1 rounded-pill"
-											onClick={() => handleExampleWithFilters('AI', {
-												time_range: 'month',
-												sentiment: 'neutral'
-											})}
-										>
-											AI (Monthly, Neutral)
-										</Button>
-									</div>
-								</Card.Body>
-							</Card>
-						</Col>
-					</Row>
-				</Col>
-			</Row>
-			
-			<Row className="mt-4 mb-5">
-				<Col>
-					<h4 className="text-center mb-4 fw-bold">
-						<i className="bi bi-collection text-primary me-2"></i>
-						Search Suggestions by Category
-					</h4>
-					<Card className="shadow-sm border-0 rounded-3">
-						<Card.Body className="p-4">
-							<Row>
-								{Object.entries(searchExamples).map(([category, examples]) => (
-									<Col md={6} lg={3} key={category} className="mb-3">
-										<h5 className="fw-bold">{category}</h5>
-										<ul className="list-unstyled">
-											{examples.map((example, idx) => (
-												<li key={idx} className="mb-2">
-													<Button
-														variant="link"
-														className="text-decoration-none p-0 text-primary"
-														onClick={() => handleExampleSearch(example.query)}
-													>
-														<i className="bi bi-arrow-right-circle me-1"></i>
-														{example.query}
-													</Button>
-													<small className="text-muted d-block ms-4">{example.description}</small>
-												</li>
+											<Button 
+												variant="outline-secondary" 
+												size="sm"
+												className="m-1 rounded-pill"
+												onClick={() => handleExampleWithFilters('Tesla', {source: 'Reuters'})}
+											>
+												Tesla in Reuters
+											</Button>
+										</div>
+									</Card.Body>
+								</Card>
+							</Col>
+							
+							<Col md={6} lg={3} className="mb-4">
+								<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+									<Card.Header className="bg-success text-white border-0 rounded-top-3">
+										<i className="bi bi-emoji-smile me-2"></i>
+										Sentiment Analysis
+									</Card.Header>
+									<Card.Body>
+										<p className="card-text">Filter results by positive, negative, or neutral sentiment</p>
+										<div className="mb-3">
+											{sentiments.filter(s => s.value !== 'all').map(sentiment => (
+												<Button 
+													key={sentiment.value}
+													variant={`outline-${sentiment.color}`}
+													size="sm"
+													className="m-1 rounded-pill"
+													onClick={() => handleExampleWithFilters('Apple', {sentiment: sentiment.value})}
+												>
+													Apple ({sentiment.label})
+												</Button>
 											))}
-										</ul>
-									</Col>
-								))}
-							</Row>
-						</Card.Body>
-					</Card>
-				</Col>
-			</Row>
-		</Container>
+										</div>
+									</Card.Body>
+								</Card>
+							</Col>
+							
+							<Col md={6} lg={3} className="mb-4">
+								<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+									<Card.Header className="bg-info text-white border-0 rounded-top-3">
+										<i className="bi bi-calendar-event me-2"></i>
+										Time Range Filtering
+									</Card.Header>
+									<Card.Body>
+										<p className="card-text">See how results change when filtered by time periods</p>
+										<div className="mb-3">
+											<Button 
+												variant="outline-secondary" 
+												size="sm"
+												className="m-1 rounded-pill"
+												onClick={() => handleExampleWithFilters('Market', {time_range: 'day'})}
+											>
+												Market (24h)
+											</Button>
+											<Button 
+												variant="outline-secondary" 
+												size="sm"
+												className="m-1 rounded-pill"
+												onClick={() => handleExampleWithFilters('Market', {time_range: 'week'})}
+											>
+												Market (Week)
+											</Button>
+										</div>
+									</Card.Body>
+								</Card>
+							</Col>
+							
+							<Col md={6} lg={3} className="mb-4">
+								<Card className="h-100 shadow-sm border-0 rounded-3 hover-lift">
+									<Card.Header className="bg-warning text-dark border-0 rounded-top-3">
+										<i className="bi bi-layers me-2"></i>
+										Combined Filters
+									</Card.Header>
+									<Card.Body>
+										<p className="card-text">Try searches with multiple filters applied</p>
+										<div className="mb-3">
+											<Button 
+												variant="outline-secondary" 
+												size="sm"
+												className="m-1 rounded-pill"
+												onClick={() => handleExampleWithFilters('Earnings', {
+													source: 'Financial Times',
+													sentiment: 'positive'
+												})}
+											>
+												Positive Earnings in FT
+											</Button>
+											<Button 
+												variant="outline-secondary" 
+												size="sm"
+												className="m-1 rounded-pill"
+												onClick={() => handleExampleWithFilters('AI', {
+													time_range: 'month',
+													sentiment: 'neutral'
+												})}
+											>
+												AI (Monthly, Neutral)
+											</Button>
+										</div>
+									</Card.Body>
+								</Card>
+							</Col>
+						</Row>
+					</Col>
+				</Row>
+				
+				<Row className="mt-4 mb-5">
+					<Col>
+						<h4 className="text-center mb-4 fw-bold">
+							<i className="bi bi-collection text-primary me-2"></i>
+							Search Suggestions by Category
+						</h4>
+						<Card className="shadow-sm border-0 rounded-3">
+							<Card.Body className="p-4">
+								<Row>
+									{Object.entries(searchExamples).map(([category, examples]) => (
+										<Col md={6} lg={3} key={category} className="mb-3">
+											<h5 className="fw-bold">{category}</h5>
+											<ul className="list-unstyled">
+												{examples.map((example, idx) => (
+													<li key={idx} className="mb-2">
+														<Button
+															variant="link"
+															className="text-decoration-none p-0 text-primary"
+															onClick={() => handleExampleSearch(example.query)}
+														>
+															<i className="bi bi-arrow-right-circle me-1"></i>
+															{example.query}
+														</Button>
+														<small className="text-muted d-block ms-4">{example.description}</small>
+													</li>
+												))}
+											</ul>
+										</Col>
+									))}
+								</Row>
+							</Card.Body>
+						</Card>
+					</Col>
+				</Row>
+			</Container>
+		</div>
 	);
 }
 

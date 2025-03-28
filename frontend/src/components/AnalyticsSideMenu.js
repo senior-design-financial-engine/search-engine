@@ -24,6 +24,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [topCompanies, setTopCompanies] = useState([]);
   const [topCategories, setTopCategories] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState({});
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   const sideMenuRef = useRef(null);
   const [tooltipText, setTooltipText] = useState('Open Analytics');
@@ -50,6 +52,34 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   useEffect(() => {
     setTooltipText(isOpen ? 'Close Analytics (Alt+A)' : 'Open Analytics (Alt+A)');
   }, [isOpen]);
+
+  // Handle window resize for responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+  
+  // Close menu when clicking outside on mobile
+  useEffect(() => {
+    if (isMobile && isOpen) {
+      const handleClickOutside = (e) => {
+        if (!e.target.closest('.side-menu') && !e.target.closest('.side-menu-toggle')) {
+          toggleMenu();
+        }
+      };
+      
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isMobile, isOpen, toggleMenu]);
 
   useEffect(() => {
     if (results && results.length > 0) {
@@ -196,16 +226,105 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       tooltip: {
         enabled: true,
         intersect: false,
-        mode: 'index'
+        mode: 'index',
+        padding: 10,
+        cornerRadius: 8,
+        caretSize: 6,
+        boxPadding: 4,
+        titleFont: {
+          size: 13,
+          weight: 'bold'
+        },
+        bodyFont: {
+          size: 12
+        },
+        callbacks: {
+          label: function(context) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += context.parsed.y;
+            }
+            return label;
+          }
+        }
       }
     },
     layout: {
-      padding: {
-        left: 5,
-        right: 5,
-        top: 5,
-        bottom: 5
+      padding: 10
+    },
+    borderColor: '#e9ecef',
+    animation: {
+      duration: 1000,
+      easing: 'easeOutQuart'
+    }
+  };
+  
+  // Pie chart options specific
+  const pieOptions = {
+    ...chartOptions,
+    cutout: '65%',
+    plugins: {
+      ...chartOptions.plugins,
+      legend: {
+        ...chartOptions.plugins.legend,
+        position: 'bottom',
       }
+    }
+  };
+
+  // Line chart options specific
+  const lineOptions = {
+    ...chartOptions,
+    scales: {
+      x: {
+        grid: {
+          display: false
+        }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        }
+      }
+    }
+  };
+
+  // Bar chart options specific
+  const barOptions = {
+    ...chartOptions,
+    scales: {
+      x: {
+        grid: {
+          display: false
+        }
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        }
+      }
+    }
+  };
+
+  // Chart colors with better accessibility
+  const chartColors = {
+    positive: 'rgba(43, 138, 62, 0.8)',
+    negative: 'rgba(224, 49, 49, 0.8)',
+    neutral: 'rgba(25, 113, 194, 0.8)',
+    background: {
+      positive: 'rgba(43, 138, 62, 0.15)',
+      negative: 'rgba(224, 49, 49, 0.15)',
+      neutral: 'rgba(25, 113, 194, 0.15)'
+    },
+    border: {
+      positive: 'rgba(43, 138, 62, 1)',
+      negative: 'rgba(224, 49, 49, 1)',
+      neutral: 'rgba(25, 113, 194, 1)'
     }
   };
   
@@ -331,140 +450,242 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       <div 
         className={`side-menu ${isOpen ? 'open' : ''}`} 
         ref={sideMenuRef}
+        id="analytics-side-menu"
         role="complementary"
-        aria-label="Analytics Sidebar"
-        tabIndex={isOpen ? 0 : -1}
+        aria-label="Analytics"
       >
         <div className="side-menu-resize-handle" title="Drag to resize"></div>
         <div className="side-menu-header">
-          <h4 className="mb-0 d-flex align-items-center">
-            <i className="bi bi-graph-up-arrow me-2 text-primary" aria-hidden="true"></i>
-            <span>Analytics</span>
-          </h4>
-          <div className="d-flex align-items-center">
-            <small className="text-muted me-2 d-none d-md-block">ESC to close</small>
-            <button 
-              className="side-menu-close" 
-              onClick={toggleMenu}
-              aria-label="Close Analytics Menu"
-            >
-              <i className="bi bi-x-lg" aria-hidden="true"></i>
-            </button>
-          </div>
+          <h2 className="m-0 fs-5 fw-semibold">Analytics Dashboard</h2>
+          <button 
+            onClick={toggleMenu} 
+            className="side-menu-close"
+            aria-label="Close analytics panel"
+          >
+            <i className="bi bi-x-lg"></i>
+          </button>
         </div>
-
-        {results && results.length > 0 ? (
-          <>
-            {/* Sentiment Distribution */}
-            <Card className="analytics-card primary shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
-                  <span>Sentiment Distribution</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {totalSentiments > 0 ? (
-                  <div className="chart-container mb-1">
-                    <Pie data={sentimentChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
-                )}
-              </Card.Body>
-            </Card>
-
-            {/* Source Distribution */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Sources</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {Object.keys(sourceCounts).length > 0 ? (
-                  <div className="chart-container mb-1">
-                    <Bar data={sourceChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-newspaper" message="No source data available" />
-                )}
-              </Card.Body>
-            </Card>
-
-            {/* Top Companies */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Companies</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {renderBadges(topCompanies, 'light')}
-              </Card.Body>
-            </Card>
-
-            {/* Top Categories */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Categories</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {renderBadges(topCategories, 'info')}
-              </Card.Body>
-            </Card>
-
-            {/* Publication Timeline */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
-                  <span>Publication Timeline</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {Object.keys(timeDistribution).length > 0 ? (
-                  <div className="chart-container mb-1">
-                    <Line data={timelineChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-calendar" message="No timeline data available" />
-                )}
-              </Card.Body>
-            </Card>
-            
-            {/* Sentiment Trends */}
-            <Card className="analytics-card shadow-sm">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
-                  <span>Sentiment Trends</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
-                  <div className="chart-container mb-1">
-                    <Line data={sentimentTrendChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-graph-up" message="No trend data available" />
-                )}
-              </Card.Body>
-            </Card>
-          </>
+        
+        {results.length === 0 ? (
+          <div className="empty-state text-center my-5">
+            <i className="bi bi-bar-chart-line-fill fs-1 text-secondary mb-3"></i>
+            <p>No data available to analyze.</p>
+            <p className="text-muted small">Search for articles to see analytics.</p>
+          </div>
         ) : (
-          <div className="text-center py-4">
-            <i className="bi bi-bar-chart text-muted" style={{fontSize: "2.5rem", opacity: 0.4}} aria-hidden="true"></i>
-            <p className="mt-2 text-muted">No data available for analytics</p>
-            <small className="text-muted d-block">Search for results to see analysis</small>
+          <div className="analytics-content">
+            <div className="section-title mb-3 pb-2 border-bottom">
+              <i className="bi bi-pie-chart-fill me-2 text-primary"></i>
+              <span className="fw-semibold">Content Overview</span>
+            </div>
+            
+            <div className="row g-3 mb-4">
+              <div className="col-6">
+                <Card className="analytics-card primary h-100">
+                  <Card.Header>
+                    <h5>Sentiment Distribution</h5>
+                  </Card.Header>
+                  <Card.Body>
+                    <div className="chart-container">
+                      <Pie 
+                        data={{
+                          labels: ['Positive', 'Neutral', 'Negative'],
+                          datasets: [
+                            {
+                              data: [
+                                sentimentCounts.positive || 0,
+                                sentimentCounts.neutral || 0,
+                                sentimentCounts.negative || 0
+                              ],
+                              backgroundColor: [
+                                chartColors.positive,
+                                chartColors.neutral,
+                                chartColors.negative
+                              ],
+                              borderColor: [
+                                chartColors.border.positive,
+                                chartColors.border.neutral,
+                                chartColors.border.negative
+                              ],
+                              borderWidth: 1
+                            }
+                          ]
+                        }}
+                        options={pieOptions}
+                      />
+                    </div>
+                    <div className="sentiment-stats mt-2">
+                      {Object.entries(sentimentCounts).map(([sentiment, count]) => {
+                        if (count === 0) return null;
+                        const percentage = totalSentiments ? Math.round((count / totalSentiments) * 100) : 0;
+                        const bgColor = sentiment === 'positive' ? 'success' : 
+                                        sentiment === 'negative' ? 'danger' : 'info';
+                        
+                        return (
+                          <div key={sentiment} className="mb-2">
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span className="text-capitalize small fw-medium">{sentiment}</span>
+                              <span className="small">{count} ({percentage}%)</span>
+                            </div>
+                            <ProgressBar 
+                              variant={bgColor} 
+                              now={percentage} 
+                              className="sentiment-progress" 
+                              style={{ height: '6px' }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </div>
+              
+              <div className="col-6">
+                <Card className="analytics-card h-100">
+                  <Card.Header>
+                    <h5>Source Distribution</h5>
+                  </Card.Header>
+                  <Card.Body>
+                    {Object.keys(sourceCounts).length === 0 ? (
+                      <EmptyState
+                        icon="bi-newspaper"
+                        message="No source data available"
+                      />
+                    ) : (
+                      <div className="chart-container">
+                        <Bar 
+                          data={{
+                            labels: Object.keys(sourceCounts).slice(0, 5),
+                            datasets: [
+                              {
+                                label: 'Articles',
+                                data: Object.values(sourceCounts).slice(0, 5),
+                                backgroundColor: 'rgba(59, 91, 219, 0.7)',
+                                borderColor: 'rgba(59, 91, 219, 1)',
+                                borderWidth: 1,
+                                borderRadius: 4
+                              }
+                            ]
+                          }}
+                          options={barOptions}
+                        />
+                      </div>
+                    )}
+                  </Card.Body>
+                </Card>
+              </div>
+            </div>
+            
+            <div className="section-title mb-3 pb-2 border-bottom">
+              <i className="bi bi-tag-fill me-2 text-primary"></i>
+              <span className="fw-semibold">Topics & Entities</span>
+            </div>
+            
+            <div className="row g-3 mb-4">
+              <div className="col-6">
+                <Card className="analytics-card h-100">
+                  <Card.Header>
+                    <h5>Top Companies</h5>
+                  </Card.Header>
+                  <Card.Body>
+                    {topCompanies.length === 0 ? (
+                      <EmptyState
+                        icon="bi-building"
+                        message="No company data available"
+                      />
+                    ) : (
+                      <div>
+                        {renderBadges(topCompanies, 'primary')}
+                      </div>
+                    )}
+                  </Card.Body>
+                </Card>
+              </div>
+              
+              <div className="col-6">
+                <Card className="analytics-card h-100">
+                  <Card.Header>
+                    <h5>Top Categories</h5>
+                  </Card.Header>
+                  <Card.Body>
+                    {topCategories.length === 0 ? (
+                      <EmptyState
+                        icon="bi-folder"
+                        message="No category data available"
+                      />
+                    ) : (
+                      <div>
+                        {renderBadges(topCategories, 'info')}
+                      </div>
+                    )}
+                  </Card.Body>
+                </Card>
+              </div>
+            </div>
+            
+            <div className="section-title mb-3 pb-2 border-bottom">
+              <i className="bi bi-graph-up me-2 text-primary"></i>
+              <span className="fw-semibold">Time Trends</span>
+            </div>
+            
+            <Card className="analytics-card mb-3">
+              <Card.Header>
+                <h5>Monthly Article Trends</h5>
+              </Card.Header>
+              <Card.Body>
+                {Object.keys(monthlyTrends).length === 0 ? (
+                  <EmptyState
+                    icon="bi-calendar"
+                    message="No time data available"
+                  />
+                ) : (
+                  <div className="chart-container" style={{ height: '220px' }}>
+                    <Line 
+                      data={{
+                        labels: Object.keys(monthlyTrends),
+                        datasets: [
+                          {
+                            label: 'All Articles',
+                            data: Object.values(monthlyTrends).map(m => m.articles),
+                            borderColor: 'rgba(59, 91, 219, 1)',
+                            backgroundColor: 'rgba(59, 91, 219, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(59, 91, 219, 1)'
+                          },
+                          {
+                            label: 'Positive',
+                            data: Object.values(monthlyTrends).map(m => m.positive),
+                            borderColor: chartColors.border.positive,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointBackgroundColor: chartColors.border.positive
+                          },
+                          {
+                            label: 'Negative',
+                            data: Object.values(monthlyTrends).map(m => m.negative),
+                            borderColor: chartColors.border.negative,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointBackgroundColor: chartColors.border.negative
+                          }
+                        ]
+                      }}
+                      options={lineOptions}
+                    />
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
           </div>
         )}
       </div>
+      
+      {isMobile && isOpen && <div className="menu-backdrop" onClick={() => toggleMenu()}></div>}
     </>
   );
 };

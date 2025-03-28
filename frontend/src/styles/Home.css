@@ -1,40 +1,74 @@
 .container {
   text-align: center;
-  margin-top: 3rem;
-  margin-bottom: 3rem;
+  margin-top: 4rem;
+  margin-bottom: 4rem;
 }
 
 .hero-section {
   max-width: 800px;
-  margin: 0 auto 3rem;
+  margin: 0 auto 3.5rem;
 }
 
 .hero-title {
-  font-weight: 700;
+  font-weight: 800;
   margin-bottom: 1.5rem;
   background: linear-gradient(45deg, var(--primary), #748af8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-fill-color: transparent;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  font-size: clamp(2rem, 5vw, 3rem);
 }
 
 .hero-subtitle {
   color: var(--secondary);
   font-size: 1.25rem;
-  line-height: 1.5;
+  line-height: 1.6;
   max-width: 600px;
-  margin: 0 auto 2rem;
+  margin: 0 auto 2.5rem;
+}
+
+.search-section {
+  margin-bottom: 3rem;
 }
 
 .search-form {
   max-width: 650px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* Enhanced glow effect behind the search form */
+.search-form::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  background: radial-gradient(circle at center, rgba(59, 91, 219, 0.1) 0%, rgba(59, 91, 219, 0) 70%);
+  z-index: -1;
+  border-radius: 50%;
+  opacity: 0.8;
 }
 
 .search-wrapper {
   position: relative;
   margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+  border-radius: var(--radius-pill);
+  transition: all var(--transition-normal);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+}
+
+.search-wrapper:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  border-color: rgba(59, 91, 219, 0.2);
 }
 
 .search-icon {
@@ -52,31 +86,51 @@
   color: var(--primary);
 }
 
+.search-wrapper:focus-within {
+  box-shadow: 0 0 0 4px var(--primary-light), var(--shadow);
+  border-color: var(--primary);
+}
+
 .input {
   width: 100%;
-  height: 60px;
-  padding: 10px 20px 10px 50px;
+  height: 64px;
+  padding: 10px 20px 10px 55px;
   font-size: 1.1rem;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--border);
+  border: none;
   transition: all var(--transition-normal);
-  box-shadow: var(--shadow-sm);
+  background-color: transparent;
+  color: var(--dark);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15);
+}
+
+.button-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 1rem;
 }
 
 .button {
-  padding: 12px 25px;
-  margin: 10px 5px;
-  font-weight: 500;
+  padding: 12px 28px;
+  font-weight: 600;
   font-size: 1rem;
   border-radius: var(--radius-md);
   transition: all var(--transition-normal);
   border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+}
+
+.button i {
+  margin-right: 8px;
+  font-size: 1.1em;
 }
 
 .primary-button {
@@ -88,11 +142,11 @@
 .primary-button:hover {
   background-color: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 15px rgba(67, 97, 238, 0.25);
+  box-shadow: 0 8px 15px rgba(59, 91, 219, 0.25);
 }
 
 .secondary-button {
-  background-color: white;
+  background-color: var(--card-bg);
   color: var(--dark);
   border: 1px solid var(--border);
 }
@@ -103,51 +157,36 @@
   box-shadow: var(--shadow-sm);
 }
 
-.advancedQuery {
-  margin-top: 30px;
-  padding: 20px;
+.advanced-query {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
   border-radius: var(--radius-md);
-  background-color: white;
+  background-color: var(--card-bg);
   box-shadow: var(--shadow);
   max-width: 650px;
   margin-left: auto;
   margin-right: auto;
-}
-
-.advancedQueryTitle {
-  font-weight: 600;
-  margin-bottom: 1.25rem;
-  font-size: 1.2rem;
-  color: var(--dark);
-}
-
-.queryRow {
-  display: flex;
-  justify-content: center;
-  margin: 15px 0;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.queryInput {
-  margin: 0;
-  padding: 10px 15px;
-  width: 100%;
-  max-width: 200px;
-  border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  transition: all var(--transition-fast);
+  text-align: left;
 }
 
-.queryInput:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+.advanced-query-title {
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+  color: var(--dark);
+  display: flex;
+  align-items: center;
 }
 
-.queryLabel {
+.advanced-query-title i {
+  margin-right: 0.5rem;
+  color: var(--primary);
+}
+
+.query-label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 0.5rem;
   font-weight: 500;
   font-size: 0.9rem;
   color: var(--secondary);
@@ -194,34 +233,34 @@
 }
 
 .example-card {
-  padding: 15px;
+  padding: 1.25rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   transition: all var(--transition-normal);
-  text-align: left;
+  background-color: var(--card-bg);
+  box-shadow: var(--shadow-sm);
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: white;
 }
 
 .example-card:hover {
   transform: translateY(-5px);
   box-shadow: var(--shadow);
-  border-color: transparent;
+  border-color: rgba(59, 91, 219, 0.3);
 }
 
 .example-query {
   font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--dark);
+  margin-bottom: 0.75rem;
+  color: var(--primary);
 }
 
 .example-description {
   color: var(--secondary);
   font-size: 0.9rem;
-  margin-bottom: 15px;
-  flex: 1;
+  margin-bottom: 0;
+  flex-grow: 1;
 }
 
 .examples-container {
@@ -241,22 +280,67 @@
   }
 }
 
+/* Mobile responsiveness */
 @media (max-width: 768px) {
   .container {
     margin-top: 2rem;
   }
   
+  .hero-section {
+    margin: 2rem 1rem;
+  }
+  
   .hero-title {
-    font-size: 2rem;
+    font-size: clamp(2rem, 8vw, 2.5rem);
+    margin-bottom: 1.5rem;
+    padding: 0 1rem;
   }
   
   .hero-subtitle {
     font-size: 1.1rem;
   }
   
+  .search-section {
+    padding: 0 1rem;
+  }
+  
+  .search-wrapper {
+    width: 100%;
+    max-width: 100%;
+  }
+  
   .input {
-    height: 50px;
+    padding: 0 1rem;
     font-size: 1rem;
+  }
+  
+  .button-container {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .button-container .button {
+    width: 100%;
+    margin: 0.5rem 0;
+  }
+  
+  .button.primary {
+    margin-right: 0;
+  }
+  
+  .advanced-query {
+    padding: 1rem;
+    margin-top: 1.5rem;
+  }
+  
+  .query-filters {
+    flex-direction: column;
+  }
+  
+  .query-filter {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 1rem;
   }
   
   .examples-container {
