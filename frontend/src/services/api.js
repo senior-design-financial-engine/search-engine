@@ -347,9 +347,29 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				// Building the query
 				const must = [{ match: { content: query } }];
 				
-				if (source && source !== 'All Sources') must.push({ match: { source } });
+				if (source && source !== 'All Sources') {
+					must.push({ match: { "source.enum": source } });
+				}
+				
 				if (sentiment && sentiment !== 'All Sentiments') {
-					must.push({ range: { sentiment_score: { gte: parseFloat(sentiment) } } });
+					switch(sentiment.toLowerCase()) {
+						case 'positive':
+							must.push({ range: { sentiment_score: { gte: 0.33 } } });
+							break;
+						case 'negative':
+							must.push({ range: { sentiment_score: { lte: -0.33 } } });
+							break;
+						case 'neutral':
+							must.push({ 
+								range: { 
+									sentiment_score: { 
+										gt: -0.33,
+										lt: 0.33
+									} 
+								} 
+							});
+							break;
+					}
 				}
 				
 				let range = {};
@@ -362,16 +382,17 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						case '7d': startDate = new Date(now.setDate(now.getDate() - 7)); break;
 						case '30d': startDate = new Date(now.setDate(now.getDate() - 30)); break;
 						case '90d': startDate = new Date(now.setDate(now.getDate() - 90)); break;
-						default: startDate = new Date(now.setDate(now.getDate() - 30)); // Default to 30 days
+						default: startDate = new Date(now.setDate(now.getDate() - 30));
 					}
 					
-					range = {
-						published_at: {
-							gte: startDate.toISOString(),
-							lte: new Date().toISOString()
+					must.push({
+						range: {
+							"published_at.enum": {
+								gte: startDate.toISOString(),
+								lte: new Date().toISOString()
+							}
 						}
-					};
-					must.push({ range });
+					});
 				}
 				
 				const esQuery = {

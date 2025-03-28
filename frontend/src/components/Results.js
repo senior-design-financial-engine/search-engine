@@ -354,13 +354,12 @@ function Results() {
                   className="rounded-3"
                 >
                   <option value="">All Sources</option>
-                  <option value="Bloomberg">Bloomberg</option>
-                  <option value="Reuters">Reuters</option>
+                  <option value="AP">AP</option>
+                  <option value="BBC">BBC</option>
                   <option value="CNBC">CNBC</option>
-                  <option value="Financial Times">Financial Times</option>
-                  <option value="Wall Street Journal">Wall Street Journal</option>
-                  <option value="MarketWatch">MarketWatch</option>
-                  <option value="Barron's">Barron's</option>
+                  <option value="CNN">CNN</option>
+                  <option value="NPR">NPR</option>
+                  <option value="Reddit">Reddit</option>
                 </Form.Select>
               </Form.Group>
             </div>

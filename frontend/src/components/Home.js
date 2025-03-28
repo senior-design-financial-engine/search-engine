@@ -8,8 +8,12 @@ const USE_MOCK_API = process.env.REACT_APP_USE_MOCK_API === 'true';
 
 // Sample sources from our mock data for the dropdown
 const availableSources = [
-	"Bloomberg", "Reuters", "CNBC", "Financial Times", 
-	"Wall Street Journal", "MarketWatch", "Barron's"
+	'AP',
+	'BBC',
+	'CNBC',
+	'CNN',
+	'NPR',
+	'Reddit'
 ];
 
 // Sample time ranges
@@ -43,15 +47,15 @@ const searchExamples = {
 		{ query: "Market", description: "Market trends and analysis" },
 		{ query: "Energy", description: "News from the energy sector" }
 	],
-	"Industries": [
-		{ query: "Technology", description: "Technology sector news" },
-		{ query: "Finance", description: "Financial industry updates" },
-		{ query: "Healthcare", description: "Healthcare sector developments" }
+	"Sources": [
+		{ query: "AI", filters: { source: "AP" }, description: "AI news from AP" },
+		{ query: "Tech", filters: { source: "BBC" }, description: "Tech news from BBC" },
+		{ query: "Market", filters: { source: "CNBC" }, description: "Market news from CNBC" }
 	],
 	"Combined Searches": [
-		{ query: "Apple AI", description: "Apple's AI initiatives" },
-		{ query: "Tesla earnings", description: "Tesla earnings reports" },
-		{ query: "Amazon market share", description: "Amazon's market position" }
+		{ query: "Apple", filters: { source: "CNN", time_range: "7d" }, description: "Recent Apple news from CNN" },
+		{ query: "Tesla", filters: { source: "NPR", sentiment: "positive" }, description: "Positive Tesla news from NPR" },
+		{ query: "Crypto", filters: { source: "Reddit", time_range: "1d" }, description: "Latest crypto discussions from Reddit" }
 	]
 };
 
