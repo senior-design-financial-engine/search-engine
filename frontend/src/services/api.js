@@ -368,7 +368,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					query: {
 						bool: { must }
 					},
-					sort: [{ published_at: { order: 'desc' } }],
+					// Modify sort to handle potential fielddata issues
+					sort: [{ "published_at.keyword": { order: "desc" } }],
 					size: 20
 				};
 				
