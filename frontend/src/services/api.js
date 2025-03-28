@@ -1,37 +1,41 @@
 import { v4 as uuidv4 } from 'uuid';
 
+// Get configuration directly from environment variables
+const SEARCH_ENGINE_ENDPOINT = process.env.REACT_APP_SEARCH_ENGINE_ENDPOINT;
+const SEARCH_ENGINE_KEY = process.env.REACT_APP_SEARCH_ENGINE_KEY;
+const SEARCH_ENGINE_INDEX = process.env.REACT_APP_SEARCH_ENGINE_INDEX;
+
 // Log environment information
 console.log('Environment information:', {
 	hostname: window.location.hostname,
 	origin: window.location.origin,
-	searchEngineEndpoint: window.__SEARCH_ENGINE_ENDPOINT || 'not set',
-	searchEngineIndex: window.__SEARCH_ENGINE_INDEX || 'not set',
-	hasApiKey: !!window.__SEARCH_ENGINE_KEY,
-	userAgent: navigator.userAgent
+	searchEngineEndpoint: SEARCH_ENGINE_ENDPOINT || 'not set',
+	searchEngineIndex: SEARCH_ENGINE_INDEX || 'not set',
+	hasApiKey: !!SEARCH_ENGINE_KEY,
+	userAgent: navigator.userAgent,
+	nodeEnv: process.env.NODE_ENV
 });
 
 // Runtime configuration from environment variables
 const __config = {
-	endpoint: window.__SEARCH_ENGINE_ENDPOINT 
-		? (window.__SEARCH_ENGINE_ENDPOINT.startsWith('http') 
-			? window.__SEARCH_ENGINE_ENDPOINT 
-			: `https://${window.__SEARCH_ENGINE_ENDPOINT}`)
+	endpoint: SEARCH_ENGINE_ENDPOINT 
+		? (SEARCH_ENGINE_ENDPOINT.startsWith('http') 
+			? SEARCH_ENGINE_ENDPOINT 
+			: `https://${SEARCH_ENGINE_ENDPOINT}`)
 		: 'https://api.financialnewsengine.com',
-	apiKey: window.__SEARCH_ENGINE_KEY || '',
-	idx: window.__SEARCH_ENGINE_INDEX || 'financial_news',
+	apiKey: SEARCH_ENGINE_KEY || '',
+	idx: SEARCH_ENGINE_INDEX || 'financial_news',
 	version: '7.14'
 };
 
-// Check for invalid environment variables
-const hasInvalidConfig = (
-	__config.endpoint.includes('%REACT_APP_') || 
-	__config.idx.includes('%REACT_APP_')
-);
+// Check for missing environment variables
+const hasMissingConfig = !SEARCH_ENGINE_ENDPOINT || !SEARCH_ENGINE_INDEX;
 
-if (hasInvalidConfig) {
-	console.error('WARNING: Environment variables not properly loaded:', {
-		endpoint: __config.endpoint,
-		idx: __config.idx
+if (hasMissingConfig) {
+	console.error('WARNING: Missing environment variables:', {
+		endpoint: SEARCH_ENGINE_ENDPOINT || 'missing',
+		idx: SEARCH_ENGINE_INDEX || 'missing',
+		hasApiKey: !!SEARCH_ENGINE_KEY
 	});
 }
 

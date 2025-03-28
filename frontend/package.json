@@ -10,6 +10,7 @@
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
     "chart.js": "^4.4.6",
+    "cross-env": "^7.0.3",
     "date-fns": "^2.30.0",
     "react": "^18.3.1",
     "react-bootstrap": "^2.10.5",
@@ -22,9 +23,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "start:api": "cp .env.api .env && react-scripts start",
+    "start:api": "node scripts/load-env.js && cross-env react-scripts start",
     "build": "react-scripts build",
-    "build:api": "cp .env.api .env && react-scripts build",
+    "build:api": "node scripts/load-env.js && cross-env react-scripts build",
     "test": "react-scripts test --transformIgnorePatterns \"node_modules/(?!axios)/\"",
     "eject": "react-scripts eject",
     "clean-install": "rm -rf node_modules package-lock.json && npm install"
