@@ -194,7 +194,7 @@ const apiClient = createClient(__config.endpoint);
 const fallbackApiClient = createClient(FALLBACK_ENDPOINT);
 
 // Data retrieval helper
-const queryElasticsearch = async (body) => {
+const queryBackend = async (body) => {
 	try {
 		const url = `${__config.endpoint}/${__config.idx}/_search`;
 		
@@ -245,19 +245,19 @@ const queryElasticsearch = async (body) => {
 	}
 };
 
-// Format ES results to match API response format
-const formatSearchResults = (esResults) => {
-	if (!esResults || !esResults.hits || !esResults.hits.hits) {
+// Format search results to match API response format
+const formatSearchResults = (results) => {
+	if (!results || !results.hits || !results.hits.hits) {
 		return { articles: [] };
 	}
 	
 	return {
-		articles: esResults.hits.hits.map(hit => ({
+		articles: results.hits.hits.map(hit => ({
 			id: hit._id,
 			score: hit._score,
 			...hit._source
 		})),
-		total: esResults.hits.total?.value || 0
+		total: results.hits.total?.value || 0
 	};
 };
 
@@ -334,7 +334,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			if (__config.endpoint && __config.endpoint !== 'https://search-api.example.com') {
 				console.log('Preparing search query with params:', params);
 				
-				// Building the query
+				// Building the query parameters
 				const must = [{ match: { content: query } }];
 				
 				if (source && source !== 'All Sources') must.push({ match: { source } });
@@ -364,20 +364,20 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					must.push({ range });
 				}
 				
-				// Enhanced query with function_score for better relevance
-				const esQuery = {
+				// Preparing the search query with relevance boosting
+				const searchQuery = {
 					query: {
 						function_score: {
 							query: {
 								bool: { must }
 							},
 							functions: [
-								// Boost exact matches in the headline
+								// Boost headline matches
 								{
 									filter: { match: { headline: query } },
 									weight: 3
 								},
-								// Boost if query terms appear close together in content
+								// Boost phrase matches
 								{
 									filter: { 
 										match_phrase: { 
@@ -389,11 +389,13 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 									},
 									weight: 2.5
 								},
-								// Boost recent articles
+								// Boost recent content
 								{
 									gauss: {
-										"published_at.enum": {
-											scale: "30d"
+										published_at: {
+											origin: "now",
+											scale: "30d",
+											decay: 0.5
 										}
 									},
 									weight: 1.5
@@ -403,17 +405,17 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 							boost_mode: "multiply"
 						}
 					},
-					// Keep date-based sorting as secondary factor
+					// Sort by relevance and date
 					sort: [
 						{ "_score": { "order": "desc" } },
-						{ "published_at.enum": { "order": "desc" } }
+						{ "published_at": { "order": "desc" } }
 					],
 					size: 20
 				};
 				
-				console.log('Query:', JSON.stringify(esQuery).substring(0, 200) + '...');
+				console.log('Query:', JSON.stringify(searchQuery).substring(0, 200) + '...');
 				
-				const results = await queryElasticsearch(esQuery);
+				const results = await queryBackend(searchQuery);
 				return { data: formatSearchResults(results) };
 			} else {
 				console.log('Configuration error, using fallback', __config.endpoint);

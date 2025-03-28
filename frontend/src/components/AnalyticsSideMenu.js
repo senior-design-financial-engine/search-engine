@@ -317,9 +317,13 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       >
         <div className="toggle-content" data-tooltip={tooltipText}>
           {isOpen ? (
-            <i className="bi bi-chevron-right" aria-hidden="true"></i>
+            <i className="bi bi-chevron-right" aria-hidden="true">
+              <span className="visually-hidden">Close</span>
+            </i>
           ) : (
-            <i className="bi bi-graph-up-arrow" aria-hidden="true"></i>
+            <i className="bi bi-graph-up" aria-hidden="true">
+              <span className="visually-hidden">Open</span>
+            </i>
           )}
         </div>
       </Button>

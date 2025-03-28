@@ -57,11 +57,34 @@
   position: relative;
 }
 
+/* Enhanced icon styling with fallback text */
 .side-menu-toggle .toggle-content i {
   font-size: 1.25rem;
-  color: white;
-  opacity: 1;
   line-height: 1;
+}
+
+/* Add a fallback icon character for when icon fonts fail to load */
+.side-menu-toggle .toggle-content i.bi-graph-up::before {
+  content: "📈";
+  display: inline-block;
+}
+
+.side-menu-toggle .toggle-content i.bi-chevron-right::before {
+  content: "›";
+  display: inline-block;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 
 .side-menu-toggle .toggle-content::after {
