@@ -391,11 +391,11 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					let startDate;
 					
 					switch (time_range) {
-						case '1d': startDate = new Date(now.setDate(now.getDate() - 1)); break;
-						case '7d': startDate = new Date(now.setDate(now.getDate() - 7)); break;
-						case '30d': startDate = new Date(now.setDate(now.getDate() - 30)); break;
-						case '90d': startDate = new Date(now.setDate(now.getDate() - 90)); break;
-						default: startDate = new Date(now.setDate(now.getDate() - 30));
+						case '1d': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
+						case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+						case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+						case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+						default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 					}
 					
 					// Convert dates to ISO strings for exact matching with the enum field
@@ -403,8 +403,18 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						range: {
 							"published_at.enum": {
 								gte: startDate.toISOString(),
-								lte: new Date().toISOString(),
+								lte: now.toISOString(),
 								format: "strict_date_time"
+							}
+						}
+					});
+
+					// Add a backup filter using the updated_at field which is a proper date type
+					must.push({
+						range: {
+							"updated_at": {
+								gte: startDate.toISOString(),
+								lte: now.toISOString()
 							}
 						}
 					});

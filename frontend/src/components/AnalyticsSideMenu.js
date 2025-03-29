@@ -3,6 +3,7 @@ import { Card, Button, ProgressBar, Badge } from 'react-bootstrap';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement } from 'chart.js';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import '../styles/SideMenu.css';
+import './AnalyticsSideMenu.css';
 
 // Register Chart.js components
 ChartJS.register(
