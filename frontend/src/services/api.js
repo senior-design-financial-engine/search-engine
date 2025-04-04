@@ -473,8 +473,11 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					);
 				}
 
+				console.log("currently here");
+				console.log(time_range);
+
 				// Add time range filtering if needed (as a backup)
-				if (time_range && time_range !== 'All Time') {
+				if (time_range && (time_range !== 'All Time')) {
 					const now = new Date();
 					let startDate;
 					
@@ -489,8 +492,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
 						const articleDate = new Date(article.published_at);
-						console.log(startDate)
-						console.log(articleDate)
 						return articleDate >= startDate && articleDate <= now;
 					});
 				}
