@@ -120,6 +120,7 @@
 
 /* Source and date info */
 .text-muted {
+  color: black;
   font-size: 0.85rem;
 }
 

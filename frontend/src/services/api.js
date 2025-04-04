@@ -489,9 +489,12 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						default: startDate = new Date(now.setDate(now.getDate() - 30));
 					}
 
+					console.log(startDate)
+
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
-						const articleDate = new Date(article.published_at);
+						const articleDate = (new Date(article.published_at));
+						console.log(articleDate)
 						return articleDate >= startDate && articleDate <= now;
 					});
 				}
@@ -529,7 +532,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		}
 		
 		// Normalize the response format
-		console.log('Response received, normalizing format 2 ');
+		console.log('Response received, normalizing format 3 ');
 		
 		let normalizedResponse;
 		if (Array.isArray(response)) {
