@@ -494,8 +494,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
 						const articleDate = (new Date(article.published_at));
-						console.log(articleDate)
-						return articleDate >= startDate && articleDate <= now;
+						return (articleDate >= startDate) && (articleDate <= now);
 					});
 				}
 				
