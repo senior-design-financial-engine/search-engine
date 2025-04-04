@@ -334,10 +334,12 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 	
 	// Request parameters
 	const params = { query };
-	
-	if (source && source !== 'All Sources') params.source = source;
-	if (time_range && time_range !== 'All Time') params.time_range = time_range;
-	if (sentiment && sentiment !== 'All Sentiments') params.sentiment = sentiment;
+
+	console.log('Query parameters:', { query, source, time_range, sentiment });
+
+	if (source && (source !== 'All Sources')) params.source = source;
+	if (time_range && (time_range !== 'All Time')) params.time_range = time_range;
+	if (sentiment && (sentiment !== 'All Sentiments')) params.sentiment = sentiment;
 	
 	const primaryRequest = async () => {
 		try {
@@ -487,6 +489,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
 						const articleDate = new Date(article.published_at);
+						console.log(startDate)
+						console.log(articleDate)
 						return articleDate >= startDate && articleDate <= now;
 					});
 				}
