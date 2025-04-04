@@ -528,7 +528,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		}
 		
 		// Normalize the response format
-		console.log('Response received, normalizing format');
+		console.log('Response received, normalizing format 2 ');
 		
 		let normalizedResponse;
 		if (Array.isArray(response)) {
