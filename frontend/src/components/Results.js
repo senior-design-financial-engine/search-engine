@@ -8,25 +8,19 @@ import '../styles/Results.css';
 
 function Results() {
   const location = useLocation();
-  const url_params = new URLSearchParams(location.search)
-
-  // get query info
+  const url_params = new URLSearchParams(location.search);
   const query = url_params.get('query');
-  url_params.delete('query')
+  const source = url_params.get('source') || 'all';
+  const timeRange = url_params.get('time_range') || 'all';
+  const sentiment = url_params.get('sentiment') || 'all';
 
-  // get all filters and normalize source case
-  const rawSource = url_params.get('source');
-  const source = rawSource ? availableSources.find(s => s.toLowerCase() === rawSource.toLowerCase()) || rawSource : null;
-  const timeRange = url_params.get('time_range')
-  const sentiment = url_params.get('sentiment')
-  
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilters, setActiveFilters] = useState({
-    source,
-    timeRange,
-    sentiment
+    source: source === 'all' ? null : source,
+    timeRange: timeRange === 'all' ? null : timeRange,
+    sentiment: sentiment === 'all' ? null : sentiment
   });
   // Add sorting state
   const [sortBy, setSortBy] = useState('relevance');
@@ -46,7 +40,7 @@ function Results() {
       
       try {
         if (query) {
-          const searchResults = await searchArticles(query, source, timeRange, sentiment);
+          const searchResults = await searchArticles(query, activeFilters.source, activeFilters.timeRange, activeFilters.sentiment);
           
           // Transform results to ensure consistent structure
           const normalizedResults = Array.isArray(searchResults) ? searchResults : 
@@ -63,7 +57,15 @@ function Results() {
     };
 
     fetchResults();
-  }, [query, source, timeRange, sentiment]);
+  }, [query, activeFilters.source, activeFilters.timeRange, activeFilters.sentiment]);
+
+  useEffect(() => {
+    setActiveFilters({
+      source: source === 'all' ? null : source,
+      timeRange: timeRange === 'all' ? null : timeRange,
+      sentiment: sentiment === 'all' ? null : sentiment
+    });
+  }, [source, timeRange, sentiment]);
 
   const handleBack = () => {
     navigate('/'); // Navigate to homepage instead of previous page
@@ -72,18 +74,25 @@ function Results() {
   const handleFilterChange = (filterType, value) => {
     const newParams = new URLSearchParams(location.search);
     
+    // Preserve the query parameter
+    newParams.set('query', query);
+    
     if (value && value !== 'all') {
-      // Normalize source case if it's a source filter
-      if (filterType === 'source') {
-        const normalizedSource = availableSources.find(
-          s => s.toLowerCase() === value.toLowerCase()
-        );
-        value = normalizedSource || value;
+      if (filterType === 'time_range') {
+        // Ensure proper parameter name for time range
+        newParams.set('time_range', value);
+      } else {
+        newParams.set(filterType, value);
       }
-      newParams.set(filterType, value);
     } else {
       newParams.delete(filterType);
     }
+    
+    // Update active filters state
+    setActiveFilters(prev => ({
+      ...prev,
+      [filterType]: value === 'all' ? null : value
+    }));
     
     navigate(`/results?${newParams.toString()}`);
   };
@@ -358,7 +367,7 @@ function Results() {
               <Form.Group>
                 <Form.Label className="fw-bold">Source</Form.Label>
                 <Form.Select 
-                  value={source || ''}
+                  value={activeFilters.source || ''}
                   onChange={(e) => handleFilterChange('source', e.target.value)}
                   className="rounded-3"
                 >
@@ -374,7 +383,7 @@ function Results() {
               <Form.Group>
                 <Form.Label className="fw-bold">Time Range</Form.Label>
                 <Form.Select 
-                  value={timeRange || 'all'}
+                  value={activeFilters.timeRange || 'all'}
                   onChange={(e) => handleFilterChange('time_range', e.target.value)}
                   className="rounded-3"
                 >
@@ -391,7 +400,7 @@ function Results() {
               <Form.Group>
                 <Form.Label className="fw-bold">Sentiment</Form.Label>
                 <Form.Select 
-                  value={sentiment || 'all'}
+                  value={activeFilters.sentiment || 'all'}
                   onChange={(e) => handleFilterChange('sentiment', e.target.value)}
                   className="rounded-3"
                 >

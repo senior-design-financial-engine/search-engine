@@ -434,3 +434,11 @@
   padding: 1rem;
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
 }
+
+.source-pill {
+  background-color: #f8f9fa;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+  border: 1px solid #dee2e6;
+}

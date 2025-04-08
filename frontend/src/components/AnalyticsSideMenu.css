@@ -59,10 +59,13 @@
 }
 
 /* Sentiment Distribution */
-.sentiment-bars {
+.sentiment-bars,
+.source-bars,
+.time-bars {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1rem;
+  padding: 1rem 0;
 }
 
 .sentiment-bar-container {
@@ -77,12 +80,14 @@
   font-size: 0.875rem;
 }
 
-.sentiment-bar-wrapper {
+.sentiment-bar-wrapper,
+.source-bar-wrapper,
+.time-bar-wrapper {
   flex-grow: 1;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  height: 20px;
+  gap: 1rem;
+  height: 24px;
 }
 
 .sentiment-bar {
@@ -110,12 +115,6 @@
 }
 
 /* Source Distribution */
-.source-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
 .source-bar-container {
   display: flex;
   align-items: center;
@@ -128,14 +127,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.source-bar-wrapper {
-  flex-grow: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: 20px;
 }
 
 .source-bar {
@@ -152,12 +143,6 @@
 }
 
 /* Time Distribution */
-.time-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
 .time-bar-container {
   display: flex;
   align-items: center;
@@ -167,14 +152,6 @@
 .time-label {
   width: 70px;
   font-size: 0.875rem;
-}
-
-.time-bar-wrapper {
-  flex-grow: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  height: 20px;
 }
 
 .time-bar {
