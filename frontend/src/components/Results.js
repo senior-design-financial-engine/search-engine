@@ -243,11 +243,7 @@ function Results() {
     
     return sortedResults.map((article, index) => (
       <Col md={4} key={index} className="mb-4">
-        <Card className="h-100 shadow hover-lift border-0 rounded-3" style={{
-          backgroundColor: '#ffffff',
-          boxShadow: '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)',
-          transition: 'all 0.2s ease-in-out'
-        }}>
+        <Card className="h-100 shadow hover-lift border-0 rounded-3 result-card">
           <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
             <Badge bg="light" text="dark" className="me-1 mb-1 border source-pill">
               {article.source || 'Unknown Source'}
@@ -264,7 +260,6 @@ function Results() {
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-decoration-none text-dark stretched-link hover-primary"
-                style={{ transition: 'color 0.2s ease-in-out' }}
               >
                 {article.headline || 'Untitled Article'}
               </a>

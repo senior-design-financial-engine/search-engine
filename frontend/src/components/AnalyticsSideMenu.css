@@ -54,7 +54,7 @@
 }
 
 .analytics-card:not(:last-child) {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .analytics-card .card-header {
@@ -172,6 +172,6 @@
 }
 
 .chart-container {
-  padding: 1rem;
-  margin: 0.5rem 0;
+  padding: 0.5rem;
+  margin: 0;
 } 

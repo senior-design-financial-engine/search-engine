@@ -417,7 +417,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               </Card.Header>
               <Card.Body>
                 {totalSentiments > 0 ? (
-                  <div className="chart-container mb-1">
+                  <div className="chart-container">
                     <Pie data={sentimentChartData} options={chartOptions} />
                   </div>
                 ) : (
@@ -436,7 +436,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               </Card.Header>
               <Card.Body>
                 {Object.keys(sourceCounts).length > 0 ? (
-                  <div className="chart-container mb-1">
+                  <div className="chart-container">
                     <Bar data={sourceChartData} options={chartOptions} />
                   </div>
                 ) : (
@@ -481,7 +481,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               </Card.Header>
               <Card.Body>
                 {Object.keys(timeDistribution).length > 0 ? (
-                  <div className="chart-container mb-1">
+                  <div className="chart-container">
                     <Line data={timelineChartData} options={chartOptions} />
                   </div>
                 ) : (
@@ -500,7 +500,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               </Card.Header>
               <Card.Body>
                 {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
-                  <div className="chart-container mb-1">
+                  <div className="chart-container">
                     <Line data={sentimentTrendChartData} options={chartOptions} />
                   </div>
                 ) : (

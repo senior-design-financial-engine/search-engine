@@ -1,3 +1,38 @@
+:root {
+  /* Color Palette */
+  --primary: var(--bs-primary, #0d6efd);
+  --primary-light: var(--bs-primary-rgb, 13, 110, 253); /* Used for hover effects - will need alpha */
+  --secondary: var(--bs-secondary, #6c757d);
+  --light: var(--bs-light, #f8f9fa);
+  --border: var(--bs-border-color, #dee2e6);
+  --white: var(--bs-white, #ffffff);
+  --black: var(--bs-black, #000000);
+  --success: var(--bs-success, #198754);
+  --info: var(--bs-info, #0dcaf0);
+  --warning: var(--bs-warning, #ffc107);
+  --danger: var(--bs-danger, #dc3545);
+
+
+  /* Borders & Radii */
+  --radius-sm: var(--bs-border-radius-sm, 0.25rem);
+  --radius-md: var(--bs-border-radius, 0.375rem);
+  --radius-lg: var(--bs-border-radius-lg, 0.5rem);
+  --radius-pill: var(--bs-border-radius-pill, 50rem);
+
+
+  /* Shadows */
+  --shadow-sm: var(--bs-box-shadow-sm, 0 .125rem .25rem rgba(0, 0, 0, .075));
+  --shadow: var(--bs-box-shadow, 0 .5rem 1rem rgba(0, 0, 0, .15));
+  --shadow-lg: var(--bs-box-shadow-lg, 0 1rem 3rem rgba(0, 0, 0, .175));
+
+
+  /* Transitions */
+  --transition-base: var(--bs-transition-base, all .2s ease-in-out);
+  --transition-fast: all 0.15s ease-in-out;
+  --transition-normal: var(--transition-base); /* Alias to base */
+}
+
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

@@ -62,8 +62,20 @@ search-engine/
 │   │   ├── public/
 │   │   ├── src/
 │   │   │   ├── components/
+│   │   │   │   ├── AnalyticsSideMenu.css
+│   │   │   │   ├── AnalyticsSideMenu.js
+│   │   │   │   ├── Article.js
+│   │   │   │   ├── Filters.js
+│   │   │   │   ├── Home.js
+│   │   │   │   ├── Results.js
+│   │   │   │   └── unused/
+│   │   │   ├── constants/
+│   │   │   │   └── index.js
 │   │   │   ├── services/
+│   │   │   │   └── api.js
 │   │   │   ├── styles/
+│   │   │   │   ├── Results.css
+│   │   │   │   └── SideMenu.css
 │   │   │   ├── App.css
 │   │   │   ├── App.js
 │   │   │   ├── App.test.js

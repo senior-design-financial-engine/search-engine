@@ -442,3 +442,10 @@
   margin-right: 0.5rem;
   border: 1px solid #dee2e6;
 }
+
+/* Add styles for the result card */
+.result-card {
+  background-color: #ffffff;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  transition: all 0.2s ease-in-out;
+}
