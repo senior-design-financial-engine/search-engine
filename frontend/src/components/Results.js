@@ -9,18 +9,18 @@ import '../styles/Results.css';
 function Results() {
   const location = useLocation();
   const url_params = new URLSearchParams(location.search);
-  const query = url_params.get('query');
-  const source = url_params.get('source') || 'all';
-  const timeRange = url_params.get('time_range') || 'all';
-  const sentiment = url_params.get('sentiment') || 'all';
+  const query = url_params.get('query') || '';
+  const source = url_params.get('source') || '';
+  const timeRange = url_params.get('time_range') || '';
+  const sentiment = url_params.get('sentiment') || '';
 
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilters, setActiveFilters] = useState({
-    source: source === 'all' ? null : source,
-    timeRange: timeRange === 'all' ? null : timeRange,
-    sentiment: sentiment === 'all' ? null : sentiment
+    source: source.toLowerCase(),
+    timeRange: timeRange.toLowerCase(),
+    sentiment: sentiment.toLowerCase()
   });
   // Add sorting state
   const [sortBy, setSortBy] = useState('relevance');
@@ -40,7 +40,12 @@ function Results() {
       
       try {
         if (query) {
-          const searchResults = await searchArticles(query, activeFilters.source, activeFilters.timeRange, activeFilters.sentiment);
+          const searchResults = await searchArticles(
+            query,
+            activeFilters.source || undefined,
+            activeFilters.timeRange || undefined,
+            activeFilters.sentiment || undefined
+          );
           
           // Transform results to ensure consistent structure
           const normalizedResults = Array.isArray(searchResults) ? searchResults : 
@@ -60,12 +65,13 @@ function Results() {
   }, [query, activeFilters.source, activeFilters.timeRange, activeFilters.sentiment]);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
     setActiveFilters({
-      source: source === 'all' ? null : source,
-      timeRange: timeRange === 'all' ? null : timeRange,
-      sentiment: sentiment === 'all' ? null : sentiment
+      source: params.get('source')?.toLowerCase() || '',
+      timeRange: params.get('time_range')?.toLowerCase() || '',
+      sentiment: params.get('sentiment')?.toLowerCase() || ''
     });
-  }, [source, timeRange, sentiment]);
+  }, [location.search]);
 
   const handleBack = () => {
     navigate('/'); // Navigate to homepage instead of previous page
@@ -243,7 +249,7 @@ function Results() {
           transition: 'all 0.2s ease-in-out'
         }}>
           <Card.Header className="bg-white border-bottom-0 pt-3 px-3 pb-0 d-flex justify-content-between align-items-center">
-            <Badge bg="primary" pill className="px-3 py-2">
+            <Badge bg="light" text="dark" className="me-1 mb-1 border source-pill">
               {article.source || 'Unknown Source'}
             </Badge>
             <small className="text-muted">
@@ -383,7 +389,7 @@ function Results() {
               <Form.Group>
                 <Form.Label className="fw-bold">Time Range</Form.Label>
                 <Form.Select 
-                  value={activeFilters.timeRange || 'all'}
+                  value={activeFilters.timeRange || ''}
                   onChange={(e) => handleFilterChange('time_range', e.target.value)}
                   className="rounded-3"
                 >
@@ -400,7 +406,7 @@ function Results() {
               <Form.Group>
                 <Form.Label className="fw-bold">Sentiment</Form.Label>
                 <Form.Select 
-                  value={activeFilters.sentiment || 'all'}
+                  value={activeFilters.sentiment || ''}
                   onChange={(e) => handleFilterChange('sentiment', e.target.value)}
                   className="rounded-3"
                 >
