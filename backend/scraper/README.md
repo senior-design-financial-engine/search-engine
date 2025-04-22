@@ -15,6 +15,7 @@ Works with news sources that provide open access RSS.xml files. The article data
 - `{source}_articles.json`:
     - `url`: Article url
     - `headline`: Article headline
+    - `date`: Article release date
     - `content`: Article body content
 
 ### ap_news_scraper.py
