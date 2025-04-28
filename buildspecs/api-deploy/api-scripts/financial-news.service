@@ -1,0 +1,51 @@
+[Unit]
+Description=Financial News API Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/financial-news-engine
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=MAX_CONSECUTIVE_DUPLICATES=1
+Environment=LOG_DIR=/opt/financial-news-engine/logs
+Environment=LOG_FORMAT=text
+Environment=LOG_LEVEL=DEBUG
+Environment=AWS_REGION=us-east-1
+Environment=AWS_DEFAULT_REGION=us-east-1
+
+# Create log directory and set full permissions for troubleshooting
+ExecStartPre=/bin/mkdir -p /opt/financial-news-engine/logs
+ExecStartPre=/bin/chmod -R 777 /opt/financial-news-engine/logs
+ExecStartPre=/usr/bin/touch /opt/financial-news-engine/logs/startup.log
+# Debug startup issues
+ExecStartPre=/bin/sh -c 'echo "Starting service $(date)" >> /opt/financial-news-engine/logs/startup.log'
+
+# Configure AWS settings
+ExecStartPre=/bin/sh -c 'if [ -f "/opt/financial-news-engine/deploy_scripts/configure_aws.sh" ]; then /bin/bash /opt/financial-news-engine/deploy_scripts/configure_aws.sh; fi'
+
+# Run the environment setup script if it exists
+ExecStartPre=/bin/sh -c 'if [ -f "/opt/financial-news-engine/deploy_scripts/create_env_file.sh" ]; then /bin/bash /opt/financial-news-engine/deploy_scripts/create_env_file.sh; fi'
+
+# Use direct gunicorn command for better control
+ExecStart=/bin/sh -c '/usr/local/bin/gunicorn \
+  --bind 0.0.0.0:5000 \
+  --workers 1 \
+  --timeout 120 \
+  --log-file=/opt/financial-news-engine/logs/gunicorn.log \
+  --error-logfile=/opt/financial-news-engine/logs/gunicorn-error.log \
+  --access-logfile=/opt/financial-news-engine/logs/gunicorn-access.log \
+  --capture-output \
+  --log-level=debug \
+  app:app'
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/opt/financial-news-engine/logs/service-output.log
+StandardError=append:/opt/financial-news-engine/logs/service-error.log
+SyslogIdentifier=financial-news
+
+[Install]
+WantedBy=multi-user.target

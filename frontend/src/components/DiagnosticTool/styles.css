@@ -1,0 +1,166 @@
+.diagnostic-tool {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.diagnostic-card {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 1.5rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.diagnostic-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.diagnostic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.75rem;
+}
+
+.diagnostic-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.status-badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+  border-radius: 10rem;
+}
+
+.diagnostic-section {
+  margin-bottom: 1.5rem;
+}
+
+.diagnostic-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #444;
+}
+
+.error-item {
+  background-color: #fff8f8;
+  border-left: 3px solid #dc3545;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0 4px 4px 0;
+}
+
+.error-timestamp {
+  color: #6c757d;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+.error-message {
+  color: #343a40;
+  margin-bottom: 0.25rem;
+}
+
+.error-details {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.info-table th {
+  width: 40%;
+  font-weight: 600;
+}
+
+.diagnostic-tabs .nav-link {
+  border-radius: 4px 4px 0 0;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s ease;
+}
+
+.diagnostic-tabs .nav-link.active {
+  background-color: #f8f9fa;
+  border-bottom-color: transparent;
+  font-weight: 500;
+}
+
+.monospace {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+.status-healthy {
+  color: #198754;
+}
+
+.status-warning {
+  color: #ffc107;
+}
+
+.status-error {
+  color: #dc3545;
+}
+
+.refresh-btn {
+  transition: transform 0.3s ease;
+}
+
+.refresh-btn.spinning {
+  transform: rotate(360deg);
+}
+
+.connection-test-results {
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.metrics-card {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+}
+
+.metrics-card:hover {
+  background-color: #f1f3f5;
+}
+
+.metrics-value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.metrics-label {
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.system-metric {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.metric-icon {
+  margin-right: 0.75rem;
+  font-size: 1.25rem;
+  width: 2rem;
+  text-align: center;
+}
+
+.report-panel {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+} 

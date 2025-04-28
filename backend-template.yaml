@@ -1,0 +1,634 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Backend Infrastructure for Financial News Engine'
+
+Parameters:
+  EnvironmentName:
+    Description: Environment name
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+  
+  BackendDomainName:
+    Description: Custom domain name for the backend ALB (e.g., api.yourdomain.com)
+    Type: String
+    Default: ""
+  
+  CorsAllowedOrigins:
+    Description: Comma-separated list of domains allowed to access the API (include protocol)
+    Type: String
+    Default: "https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
+  
+  VpcStackName:
+    Description: Name of the VPC CloudFormation stack
+    Type: String
+    Default: financial-news-vpc
+  
+  InstanceType:
+    Description: EC2 instance type for the backend servers
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+  
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Must be the name of an existing EC2 KeyPair.
+  
+  AMIId:
+    Description: AMI ID for the EC2 instances
+    Type: AWS::EC2::Image::Id
+    Default: ami-0261755bbcb8c4a84  # Ubuntu 20.04 LTS in us-east-1 (update for your region)
+  
+  ElasticsearchEndpoint:
+    Description: Endpoint URL for Elasticsearch
+    Type: String
+    Default: https://your-elasticsearch-endpoint.es.amazonaws.com
+  
+  ElasticsearchApiKey:
+    Description: API Key for Elasticsearch
+    Type: String
+    NoEcho: true
+  
+  ElasticsearchIndex:
+    Description: Elasticsearch index name
+    Type: String
+    Default: financial_news
+  
+  EsNumberOfShards:
+    Description: Number of shards for Elasticsearch index
+    Type: Number
+    Default: 3
+  
+  EsNumberOfReplicas:
+    Description: Number of replicas for Elasticsearch index
+    Type: Number
+    Default: 2
+  
+  MinSize:
+    Description: Minimum number of EC2 instances in the Auto Scaling Group
+    Type: Number
+    Default: 2
+    MinValue: 1
+  
+  MaxSize:
+    Description: Maximum number of EC2 instances in the Auto Scaling Group
+    Type: Number
+    Default: 6
+    MinValue: 1
+  
+  DesiredCapacity:
+    Description: Desired number of EC2 instances in the Auto Scaling Group
+    Type: Number
+    Default: 2
+    MinValue: 1
+  
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    Default: 0.0.0.0/0
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+  
+  SSLCertificateArn:
+    Description: ARN of the SSL certificate from AWS Certificate Manager
+    Type: String
+    Default: "arn:aws:acm:us-east-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERTIFICATE_ID"
+
+  HostedZoneId:
+    Type: String
+    Description: (Optional) Route 53 Hosted Zone ID for DNS Records. Leave empty to skip DNS record creation.
+    Default: ""
+
+Conditions:
+  HasDomainName: !Not [!Equals [!Ref BackendDomainName, ""]]
+  CreateDNSRecord: !And
+    - !Condition HasDomainName
+    - !Not [!Equals [!Ref HostedZoneId, ""]]
+
+Resources:
+  # S3 Bucket for storing deployment files
+  FinancialNewsAssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "financial-news-assets-${AWS::AccountId}-${AWS::Region}"
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-assets-bucket
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # SSL Certificate
+  SSLCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: HasDomainName
+    Properties:
+      DomainName: !Ref BackendDomainName
+      ValidationMethod: DNS
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-certificate
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # IAM Role for EC2 instances
+  BackendInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+      Path: /
+      Policies:
+        - PolicyName: ESAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'es:ESHttpGet'
+                  - 'es:ESHttpPost'
+                  - 'es:ESHttpPut'
+                  - 'es:ESHttpDelete'
+                Resource: '*'
+        - PolicyName: S3AccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:ListBucket'
+                  - 's3:PutObject'
+                  - 's3:DeleteObject'
+                  - 's3:CopyObject'
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${FinancialNewsAssetsBucket}/*'
+                  - !Sub 'arn:aws:s3:::${FinancialNewsAssetsBucket}'
+        - PolicyName: CloudFormationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'cloudformation:SignalResource'
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+
+  # IAM Instance Profile for EC2 instances
+  BackendInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref BackendInstanceRole
+
+  # Standard SSM Parameters for the application
+  ElasticsearchEndpointParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/endpoint
+      Type: String
+      Value: !Ref ElasticsearchEndpoint
+      Description: Elasticsearch endpoint URL
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchApiKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/api_key
+      Type: String
+      Value: !Ref ElasticsearchApiKey
+      Description: Elasticsearch API key 
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchIndexParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/index
+      Type: String
+      Value: !Ref ElasticsearchIndex
+      Description: Elasticsearch index name
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchShardsParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/shards
+      Type: String
+      Value: !Ref EsNumberOfShards
+      Description: Number of Elasticsearch index shards
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  ElasticsearchReplicasParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/elasticsearch/replicas
+      Type: String
+      Value: !Ref EsNumberOfReplicas
+      Description: Number of Elasticsearch index replicas
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  EnvironmentNameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /financial-news/environment
+      Type: String
+      Value: !Ref EnvironmentName
+      Description: Application environment name
+      Tags:
+        Environment: !Ref EnvironmentName
+
+  # Security Group for backend instances
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH and HTTP/HTTPS access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-sg
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Launch Template for backend EC2 instances
+  BackendLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${EnvironmentName}-backend-launch-template
+      LaunchTemplateData:
+        ImageId: !Ref AMIId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref BackendSecurityGroup
+          - Fn::ImportValue: !Sub "${VpcStackName}-AppServerSG"
+        IamInstanceProfile:
+          Name: !Ref BackendInstanceProfile
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda  # Root volume
+            Ebs:
+              VolumeSize: 30  # Increased from default to ensure enough space
+              VolumeType: gp3
+              DeleteOnTermination: true
+              Encrypted: true
+          - DeviceName: /dev/sdf  # Dedicated volume for financial-news-engine
+            Ebs:
+              VolumeSize: 20
+              VolumeType: gp3
+              DeleteOnTermination: true
+              Encrypted: true
+        UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            # Environment setup script for Financial News EC2 instances
+            
+            # Set environment variables
+            AWS_DEFAULT_REGION=${AWS::Region}
+            INSTALL_DIR="/opt/financial-news-engine"
+            LOG_DIR="$INSTALL_DIR/logs"
+            
+            # Create application directory structure
+            mkdir -p $INSTALL_DIR
+            mkdir -p $LOG_DIR
+            mkdir -p $INSTALL_DIR/deploy_scripts
+            mkdir -p $INSTALL_DIR/utils
+            
+            # Create log file with proper permissions
+            touch $LOG_DIR/init.log
+            chmod 666 $LOG_DIR/init.log
+            
+            echo "$(date) - Starting EC2 initialization" >> $LOG_DIR/init.log
+            
+            # Create basic environment file with AWS region
+            cat > $INSTALL_DIR/.env << EOL
+            # Environment variables for Financial News Engine
+            AWS_REGION=${AWS::Region}
+            AWS_DEFAULT_REGION=${AWS::Region}
+            ELASTICSEARCH_URL=http://localhost:9200
+            ELASTICSEARCH_ENDPOINT=http://localhost:9200
+            ELASTICSEARCH_API_KEY=default-dev-key
+            ELASTICSEARCH_INDEX=financial_news
+            ES_NUMBER_OF_SHARDS=1
+            ES_NUMBER_OF_REPLICAS=0
+            ENVIRONMENT=development
+            CORS_ALLOWED_ORIGINS="https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000"
+            APP_VERSION="1.0.0"
+            EOL
+            
+            # Set proper permissions
+            chmod 644 $INSTALL_DIR/.env
+            
+            # Create empty __init__.py files in Python directories
+            touch $INSTALL_DIR/utils/__init__.py
+            mkdir -p $INSTALL_DIR/es_database
+            touch $INSTALL_DIR/es_database/__init__.py
+            
+            # Create a simple system start script
+            cat > $INSTALL_DIR/deploy_scripts/fix_environment.sh << 'EOL'
+            #!/bin/bash
+            # Script to fix common environment issues on startup
+            INSTALL_DIR="/opt/financial-news-engine"
+            LOG_FILE="${INSTALL_DIR}/logs/environment_fix.log"
+            
+            # Ensure log directory exists
+            mkdir -p "${INSTALL_DIR}/logs"
+            touch $LOG_FILE
+            chmod 666 $LOG_FILE
+            
+            echo "$(date) - Running environment fix script" | tee -a $LOG_FILE
+            
+            # Check for Python package structure
+            for dir in utils es_database api scraper; do
+              if [ -d "${INSTALL_DIR}/${dir}" ] && [ ! -f "${INSTALL_DIR}/${dir}/__init__.py" ]; then
+                echo "Creating missing __init__.py in ${dir} directory" | tee -a $LOG_FILE
+                touch "${INSTALL_DIR}/${dir}/__init__.py"
+              elif [ ! -d "${INSTALL_DIR}/${dir}" ]; then
+                echo "Creating ${dir} directory with __init__.py" | tee -a $LOG_FILE
+                mkdir -p "${INSTALL_DIR}/${dir}"
+                touch "${INSTALL_DIR}/${dir}/__init__.py"
+              fi
+            done
+            
+            # Add current directory to Python path in app.py if not already there
+            if [ -f "${INSTALL_DIR}/app.py" ] && ! grep -q "sys.path.insert" "${INSTALL_DIR}/app.py"; then
+              echo "Adding current directory to Python path in app.py" | tee -a $LOG_FILE
+              sed -i '5i\
+            import sys\
+            current_dir = os.path.dirname(os.path.abspath(__file__))\
+            if current_dir not in sys.path:\
+                sys.path.insert(0, current_dir)' "${INSTALL_DIR}/app.py"
+            fi
+            
+            # Restart service if it's in a failed state
+            if systemctl is-active --quiet financial-news; then
+              echo "Service is already running." | tee -a $LOG_FILE
+            else
+              echo "Service is not running. Attempting to restart." | tee -a $LOG_FILE
+              systemctl restart financial-news
+              
+              # Check if service started successfully
+              sleep 5
+              if systemctl is-active --quiet financial-news; then
+                echo "Service restarted successfully." | tee -a $LOG_FILE
+              else
+                echo "Service failed to restart. See service logs for details." | tee -a $LOG_FILE
+              fi
+            fi
+            
+            echo "Environment fix completed at $(date)" | tee -a $LOG_FILE
+            exit 0
+            EOL
+            
+            # Make the fix script executable
+            chmod +x $INSTALL_DIR/deploy_scripts/fix_environment.sh
+            
+            # Create fix environment service
+            cat > /etc/systemd/system/fix-environment.service << EOL
+            [Unit]
+            Description=Financial News Environment Fix Service
+            After=network.target
+            
+            [Service]
+            Type=oneshot
+            ExecStart=/opt/financial-news-engine/deploy_scripts/fix_environment.sh
+            RemainAfterExit=true
+            StandardOutput=journal
+            
+            [Install]
+            WantedBy=multi-user.target
+            EOL
+            
+            # Reload systemd and enable the fix service
+            systemctl daemon-reload
+            systemctl enable fix-environment.service
+            systemctl start fix-environment.service
+            
+            echo "$(date) - EC2 initialization completed" >> $LOG_DIR/init.log
+
+  # Backend Auto Scaling Group
+  BackendAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: HTTPSListener
+    CreationPolicy:
+      ResourceSignal:
+        Count: !Ref DesiredCapacity
+        Timeout: "PT15M"
+    Properties:
+      AutoScalingGroupName: !Sub ${EnvironmentName}-backend-asg
+      LaunchTemplate:
+        LaunchTemplateId: !Ref BackendLaunchTemplate
+        Version: !GetAtt BackendLaunchTemplate.LatestVersionNumber
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+      TargetGroupARNs:
+        - !Ref BackendTargetGroup
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PrivateSubnet2ID"
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-instance
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref EnvironmentName
+          PropagateAtLaunch: true
+
+  # Auto Scaling Lifecycle Hook for termination
+  BackendTerminationLifecycleHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: !Ref BackendAutoScalingGroup
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+      DefaultResult: CONTINUE
+      HeartbeatTimeout: 300
+      NotificationMetadata: !Sub |
+        {"action": "terminating", "hook_name": "BackendTerminationLifecycleHook"}
+
+  # Auto Scaling Policy for CPU
+  CPUScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref BackendAutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 70.0
+        DisableScaleIn: false
+
+  # Load Balancer Security Group
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS access to ALB
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-lb-sg
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Application Load Balancer for backend
+  BackendLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${EnvironmentName}-backend-alb
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet1ID"
+        - Fn::ImportValue: !Sub "${VpcStackName}-PublicSubnet2ID"
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-alb
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Target Group for backend instances
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${EnvironmentName}-backend-tg
+      Protocol: HTTP
+      Port: 5000
+      TargetType: instance
+      VpcId:
+        Fn::ImportValue: !Sub "${VpcStackName}-VPCID"
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "5000"
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-backend-tg
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # HTTP Listener for ALB
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BackendLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
+
+  # HTTPS Listener for ALB
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref BackendLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !If [HasDomainName, !Ref SSLCertificate, !Ref SSLCertificateArn]
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BackendTargetGroup
+
+  # DNS Record for ALB (if domain name is provided)
+  BackendDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDNSRecord
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref BackendDomainName
+      Type: A
+      AliasTarget:
+        HostedZoneId: !GetAtt BackendLoadBalancer.CanonicalHostedZoneID
+        DNSName: !GetAtt BackendLoadBalancer.DNSName
+
+Outputs:
+  BackendURL:
+    Description: URL of the backend API
+    Value: !If [HasDomainName, !Sub "https://${BackendDomainName}", !Sub "https://${BackendLoadBalancer.DNSName}"]
+  
+  BackendALBURL:
+    Description: DNS name of the backend Application Load Balancer
+    Value: !GetAtt BackendLoadBalancer.DNSName
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendALBURL"
+  
+  BackendAutoScalingGroupName:
+    Description: Name of the Auto Scaling Group for backend instances
+    Value: !Ref BackendAutoScalingGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BackendAutoScalingGroupName"
+  
+  AssetsBucketName:
+    Description: S3 bucket name for financial news assets
+    Value: !Ref FinancialNewsAssetsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-AssetsBucketName" 

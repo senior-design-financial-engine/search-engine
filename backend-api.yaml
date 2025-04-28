@@ -1,0 +1,454 @@
+---
+# Financial News Engine API Configuration
+# This file contains the API code to be deployed to the backend instances
+
+api:
+  app_path: /opt/financial-news-engine/app.py
+  requirements_path: /opt/financial-news-engine/requirements.txt
+  service_definition: /etc/systemd/system/financial-news.service
+
+app_code: |
+  from flask import Flask, jsonify, request, make_response
+  from flask_cors import CORS
+  import os
+  import logging
+  import sys
+  import json
+  import time
+  from datetime import datetime
+  
+  # Configure logging
+  log_dir = "logs"
+  if not os.path.exists(log_dir):
+      os.makedirs(log_dir)
+      
+  logger = logging.getLogger("backend")
+  logger.setLevel(logging.INFO)
+  
+  # Create console handler
+  ch = logging.StreamHandler(sys.stdout)
+  ch.setLevel(logging.INFO)
+  
+  # Create file handler
+  fh = logging.FileHandler(os.path.join(log_dir, "backend.log"))
+  fh.setLevel(logging.INFO)
+  
+  # Create formatter and add to handlers
+  formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+  ch.setFormatter(formatter)
+  fh.setFormatter(formatter)
+  
+  # Add handlers to logger
+  logger.addHandler(ch)
+  logger.addHandler(fh)
+  
+  # Create Flask app
+  app = Flask(__name__)
+  
+  # Setup CORS - make sure it supports all routes
+  cors_origins = os.environ.get('CORS_ALLOWED_ORIGINS', '*')
+  allowed_origins = []
+  
+  if cors_origins != '*':
+      # If specific origins are provided, split the comma-separated list
+      allowed_origins = [origin.strip() for origin in cors_origins.split(',')]
+      logger.info(f"CORS configured with specific origins: {allowed_origins}")
+  else:
+      logger.info("CORS configured with wildcard origin")
+  
+  # Enable CORS for all routes with proper credentials support
+  CORS(app, 
+       resources={r"/*": {
+           "origins": allowed_origins if allowed_origins else "*",
+           "allow_headers": ["Content-Type", "Authorization", "X-Api-Key", "X-Amz-Date", "X-Amz-Security-Token"],
+           "expose_headers": ["Content-Length", "X-Amz-Date"],
+           "methods": ["GET", "POST", "OPTIONS"],
+           "max_age": 3600,
+           "supports_credentials": bool(allowed_origins)  # Only enable credentials with specific origins
+       }}
+  )
+  
+  # Custom middleware to ensure CORS headers are on every response
+  @app.after_request
+  def add_cors_headers(response):
+      origin = request.headers.get('Origin')
+      
+      # If origin matches allowed origins or wildcard is used
+      if origin and (not allowed_origins or origin in allowed_origins):
+          response.headers['Access-Control-Allow-Origin'] = origin
+      elif not allowed_origins:
+          response.headers['Access-Control-Allow-Origin'] = '*'
+          
+      if origin and (not allowed_origins or origin in allowed_origins):
+          response.headers['Access-Control-Allow-Credentials'] = 'true'
+          
+      response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+      response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Api-Key, X-Amz-Date, X-Amz-Security-Token'
+      response.headers['Access-Control-Expose-Headers'] = 'Content-Length, X-Amz-Date'
+      response.headers['Access-Control-Max-Age'] = '3600'
+      
+      return response
+  
+  # Handle OPTIONS preflight requests
+  @app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
+  @app.route('/<path:path>', methods=['OPTIONS'])
+  def handle_options(path):
+      response = make_response()
+      origin = request.headers.get('Origin')
+      
+      # Set CORS headers
+      if origin and (not allowed_origins or origin in allowed_origins):
+          response.headers['Access-Control-Allow-Origin'] = origin
+          response.headers['Access-Control-Allow-Credentials'] = 'true'
+      elif not allowed_origins:
+          response.headers['Access-Control-Allow-Origin'] = '*'
+          
+      response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+      response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Api-Key, X-Amz-Date, X-Amz-Security-Token'
+      response.headers['Access-Control-Max-Age'] = '3600'
+      response.status_code = 204  # No content needed for OPTIONS
+      
+      return response
+  
+  # Load environment variables
+  es_url = os.environ.get('ELASTICSEARCH_URL')
+  es_api_key = os.environ.get('ELASTICSEARCH_API_KEY')
+  es_index = os.environ.get('ELASTICSEARCH_INDEX')
+  
+  @app.route('/health', methods=['GET'])
+  def health():
+      """Health check endpoint"""
+      status = {
+          "status": "healthy",
+          "timestamp": datetime.now().isoformat(),
+          "version": "1.0",
+          "environment": os.environ.get('ENVIRONMENT', 'development')
+      }
+      
+      # Add Elasticsearch connection status if configured
+      if es_url and es_api_key:
+          try:
+              # Import here to avoid requiring the package if not used
+              from elasticsearch import Elasticsearch
+              
+              # Test connection with a short timeout
+              es = Elasticsearch([es_url], api_key=es_api_key, request_timeout=5)
+              es_info = es.info()
+              
+              status["elasticsearch"] = {
+                  "connected": True,
+                  "version": es_info.get("version", {}).get("number", "unknown")
+              }
+          except Exception as e:
+              status["elasticsearch"] = {
+                  "connected": False,
+                  "error": str(e)
+              }
+              # Mark as degraded if ES connection fails
+              status["status"] = "degraded"
+              logger.warning(f"Elasticsearch connection failed: {str(e)}")
+      else:
+          status["elasticsearch"] = {
+              "connected": False,
+              "error": "Not configured"
+          }
+      
+      return jsonify(status)
+  
+  @app.route('/query', methods=['GET', 'POST'])
+  def query():
+      """Search endpoint for the Financial News Engine API"""
+      try:
+          if request.method == 'POST':
+              # For POST requests, get query from JSON body
+              data = request.get_json()
+              if not data:
+                  return jsonify({
+                      "error": "Invalid request: No JSON data provided",
+                      "status": "error"
+                  }), 400
+                  
+              query_text = data.get('query', '')
+              filters = data.get('filters', {})
+              time_range = data.get('timeRange', {})
+          else:
+              # For GET requests, get query from URL parameters
+              query_text = request.args.get('query', '')
+              filters = json.loads(request.args.get('filters', '{}'))
+              time_range = json.loads(request.args.get('timeRange', '{}'))
+          
+          # Log the incoming request
+          logger.info(f"Search request: query='{query_text}', filters={filters}, time_range={time_range}")
+          
+          # Add a timestamp parameter to prevent caching
+          timestamp = request.args.get('_t', int(time.time()))
+          
+          # TODO: Connect to Elasticsearch and perform the actual query
+          # For now, return mock data
+          results = {
+              "query": query_text,
+              "timestamp": timestamp,
+              "results": [
+                  {
+                      "id": "mock-1",
+                      "title": f"Sample Article about {query_text}",
+                      "snippet": f"This is a sample snippet for {query_text} search query...",
+                      "url": "https://example.com/article1",
+                      "publishedDate": "2023-06-01T12:00:00Z",
+                      "source": "Mock News"
+                  },
+                  {
+                      "id": "mock-2",
+                      "title": f"Another Article mentioning {query_text}",
+                      "snippet": f"Another sample result with {query_text} in the content...",
+                      "url": "https://example.com/article2",
+                      "publishedDate": "2023-05-28T09:30:00Z",
+                      "source": "Mock Finance"
+                  }
+              ],
+              "totalHits": 2,
+              "processingTimeMs": 42
+          }
+          
+          return jsonify(results)
+      except Exception as e:
+          logger.error(f"Error processing search query: {str(e)}", exc_info=True)
+          return jsonify({
+              "error": f"Server error: {str(e)}",
+              "status": "error"
+          }), 500
+  
+  @app.route('/diagnostic/health', methods=['GET'])
+  def diagnostic_health():
+      """Diagnostic health check endpoint - frontend expects this route"""
+      return health()
+  
+  @app.route('/diagnostic', methods=['GET'])
+  def diagnostic():
+      """Diagnostic information endpoint"""
+      import platform
+      import socket
+      import psutil
+      
+      # Collect system information
+      system_info = {
+          "hostname": socket.gethostname(),
+          "platform": platform.system(),
+          "platform_version": platform.version(),
+          "python_version": platform.python_version(),
+          "cpu_percent": psutil.cpu_percent(),
+          "memory_percent": psutil.virtual_memory().percent,
+          "disk_percent": psutil.disk_usage('/').percent
+      }
+      
+      # Add environment variables (redacted)
+      env_vars = {}
+      for key, value in os.environ.items():
+          if key.lower() in ('api_key', 'key', 'secret', 'password', 'token'):
+              env_vars[key] = '***REDACTED***'
+          else:
+              env_vars[key] = value
+      
+      return jsonify({
+          "system": system_info,
+          "environment": env_vars,
+          "timestamp": datetime.now().isoformat()
+      })
+  
+  @app.route('/diagnostic/report', methods=['GET'])
+  def diagnostic_report():
+      """Diagnostic report endpoint - frontend expects this route"""
+      import platform
+      import socket
+      import psutil
+      
+      # Collect system information
+      system_info = {
+          "hostname": socket.gethostname(),
+          "platform": platform.system(),
+          "platform_version": platform.version(),
+          "python_version": platform.python_version(),
+          "cpu_percent": psutil.cpu_percent(),
+          "memory_percent": psutil.virtual_memory().percent,
+          "disk_percent": psutil.disk_usage('/').percent
+      }
+      
+      # Add environment variables (redacted)
+      env_vars = {}
+      for key, value in os.environ.items():
+          if key.lower() in ('api_key', 'key', 'secret', 'password', 'token'):
+              env_vars[key] = '***REDACTED***'
+          else:
+              env_vars[key] = value
+      
+      # More detailed report with additional data
+      return jsonify({
+          "system": system_info,
+          "environment": env_vars,
+          "timestamp": datetime.now().isoformat(),
+          "memory": {
+              "total": psutil.virtual_memory().total,
+              "available": psutil.virtual_memory().available,
+              "used": psutil.virtual_memory().used,
+              "percent": psutil.virtual_memory().percent
+          },
+          "disk": {
+              "total": psutil.disk_usage('/').total,
+              "used": psutil.disk_usage('/').used,
+              "free": psutil.disk_usage('/').free,
+              "percent": psutil.disk_usage('/').percent
+          }
+      })
+
+# Now let's ensure we have the right requirements for this application
+requirements: |
+  flask==2.0.1
+  flask-cors==3.0.10
+  elasticsearch==7.14.0
+  requests==2.26.0
+  python-dotenv==0.19.0
+  psutil==5.8.0
+  gunicorn==20.1.0
+  uwsgi==2.0.19.1
+
+# Service definition
+service_definition: |
+  [Unit]
+  Description=Financial News Engine Backend API
+  After=network.target
+
+  [Service]
+  User=ubuntu
+  Group=ubuntu
+  WorkingDirectory=/opt/financial-news-engine
+  Environment="PATH=/opt/financial-news-engine/venv/bin"
+  EnvironmentFile=/opt/financial-news-engine/.env
+  ExecStart=/opt/financial-news-engine/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 app:app
+  Restart=always
+  RestartSec=10
+
+  [Install]
+  WantedBy=multi-user.target
+
+verification_script: |
+  #!/bin/bash
+
+  echo "Verifying backend service startup..."
+
+  # Check if the service is running
+  function check_service() {
+    echo "Checking if service is running..."
+    systemctl is-active --quiet financial-news.service
+    if [ $? -eq 0 ]; then
+      echo "Service is running"
+      return 0
+    else
+      echo "ERROR: Service is not running"
+      return 1
+    fi
+  }
+
+  # Check if the service responds to ping
+  function check_ping() {
+    echo "Checking service response..."
+    RESPONSE=$(curl -s http://localhost:5000/ping)
+    if [[ "$RESPONSE" == *"ok"* ]]; then
+      echo "Service is responding to ping"
+      return 0
+    else
+      echo "ERROR: Service is not responding to ping"
+      echo "Response: $RESPONSE"
+      return 1
+    fi
+  }
+
+  # Perform advanced validation
+  function validate_setup() {
+    echo "Validating setup..."
+    
+    # Run Python validation script
+    python3 - << 'PYEOF'
+  import json
+  import os
+  import socket
+  import subprocess
+  try:
+      import psutil
+      disk_success = True
+      disk_error = None
+  except ImportError:
+      disk_success = False
+      disk_error = "name 'psutil' is not defined"
+
+  # Check disk space
+  disk_check = {"success": disk_success}
+  if disk_error:
+      disk_check["error"] = disk_error
+
+  # DNS Check
+  dns_success = False
+  try:
+      dns_output = subprocess.check_output("nslookup google.com", shell=True, universal_newlines=True)
+      dns_success = True
+  except Exception as e:
+      dns_output = str(e)
+
+  dns_check = {
+      "success": dns_success,
+      "output": dns_output
+  }
+
+  # Elasticsearch check
+  es_config = {
+      "configured": os.environ.get("ELASTICSEARCH_URL") is not None,
+      "success": False,
+      "version": None
+  }
+
+  if es_config["configured"]:
+      try:
+          import requests
+          es_url = os.environ.get("ELASTICSEARCH_URL", "").rstrip('/')
+          if es_url:
+              try:
+                  response = requests.get(f"{es_url}", timeout=5)
+                  if response.status_code == 200:
+                      es_config["success"] = True
+                      version_info = response.json()
+                      es_config["version"] = version_info.get("version", {}).get("number", "unknown")
+              except Exception as e:
+                  es_config["error"] = str(e)
+      except ImportError:
+          es_config["error"] = "requests module not installed"
+
+  # Combine all checks
+  result = {
+      "success": disk_success and dns_success and es_config["success"],
+      "timestamp": subprocess.check_output("date -Iseconds", shell=True, universal_newlines=True).strip(),
+      "checks": {
+          "disk": disk_check,
+          "dns": dns_check,
+          "elasticsearch": es_config
+      }
+  }
+
+  print(json.dumps(result))
+  PYEOF
+  }
+
+  # Main
+  check_ping
+  if [ $? -eq 0 ]; then
+    VALIDATION=$(validate_setup)
+    if [[ "$VALIDATION" == *"\"success\":true"* ]]; then
+      echo "All validation checks passed"
+      exit 0
+    else
+      echo "WARNING: Setup validation failed:"
+      echo "$VALIDATION"
+      exit 1
+    fi
+  else
+    echo "ERROR: Backend service ping failed"
+    exit 1
+  fi 

@@ -1,155 +1,178 @@
-from es_database import Engine
+import os
+import unittest
+from unittest import mock
+from unittest.mock import patch, MagicMock
+from es_database.Engine import Engine
+from es_database.mock_data_generator import (
+    generate_fake_article, 
+    generate_fake_articles,
+    generate_fake_id,
+    generate_mock_search_response
+)
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
-import time
+import random
+import json
+from flask import Flask, jsonify, request
 
-# Initialize the engine
-load_dotenv()
-engine = Engine()
-engine.config.validate_config()
+# Use the test environment
+load_dotenv('.env.test')
 
-# Create some fake articles
-fake_articles = [
-    {
-        "headline": "Tesla Reports Record Q4 Earnings",
-        "source": "Financial Times",
-        "url": "https://ft.com/tesla-q4-2023",
-        "content": "Tesla reported record earnings in Q4 2023, beating analyst expectations.",
-        "companies": [{"name": "Tesla", "ticker": "TSLA", "exchange": "NASDAQ"}],
-        "categories": ["earnings", "automotive"],
-        "sentiment": "positive",
-        "sentiment_score": 0.8,
-        "published_at": datetime.now() - timedelta(days=1)
-    },
-    {
-        "headline": "Apple and Microsoft Collaborate on AI Initiative",
-        "source": "Reuters",
-        "url": "https://reuters.com/apple-microsoft-ai",
-        "content": "Tech giants Apple and Microsoft announce joint AI research initiative.",
-        "companies": [
-            {"name": "Apple", "ticker": "AAPL", "exchange": "NASDAQ"},
-            {"name": "Microsoft", "ticker": "MSFT", "exchange": "NASDAQ"}
-        ],
-        "categories": ["technology", "artificial-intelligence"],
-        "sentiment": "positive",
-        "sentiment_score": 0.6,
-        "published_at": datetime.now() - timedelta(days=2)
-    },
-    {
-        "headline": "JPMorgan Warns of Market Volatility",
-        "source": "Bloomberg",
-        "url": "https://bloomberg.com/jpmorgan-warning",
-        "content": "JPMorgan analysts warn of increased market volatility in coming months.",
-        "companies": [{"name": "JPMorgan", "ticker": "JPM", "exchange": "NYSE"}],
-        "categories": ["markets", "banking"],
-        "sentiment": "negative",
-        "sentiment_score": -0.4,
-        "published_at": datetime.now() - timedelta(days=3)
-    }
+# Create a Flask app for the mock API
+app = Flask(__name__)
+from flask_cors import CORS
+CORS(app)
+
+# Sample data for generating fake articles
+sources = ["Bloomberg", "Reuters", "CNBC", "Financial Times", "Wall Street Journal", "MarketWatch", "Barron's"]
+companies = ["Apple", "Microsoft", "Google", "Amazon", "Tesla", "Meta", "Nvidia", "IBM", "Intel", "AMD"]
+sectors = ["Technology", "Finance", "Healthcare", "Energy", "Consumer Goods", "Communications", "Utilities"]
+sentiment_options = ["positive", "negative", "neutral"]
+headline_templates = [
+    "{company} Reports Strong Quarterly Earnings, Stock {movement}",
+    "{company} Announces New {product_type} Products",
+    "{company} Faces Regulatory Scrutiny in {region}",
+    "{company} Expands Operations in {region}",
+    "{company} CEO Discusses Future of {sector}",
+    "Investors React to {company}'s Latest {announcement_type}",
+    "{company} Stock {movement} After Analyst Upgrade",
+    "{company} Partners with {company2} on New Initiative",
+    "Market Analysis: What's Next for {company}?",
+    "{sector} Sector Outlook: Focus on {company}"
 ]
 
-# Add articles to the index
-article_ids = engine.batch_add_articles(fake_articles)
-print(f"Added {len(article_ids)} articles")
+# Helper functions to generate random fake articles
+def generate_fake_date(days_ago_max=30):
+    days_ago = random.randint(0, days_ago_max)
+    return (datetime.now() - timedelta(days=days_ago)).strftime('%Y-%m-%d')
 
-time.sleep(5)
+def generate_fake_headline():
+    template = random.choice(headline_templates)
+    company = random.choice(companies)
+    company2 = random.choice([c for c in companies if c != company])
+    sector = random.choice(sectors)
+    region = random.choice(["US", "Europe", "Asia", "Global"])
+    movement = random.choice(["Surges", "Drops", "Rises", "Falls", "Stabilizes"])
+    product_type = random.choice(["Consumer", "Enterprise", "Cloud", "AI", "IoT", "Mobile"])
+    announcement_type = random.choice(["Earnings Report", "Product Launch", "Strategic Plan", "Restructuring"])
+    
+    return template.format(
+        company=company,
+        company2=company2,
+        sector=sector,
+        region=region,
+        movement=movement,
+        product_type=product_type,
+        announcement_type=announcement_type
+    )
 
-# Test different search scenarios
-print("\n1. Search for Tesla related news:")
-tesla_results = engine.search_news(
-    query_text="Tesla",
-    filters={
-        "companies.ticker": ["TSLA"]
+def generate_fake_article():
+    company = random.choice(companies)
+    published_date = generate_fake_date()
+    sentiment = random.choice(sentiment_options)
+    
+    return {
+        "_id": generate_fake_id(),
+        "_source": {
+            "headline": generate_fake_headline(),
+            "url": f"http://example.com/article/{generate_fake_id()}",
+            "published_at": published_date,
+            "source": random.choice(sources),
+            "content": f"This is a placeholder article about {company}. It contains sample text for frontend debugging purposes.",
+            "snippet": f"Sample article snippet about {company} for testing the frontend interface...",
+            "sentiment": sentiment,
+            "sentiment_score": random.uniform(-1.0, 1.0),
+            "companies": [
+                {
+                    "name": company,
+                    "ticker": company[:3].upper(),
+                    "sentiment": sentiment,
+                    "mentions": random.randint(1, 10)
+                }
+            ],
+            "categories": [random.choice(sectors)],
+            "relevance_score": random.uniform(0.5, 1.0)
+        }
     }
-)
-print(f"Found {tesla_results['hits']['total']['value']} Tesla articles")
 
-print("\n2. Search for positive AI news:")
-ai_results = engine.search_news(
-    query_text="AI artificial intelligence",
-    filters={
-        "sentiment": "positive",
-        "categories": ["technology", "artificial-intelligence"]
+def generate_fake_articles(count=10):
+    return [generate_fake_article() for _ in range(count)]
+
+# API routes for frontend testing
+@app.route('/query', methods=['GET'])
+def query():
+    query_text = request.args.get('query', '')
+    source = request.args.get('source', None)
+    time_range = request.args.get('time_range', None)
+    
+    # Generate between 5 and 15 fake results
+    results_count = random.randint(5, 15)
+    
+    # Filter by source if specified
+    fake_articles = generate_fake_articles(results_count)
+    
+    if source:
+        fake_articles = [article for article in fake_articles if article["_source"]["source"] == source]
+    
+    # If query contains a company name, bias results toward that company
+    for company in companies:
+        if company.lower() in query_text.lower():
+            for article in fake_articles[:3]:  # Modify first few results
+                article["_source"]["headline"] = article["_source"]["headline"].replace(
+                    random.choice(companies), company
+                )
+                article["_source"]["companies"][0]["name"] = company
+                article["_source"]["companies"][0]["ticker"] = company[:3].upper()
+    
+    response = {
+        "hits": {
+            "total": {"value": len(fake_articles)},
+            "hits": fake_articles
+        }
     }
-)
-print(f"Found {ai_results['hits']['total']['value']} positive AI articles")
+    
+    return jsonify(response)
 
-print("\n3. Search for recent market warnings:")
-market_results = engine.search_news(
-    query_text="market warning volatility",
-    filters={
-        "categories": ["markets"]
-    },
-    time_range={
-        "start": (datetime.now() - timedelta(days=7)).isoformat(),
-        "end": datetime.now().isoformat()
-    }
-)
-print(f"Found {market_results['hits']['total']['value']} market warning articles")
+# Simple placeholder tests that don't rely on mocking Elasticsearch
+class TestElasticsearch(unittest.TestCase):
+    def setUp(self):
+        """Setup test environment without mocking"""
+        # Set up the environment to use mock data
+        os.environ['USE_MOCK_DATA'] = 'true'
+        
+    def test_engine_initialization(self):
+        """Test using the MockEngine that doesn't need Elasticsearch."""
+        # Import the MockEngine directly instead of mocking Elasticsearch
+        from es_database.mock_data_generator import MockEngine
+        mock_engine = MockEngine()
+        self.assertIsNotNone(mock_engine)
+    
+    def test_search_articles(self):
+        """Test search functionality with the MockEngine."""
+        from es_database.mock_data_generator import MockEngine
+        mock_engine = MockEngine()
+        results = mock_engine.search_news("test query")
+        self.assertIsNotNone(results)
+        self.assertIn('hits', results)
+        self.assertGreater(len(results['hits']['hits']), 0)
+    
+    def test_index_article(self):
+        """Test indexing an article with the MockEngine."""
+        from es_database.mock_data_generator import MockEngine
+        mock_engine = MockEngine()
+        article = generate_fake_article()["_source"]
+        result = mock_engine.add_article(article)
+        self.assertIsNotNone(result)
 
-print("\n4. Search for AI no categories:")
-no_category_results = engine.search_news(
-    query_text="AI",
-)
-print(f"Found {market_results['hits']['total']['value']} market warning articles")
-
-# Print detailed results for each search
-def print_results(results):
-    for hit in results['hits']['hits']:
-        source = hit['_source']
-        print(f"\nHeadline: {source['headline']}")
-        print(f"Source: {source['source']}")
-        print(f"Score: {hit['_score']}")
-        print(f"Categories: {source.get('categories', [])}")
-        print(f"Sentiment: {source.get('sentiment', 'neutral')}")
-
-print("\nDetailed Tesla search results:")
-print_results(tesla_results)
-
-print("\nDetailed AI search results:")
-print_results(ai_results)
-
-print("\nDetailed market warning results:")
-print_results(market_results)
-
-print("\nLast results:")
-print_results(no_category_results)
-print(no_category_results)
-
-
-'''
-Added 3 articles
-
-1. Search for Tesla related news:
-Found 1 Tesla articles
-
-2. Search for positive AI news:
-Found 1 positive AI articles
-
-3. Search for recent market warnings:
-Found 1 market warning articles
-
-Detailed Tesla search results:
-
-Headline: Tesla Reports Record Q4 Earnings
-Source: Financial Times
-Score: 0.8630463
-Categories: ['earnings', 'automotive']
-Sentiment: positive
-
-Detailed AI search results:
-
-Headline: Apple and Microsoft Collaborate on AI Initiative
-Source: Reuters
-Score: 0.8630463
-Categories: ['technology', 'artificial-intelligence']
-Sentiment: positive
-
-Detailed market warning results:
-
-Headline: JPMorgan Warns of Market Volatility
-Source: Bloomberg
-Score: 2.589139
-Categories: ['markets', 'banking']
-Sentiment: negative
-'''
+if __name__ == '__main__':
+    # Check if we should run the API server or tests
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '--server':
+        # Run as API server if flag is provided
+        print("Starting mock Elasticsearch API server for frontend testing...")
+        print("Generating fake articles for search results")
+        print("Access the API at: http://127.0.0.1:5001/query?query=your+search+query")
+        app.run(host='127.0.0.1', port=5001, debug=True)
+    else:
+        # Run tests by default
+        unittest.main() 

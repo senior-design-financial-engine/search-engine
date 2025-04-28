@@ -1,0 +1,17 @@
+version: 0.0
+os: linux
+files:
+  - source: **/*
+    destination: /opt/financial-news-engine/
+hooks:
+  BeforeInstall:
+    - location: backend-scripts/before_install.sh
+      timeout: 300
+      runas: root
+  AfterInstall:
+    - location: backend-scripts/deploy.sh
+      timeout: 300
+      runas: root
+    - location: scripts/create_env_file.sh
+      timeout: 300
+      runas: root 

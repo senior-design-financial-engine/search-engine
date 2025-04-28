@@ -1,8 +1,28 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
+// Mock the components used in App
+jest.mock('./components/Home', () => () => <div>Home Component</div>);
+jest.mock('./components/Results', () => () => <div>Results Component</div>);
+jest.mock('./components/Article', () => () => <div>Article Component</div>);
+jest.mock('./components/DiagnosticTool', () => () => <div>DiagnosticTool Component</div>);
+jest.mock('react-router-dom', () => ({
+  BrowserRouter: ({ children }) => <div>{children}</div>,
+  Routes: ({ children }) => <div>{children}</div>,
+  Route: () => <div />,
+  Navigate: () => <div>Navigate Component</div>,
+  Link: ({ children }) => <div>{children}</div>
+}));
+
+test('renders Financial Search Engine navbar', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  const titleElement = screen.getByText(/Financial Search Engine/i);
+  expect(titleElement).toBeInTheDocument();
+});
+
+test('renders Bootstrap Navbar', () => {
+  render(<App />);
+  const navbarBrand = screen.getByText(/Financial Search Engine/i);
+  expect(navbarBrand).toBeInTheDocument();
+  expect(navbarBrand.tagName.toLowerCase()).toBe('a');
 });

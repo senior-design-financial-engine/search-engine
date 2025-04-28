@@ -4,7 +4,7 @@
 The Financial News Engine is an open-source, customizable search platform designed to provide real-time financial news aggregation and analysis. The system aims to democratize access to financial information by offering a free alternative to expensive terminals while incorporating advanced machine learning capabilities for enhanced news processing and analysis.
 
 ## Project Status
-Currently in development by Team 14 at Boston University's Electrical & Computer Engineering department as part of the EC463/EC464 Capstone Senior Design Project.
+Currently in active development by Team 14 at Boston University's Electrical & Computer Engineering department as part of the EC463/EC464 Capstone Senior Design Project. The MVP features are implemented and functional.
 
 ## Key Features
 
@@ -31,6 +31,11 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - Regional news coverage analysis
 - Company mention tracking
 
+### Development Features
+- Mock data generator for frontend development
+- Configurable environment variables to toggle mock/real backends
+- CI/CD integration with AWS deployment
+
 ## Technical Architecture
 
 ### Frontend (React.js)
@@ -44,6 +49,7 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - CORS support
 - Elasticsearch integration
 - Environment-based configuration
+- Mock data generator for development and testing
 
 ### Core Components
 1. **Web Crawler**
@@ -88,6 +94,12 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - Elasticsearch instance
 - Environment configuration (.env)
 
+### Mock Data Mode
+For development without an Elasticsearch instance:
+1. Set `USE_MOCK_DATA=true` in your environment file
+2. Run the backend server as normal
+3. All API requests will return realistic fake financial news data
+
 ## Differentiators
 
 ### vs. Bloomberg Terminal
@@ -121,3 +133,91 @@ Currently in development by Team 14 at Boston University's Electrical & Computer
 - Enhanced visualization tools
 - Mobile application development
 - API ecosystem expansion
+
+## Cloud Deployment
+
+This project is designed to be deployed on AWS using a comprehensive infrastructure-as-code approach with CloudFormation templates.
+
+### Deployment Architecture
+
+The system is deployed using four main CloudFormation templates:
+
+1. **VPC Infrastructure** (`vpc-template.yaml`)
+   - Networking foundation with public and private subnets
+   - NAT Gateways for private subnet internet access
+   - Appropriate security groups and routing tables
+
+2. **Backend Infrastructure** (`backend-template.yaml`)
+   - Auto Scaling Group of EC2 instances
+   - Application Load Balancer
+   - Security groups with appropriate ingress/egress rules
+   - IAM roles with least privilege access
+
+3. **Frontend Infrastructure** (`frontend-template.yaml`)
+   - S3 bucket for static website hosting
+   - CloudFront distribution for content delivery
+   - Appropriate bucket policies and access controls
+
+4. **CI/CD Pipeline** (`cicd-template.yaml`)
+   - CodePipeline for orchestrating the deployment workflow
+   - CodeBuild projects for building and testing
+   - GitHub integration for automatic deployments
+   - IAM roles with appropriate permissions
+
+### Deployment Steps
+
+See the dedicated README files for detailed deployment instructions:
+- VPC setup: [vpc-setup-readme.md](vpc-setup-readme.md)
+- Backend setup: [backend-setup-readme.md](backend-setup-readme.md)
+- Frontend setup: [frontend-setup-readme.md](frontend-setup-readme.md)
+- CI/CD setup: [cicd-setup-readme.md](cicd-setup-readme.md)
+
+## Deployment Quick Start
+
+Follow these steps to quickly deploy the entire application:
+
+1. **Set up VPC infrastructure**
+   ```bash
+   aws cloudformation create-stack --stack-name financial-news-vpc-{environment} --template-body file://vpc-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment}
+   ```
+
+2. **Deploy backend services**
+   ```bash
+   aws cloudformation create-stack --stack-name financial-news-backend-{environment} --template-body file://backend-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment} ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-{environment} --capabilities CAPABILITY_IAM
+   ```
+
+3. **Deploy frontend application**
+   ```bash
+   aws cloudformation create-stack --stack-name financial-news-frontend-{environment} --template-body file://frontend-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment} ParameterKey=BackendStackName,ParameterValue=financial-news-backend-{environment} --capabilities CAPABILITY_IAM
+   ```
+
+4. **Set up CI/CD pipeline**
+   ```bash
+   aws cloudformation create-stack --stack-name financial-news-cicd-{environment} --template-body file://cicd-template.yaml --parameters ParameterKey=EnvironmentName,ParameterValue={environment} ParameterKey=VpcStackName,ParameterValue=financial-news-vpc-{environment} ParameterKey=BackendStackName,ParameterValue=financial-news-backend-{environment} ParameterKey=FrontendStackName,ParameterValue=financial-news-frontend-{environment} --capabilities CAPABILITY_IAM
+   ```
+
+Replace `{environment}` with your target environment (e.g., `development`, `staging`, or `production`).
+
+> **Important**: Always include the environment name in the stack name itself, not just as a parameter. This ensures proper cross-stack references and allows you to deploy multiple environments in the same AWS account.
+
+For detailed setup instructions, refer to the dedicated README files:
+- [VPC Setup](vpc-setup-readme.md)
+- [Backend Setup](backend-setup-readme.md)
+- [Frontend Setup](frontend-setup-readme.md)
+- [CI/CD Pipeline Setup](cicd-setup-readme.md)
+
+## Deployment Paths and Structure
+
+The application uses the following standardized paths for deployment:
+
+- **Application Directory**: `/opt/financial-news-engine`
+- **Logs Directory**: `/opt/financial-news-engine/logs`
+- **Deployment Scripts**: `/opt/financial-news-engine/deploy_scripts`
+- **Environment File**: `/opt/financial-news-engine/.env`
+- **Service File**: `/etc/systemd/system/financial-news.service`
+
+### Parameter Retrieval
+
+The application retrieves configuration parameters from AWS Parameter Store using either:
+1. Batch retrieval with `get-parameters-by-path` from path `/financial-news/`
+2. Fallback to individual parameter retrieval if batch retrieval fails

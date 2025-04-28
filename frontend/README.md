@@ -1,6 +1,69 @@
-# Getting Started with Create React App
+# Financial News Search Engine Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This directory contains the React.js frontend application for the Financial News Engine project.
+
+## Features
+
+- **Responsive search interface** for real-time financial news
+- **Advanced filtering** by source, time range, and categories
+- **Search results visualization** with metadata display
+- **Sentiment analysis** visualization of news articles
+- **Mobile-responsive** design using Bootstrap components
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+```
+
+## Environment Configuration
+
+### API Configuration
+This application requires connection to an Elasticsearch instance to function properly. Configuration is provided through environment variables.
+
+#### Development Setup
+
+1. Create a `.env.api` file in the frontend directory with these values:
+```
+REACT_APP_SEARCH_ENGINE_ENDPOINT=your-elasticsearch-endpoint 
+REACT_APP_SEARCH_ENGINE_KEY=your-api-key
+REACT_APP_SEARCH_ENGINE_INDEX=your-index-name
+REACT_APP_USE_ENV_API=true
+```
+
+2. Run the application with the API configuration:
+```
+npm run start:api
+```
+
+#### Handling CORS Issues
+
+If you encounter CORS errors when connecting to Elasticsearch, you should:
+
+1. Configure your Elasticsearch server to allow CORS requests from your application domain
+2. Set up a reverse proxy in production to forward requests to Elasticsearch
+3. Use a browser extension like CORS Unblock for development
+
+#### CI/CD Environment Setup
+
+For automated deployments, the application uses a CI/CD script that automatically generates environment variables from deployment settings.
+
+The CI/CD pipeline should set these environment variables:
+- `ELASTICSEARCH_URL`: The Elasticsearch endpoint
+- `ELASTICSEARCH_API_KEY`: The API key for authentication
+- `ELASTICSEARCH_INDEX`: The name of the index to use
+
+These will be automatically mapped to the corresponding React environment variables during the build process.
 
 ## Available Scripts
 
@@ -11,60 +74,72 @@ In the project directory, you can run:
 Runs the app in the development mode.\
 Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### `npm run start:api`
+
+Runs the app using the configuration from `.env.api`
 
 ### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Launches the test runner in the interactive watch mode.
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Builds the app for production to the `build` folder.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### `npm run build:api`
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Builds the app using the configuration from `.env.api`
 
-### `npm run eject`
+## How Environment Variables Work
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+This project uses React's built-in environment variable system, which requires variables to be prefixed with `REACT_APP_` to be accessible in the frontend code.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+The application accesses these variables directly using `process.env.REACT_APP_*` in the source code, which are substituted at build time.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+No environment variables are injected at runtime - all environment values are baked into the build when you run `npm run build` or `npm run build:api`.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Mock API Mode
 
-## Learn More
+For development without a backend, set `REACT_APP_USE_MOCK_API=true`. This generates realistic financial news data for testing the UI.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Project Structure
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+src/
+├── components/            # React components
+│   ├── Article.js         # Article display component
+│   ├── AnalyticsSideMenu.js # Analytics menu component
+│   ├── Filters.js         # Search filters component
+│   ├── Home.js            # Homepage component
+│   ├── Results.js         # Search results component
+│   └── unused/            # Archived components
+├── services/              # API and data services
+│   └── api.js             # API interaction service
+├── styles/                # CSS and styling files
+├── App.js                 # Main application component
+├── App.css                # Main application styles
+├── App.test.js            # Application tests
+├── index.js               # Application entry point
+└── index.css              # Global CSS styles
+```
 
-### Code Splitting
+## AWS Deployment
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+This frontend is designed to be deployed to AWS S3 and CloudFront using the provided CloudFormation templates.
 
-### Analyzing the Bundle Size
+For detailed deployment instructions, see the [frontend-setup-readme.md](../frontend-setup-readme.md) file.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## CI/CD Pipeline
 
-### Making a Progressive Web App
+The application is automatically built and deployed through AWS CodePipeline when changes are pushed to the specified GitHub branch.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+For CI/CD setup details, see the [cicd-setup-readme.md](../cicd-setup-readme.md) file.
 
-### Advanced Configuration
+## Testing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Run tests with:
+```bash
+npm test
+```
 
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The project uses Jest and React Testing Library for component testing.

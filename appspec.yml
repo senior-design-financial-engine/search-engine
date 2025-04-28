@@ -1,0 +1,27 @@
+version: 0.0
+os: linux
+files:
+  - source: dist/backend.zip
+    destination: /tmp/
+  - source: deployment-scripts/
+    destination: /opt/financial-news-engine/deploy_scripts/
+hooks:
+  BeforeInstall:
+    - location: deployment-scripts/before_install.sh
+      timeout: 300
+      runas: root
+  AfterInstall:
+    - location: deployment-scripts/deploy.sh
+      timeout: 300
+      runas: root
+    - location: deployment-scripts/create_env_file.sh
+      timeout: 300
+      runas: root
+  ApplicationStart:
+    - location: deployment-scripts/lifecycle_handler.sh
+      timeout: 180
+      runas: root
+  ApplicationStop:
+    - location: deployment-scripts/lifecycle_handler.sh TERMINATING
+      timeout: 180
+      runas: root 

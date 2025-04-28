@@ -1,0 +1,515 @@
+version: 0.2
+
+env:
+  variables:
+    SCRIPTS_S3_PREFIX: "scripts/"
+    ASSETS_BUCKET_NAME: ""
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo Installing required tools
+      - pip install awscli boto3
+  
+  pre_build:
+    commands:
+      - echo Preparing scripts for deployment to S3
+      - |
+        if [ -z "$ASSETS_BUCKET_NAME" ]; then
+          echo "Determining assets bucket name from backend stack"
+          export ASSETS_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name $BACKEND_STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='AssetsBucketName'].OutputValue" --output text)
+          echo "Assets bucket name: $ASSETS_BUCKET_NAME"
+        fi
+      
+      # Create temporary scripts directory
+      - mkdir -p scripts
+      - mkdir -p lambda
+
+  build:
+    commands:
+      - echo Creating scripts for backend instance initialization
+      
+      # Create create_env_file.sh
+      - |
+        cat > scripts/create_env_file.sh << 'EOF'
+        #!/bin/bash
+        # Create .env file with environment variables by fetching from SSM Parameter Store
+        set -e  # Exit immediately if a command exits with a non-zero status
+        set -o pipefail  # Return value of a pipeline is the status of the last command
+
+        # Colors for output
+        GREEN='\033[0;32m'
+        RED='\033[0;31m'
+        YELLOW='\033[0;33m'
+        NC='\033[0m' # No Color
+
+        echo "================================================"
+        echo "Financial News Engine - Environment Setup"
+        echo "================================================"
+        echo "$(date)"
+        echo "Fetching credentials from SSM Parameter Store..."
+
+        # Function to get parameters from SSM with proper error handling
+        function get_parameter() {
+            local param_name=$1
+            local default_value=$2
+            
+            echo "Fetching parameter: $param_name" >&2
+            
+            # Check if AWS CLI is installed
+            if ! command -v aws &> /dev/null; then
+                echo -e "${RED}ERROR: AWS CLI is not installed. Cannot fetch parameters.${NC}" >&2
+                echo "$default_value"
+                return 1
+            fi
+            
+            # Try to get the parameter with exponential backoff retry
+            local max_attempts=5
+            local attempt=1
+            local value=""
+            local exit_code=1
+            
+            while [ $attempt -le $max_attempts ]; do
+                # Capture only the value, redirect error messages to stderr
+                value=$(aws ssm get-parameter --name "$param_name" --with-decryption --query "Parameter.Value" --output text 2>/dev/null)
+                exit_code=$?
+                
+                if [ $exit_code -eq 0 ] && [ -n "$value" ] && [ "$value" != "None" ]; then
+                    echo -e "${GREEN}Successfully retrieved parameter: $param_name (Attempt $attempt)${NC}" >&2
+                    # Only output the clean value, no debug messages
+                    echo "$value"
+                    return 0
+                else
+                    if [ $attempt -lt $max_attempts ]; then
+                        local sleep_time=$((2 ** (attempt - 1) * 3))
+                        echo -e "${YELLOW}Attempt $attempt failed. Retrying in $sleep_time seconds...${NC}" >&2
+                        sleep $sleep_time
+                    else
+                        echo -e "${RED}WARNING: Failed to retrieve parameter after $max_attempts attempts: $param_name${NC}" >&2
+                        echo -e "${YELLOW}Using default value: $default_value${NC}" >&2
+                        # Only output the clean value, no debug messages
+                        echo "$default_value"
+                        return 1
+                    fi
+                fi
+                
+                attempt=$((attempt + 1))
+            done
+        }
+
+        # Ensure the target directory exists
+        echo "Verifying application directories exist..." >&2
+        # Check if directory exists and create if needed
+        if [ ! -d "/opt/financial-news-engine" ]; then
+            echo -e "${YELLOW}WARNING: /opt/financial-news-engine doesn't exist. Creating it now.${NC}" >&2
+            mkdir -p /opt/financial-news-engine
+            chmod 755 /opt/financial-news-engine
+        else
+            echo -e "${GREEN}/opt/financial-news-engine directory exists${NC}" >&2
+        fi
+
+        # Check for logs directory
+        if [ ! -d "/opt/financial-news-engine/logs" ]; then
+            echo -e "${YELLOW}Creating logs directory${NC}" >&2
+            mkdir -p /opt/financial-news-engine/logs
+            chmod 755 /opt/financial-news-engine/logs
+        fi
+
+        # Check for deploy_scripts directory
+        if [ ! -d "/opt/financial-news-engine/deploy_scripts" ]; then
+            echo -e "${YELLOW}Creating deploy_scripts directory${NC}" >&2
+            mkdir -p /opt/financial-news-engine/deploy_scripts
+            chmod 755 /opt/financial-news-engine/deploy_scripts
+        fi
+
+        # Check available disk space and log it
+        df -h /opt/financial-news-engine | tee -a /var/log/disk-space.log
+
+        # Get parameters with default fallbacks
+        ES_URL=$(get_parameter "/financial-news/elasticsearch-url" "https://your-elasticsearch-endpoint.es.amazonaws.com")
+        ES_API_KEY=$(get_parameter "/financial-news/elasticsearch-api-key" "default-api-key")
+        ES_INDEX=$(get_parameter "/financial-news/elasticsearch-index" "financial_news")
+        ES_SHARDS=$(get_parameter "/financial-news/es-number-of-shards" "3")
+        ES_REPLICAS=$(get_parameter "/financial-news/es-number-of-replicas" "2")
+        ENV=$(get_parameter "/financial-news/environment" "development")
+
+        # Create the .env file
+        cat > /opt/financial-news-engine/.env << EOL
+        ELASTICSEARCH_URL=$ES_URL
+        ELASTICSEARCH_API_KEY=$ES_API_KEY
+        ELASTICSEARCH_INDEX=$ES_INDEX
+        ES_NUMBER_OF_SHARDS=$ES_SHARDS
+        ES_NUMBER_OF_REPLICAS=$ES_REPLICAS
+        ENVIRONMENT=$ENV
+        CORS_ALLOWED_ORIGINS=https://financialnewsengine.com,https://www.financialnewsengine.com,http://localhost:3000
+        EOL
+
+        # Set secure permissions
+        chmod 600 /opt/financial-news-engine/.env
+        echo -e "${GREEN}Created .env file with environment variables from SSM Parameter Store${NC}" >&2
+
+        # Output parameters retrieved (with API key redacted)
+        echo -e "${GREEN}Environment loaded with the following parameters:${NC}" >&2
+        echo "ELASTICSEARCH_URL=$ES_URL" >&2
+        echo "ELASTICSEARCH_API_KEY=****REDACTED****" >&2
+        echo "ELASTICSEARCH_INDEX=$ES_INDEX" >&2
+        echo "ES_NUMBER_OF_SHARDS=$ES_SHARDS" >&2
+        echo "ES_NUMBER_OF_REPLICAS=$ES_REPLICAS" >&2
+        echo "ENVIRONMENT=$ENV" >&2
+
+        # Create a cron job to update the .env file daily if script is run on a server
+        if [ -d "/etc/cron.daily" ]; then
+            cat > /etc/cron.daily/update_env_file << EOL
+        #!/bin/bash
+        /opt/financial-news-engine/deploy_scripts/create_env_file.sh
+        if systemctl is-active --quiet financial-news.service; then
+          systemctl restart financial-news.service
+        fi
+        EOL
+            chmod +x /etc/cron.daily/update_env_file
+            echo -e "${GREEN}Created daily cron job to update environment variables${NC}" >&2
+        fi
+
+        echo "================================================" >&2
+        echo "Environment setup completed at $(date)" >&2
+        echo "================================================" >&2
+        EOF
+      
+      # Create lifecycle_handler.sh
+      - |
+        cat > scripts/lifecycle_handler.sh << 'EOF'
+        #!/bin/bash
+        # lifecycle_handler.sh - Handler for Auto Scaling Group lifecycle events
+        # This script manages the ASG lifecycle hooks for graceful instance termination
+
+        set -e
+        set -o pipefail
+
+        # Colors for output
+        GREEN='\033[0;32m'
+        RED='\033[0;31m'
+        YELLOW='\033[0;33m'
+        NC='\033[0m' # No Color
+
+        LOG_FILE="/var/log/asg-lifecycle.log"
+        APP_NAME="financial-news"
+        LIFECYCLE_STATE_FILE="/var/run/financial-news-lifecycle-hook-state"
+        APP_DIR="/opt/financial-news-engine"
+
+        function log_message() {
+            local message="$1"
+            local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+            echo -e "[$timestamp] $message" | tee -a "$LOG_FILE"
+        }
+
+        # Ensure log directory exists
+        mkdir -p "$(dirname "$LOG_FILE")"
+        touch "$LOG_FILE"
+        chmod 644 "$LOG_FILE"
+
+        log_message "${GREEN}Starting lifecycle handler script${NC}"
+
+        # Get the EC2 instance ID
+        INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+        if [ -z "$INSTANCE_ID" ]; then
+            log_message "${RED}ERROR: Could not retrieve instance ID from metadata service${NC}"
+            exit 1
+        fi
+        log_message "Instance ID: $INSTANCE_ID"
+
+        # Get the Auto Scaling Group name
+        ASG_NAME=$(aws autoscaling describe-auto-scaling-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --query "AutoScalingInstances[0].AutoScalingGroupName" \
+            --output text 2>/dev/null)
+            
+        if [ -z "$ASG_NAME" ] || [ "$ASG_NAME" == "None" ]; then
+            log_message "${YELLOW}WARNING: Could not retrieve Auto Scaling Group name for instance $INSTANCE_ID${NC}"
+            # Not running in an ASG, nothing to do
+            exit 0
+        fi
+        log_message "Auto Scaling Group: $ASG_NAME"
+
+        # Verify application directory exists and has correct permissions
+        function verify_app_directory() {
+            log_message "Verifying application directory structure"
+            
+            # Check if the main application directory exists
+            if [ ! -d "$APP_DIR" ]; then
+                log_message "${YELLOW}WARNING: Application directory $APP_DIR does not exist. Creating it now...${NC}"
+                mkdir -p "$APP_DIR"
+                chmod 755 "$APP_DIR"
+            fi
+            
+            # Check for nested directories
+            for dir in logs deploy_scripts; do
+                if [ ! -d "$APP_DIR/$dir" ]; then
+                    log_message "${YELLOW}Creating $APP_DIR/$dir directory${NC}"
+                    mkdir -p "$APP_DIR/$dir"
+                    chmod 755 "$APP_DIR/$dir"
+                fi
+            done
+            
+            # Check disk space
+            log_message "Checking disk space for $APP_DIR"
+            df -h "$APP_DIR" | tee -a "$LOG_FILE"
+            
+            # Verify disk space is sufficient (at least 1GB free)
+            AVAILABLE_SPACE=$(df -m "$APP_DIR" | awk 'NR==2 {print $4}')
+            if [ "$AVAILABLE_SPACE" -lt 1024 ]; then
+                log_message "${RED}WARNING: Less than 1GB of free space available in $APP_DIR ($AVAILABLE_SPACE MB)${NC}"
+                # Log to CloudWatch for monitoring
+                if command -v aws &> /dev/null; then
+                    aws cloudwatch put-metric-data \
+                        --namespace "FinancialNewsEngine" \
+                        --metric-name "LowDiskSpace" \
+                        --dimensions "InstanceId=$INSTANCE_ID" \
+                        --value 1 \
+                        --unit "Count"
+                fi
+            else
+                log_message "${GREEN}Disk space check passed: $AVAILABLE_SPACE MB available${NC}"
+            fi
+        }
+
+        function handle_pending_termination() {
+            log_message "${YELLOW}Received termination notification for instance $INSTANCE_ID${NC}"
+            
+            # Gracefully stop the application to prevent disruptions
+            if systemctl is-active --quiet $APP_NAME; then
+                log_message "Stopping $APP_NAME service"
+                systemctl stop $APP_NAME
+            else
+                log_message "${YELLOW}$APP_NAME service is not running${NC}"
+            fi
+            
+            # Perform any cleanup needed
+            log_message "Performing cleanup operations"
+            
+            # Wait a moment to ensure the service has stopped
+            sleep 5
+            
+            # Complete the lifecycle action
+            log_message "${GREEN}Completing lifecycle action${NC}"
+            aws autoscaling complete-lifecycle-action \
+                --lifecycle-hook-name "$1" \
+                --auto-scaling-group-name "$ASG_NAME" \
+                --lifecycle-action-result CONTINUE \
+                --instance-id "$INSTANCE_ID"
+            
+            # Write state file to indicate we've handled termination
+            echo "TERMINATION_HANDLED" > "$LIFECYCLE_STATE_FILE"
+            
+            log_message "${GREEN}Lifecycle action completed, instance ready for termination${NC}"
+        }
+
+        function register_with_load_balancer() {
+            log_message "Registering instance with load balancer"
+            
+            # First, verify the application directory is properly set up
+            verify_app_directory
+            
+            # Ensure environment file exists
+            if [ ! -f "$APP_DIR/.env" ]; then
+                log_message "${YELLOW}Environment file not found. Attempting to create it...${NC}"
+                if [ -f "$APP_DIR/deploy_scripts/create_env_file.sh" ]; then
+                    "$APP_DIR/deploy_scripts/create_env_file.sh"
+                else
+                    log_message "${RED}Cannot create environment file: create_env_file.sh not found${NC}"
+                    # Copy the script if possible
+                    if [ -f "/deployment-scripts/create_env_file.sh" ]; then
+                        mkdir -p "$APP_DIR/deploy_scripts"
+                        cp "/deployment-scripts/create_env_file.sh" "$APP_DIR/deploy_scripts/"
+                        chmod +x "$APP_DIR/deploy_scripts/create_env_file.sh"
+                        "$APP_DIR/deploy_scripts/create_env_file.sh"
+                    fi
+                fi
+            fi
+            
+            # Start the application service
+            if [ -f "/etc/systemd/system/$APP_NAME.service" ]; then
+                log_message "Starting $APP_NAME service"
+                systemctl start $APP_NAME
+            else
+                log_message "${YELLOW}$APP_NAME service definition not found${NC}"
+            fi
+        }
+
+        # Process based on action parameter
+        if [ "$1" == "launching" ]; then
+            log_message "Instance startup detected"
+            register_with_load_balancer
+            log_message "${GREEN}Lifecycle handler completed startup tasks${NC}"
+        elif [ "$1" == "terminating" ]; then
+            handle_pending_termination "$2"
+        else
+            log_message "${RED}Unknown action: $1 - Expected 'launching' or 'terminating'${NC}"
+            exit 1
+        fi
+
+        exit 0
+        EOF
+      
+      # Create Python script for SSM Parameter initialization
+      - |
+        cat > scripts/initialize_ssm_parameters.py << 'EOF'
+        #!/usr/bin/env python3
+        """
+        Initialize SSM parameters for the Financial News Engine
+        This script creates/updates SSM parameters needed by the backend
+        """
+        import argparse
+        import boto3
+        import sys
+        import logging
+
+        # Configure logging
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        logger = logging.getLogger(__name__)
+
+        def create_or_update_parameter(ssm_client, name, value, param_type='String', description=None, overwrite=False):
+            """Create or update an SSM parameter"""
+            try:
+                # Check if parameter exists
+                try:
+                    ssm_client.get_parameter(Name=name)
+                    if not overwrite:
+                        logger.info(f"Parameter {name} already exists, skipping.")
+                        return True
+                except ssm_client.exceptions.ParameterNotFound:
+                    pass
+                
+                # Create/update parameter
+                params = {
+                    'Name': name,
+                    'Value': str(value),
+                    'Type': param_type,
+                    'Overwrite': overwrite,
+                    'Tier': 'Standard'
+                }
+                
+                if description:
+                    params['Description'] = description
+                
+                ssm_client.put_parameter(**params)
+                logger.info(f"Successfully created/updated parameter: {name}")
+                return True
+            except Exception as e:
+                logger.error(f"Error creating/updating parameter {name}: {str(e)}")
+                return False
+
+        def main():
+            parser = argparse.ArgumentParser(description='Initialize SSM parameters for Financial News Engine')
+            parser.add_argument('--elasticsearch-url', required=True, help='Elasticsearch endpoint URL')
+            parser.add_argument('--elasticsearch-api-key', required=True, help='Elasticsearch API key')
+            parser.add_argument('--elasticsearch-index', default='financial_news', help='Elasticsearch index name')
+            parser.add_argument('--shards', type=int, default=3, help='Number of Elasticsearch shards')
+            parser.add_argument('--replicas', type=int, default=2, help='Number of Elasticsearch replicas')
+            parser.add_argument('--environment', default='production', help='Environment name')
+            parser.add_argument('--overwrite', action='store_true', help='Overwrite existing parameters')
+            parser.add_argument('--region', help='AWS region')
+            
+            args = parser.parse_args()
+            
+            # Initialize SSM client
+            ssm_kwargs = {}
+            if args.region:
+                ssm_kwargs['region_name'] = args.region
+            
+            ssm_client = boto3.client('ssm', **ssm_kwargs)
+            
+            # Define parameters to create
+            parameters = {
+                '/financial-news/elasticsearch-url': {
+                    'value': args.elasticsearch_url,
+                    'type': 'String',
+                    'description': 'Elasticsearch endpoint URL for Financial News Engine'
+                },
+                '/financial-news/elasticsearch-api-key': {
+                    'value': args.elasticsearch_api_key,
+                    'type': 'SecureString',
+                    'description': 'Elasticsearch API key for authentication'
+                },
+                '/financial-news/elasticsearch-index': {
+                    'value': args.elasticsearch_index,
+                    'type': 'String',
+                    'description': 'Elasticsearch index name for storing news data'
+                },
+                '/financial-news/es-number-of-shards': {
+                    'value': str(args.shards),
+                    'type': 'String',
+                    'description': 'Number of shards for Elasticsearch index'
+                },
+                '/financial-news/es-number-of-replicas': {
+                    'value': str(args.replicas),
+                    'type': 'String',
+                    'description': 'Number of replicas for Elasticsearch index'
+                },
+                '/financial-news/environment': {
+                    'value': args.environment,
+                    'type': 'String',
+                    'description': 'Environment name (production, staging, development)'
+                }
+            }
+            
+            # Create/update parameters
+            success = True
+            for name, param in parameters.items():
+                result = create_or_update_parameter(
+                    ssm_client, 
+                    name, 
+                    param['value'], 
+                    param['type'], 
+                    param.get('description'), 
+                    args.overwrite
+                )
+                if not result:
+                    success = False
+            
+            if success:
+                logger.info("Successfully initialized all SSM parameters")
+                return 0
+            else:
+                logger.error("One or more parameters failed to initialize")
+                return 1
+
+        if __name__ == "__main__":
+            sys.exit(main())
+        EOF
+      
+      # Make all scripts executable
+      - chmod +x scripts/*.sh
+      
+      # Package Lambda function
+      - echo "Creating Lambda function packages"
+      - cp scripts/create_lambda_layer.sh lambda/
+      - cp scripts/create_lambda_package.sh lambda/
+      - cp scripts/init_ssm_parameters_lambda.py lambda/
+      - cd lambda && chmod +x *.sh && ./create_lambda_layer.sh && ./create_lambda_package.sh && cd ..
+      
+      # Upload Lambda packages to S3
+      - echo "Uploading Lambda packages to S3"
+      - aws s3 cp lambda/lambda_function.zip s3://$ASSETS_BUCKET_NAME/lambda/init_ssm_parameters.zip --acl private
+      - aws s3 cp lambda/cfnresponse_layer.zip s3://$ASSETS_BUCKET_NAME/lambda/cfnresponse_layer.zip --acl private
+      
+      # Upload scripts to S3
+      - echo Uploading scripts to S3 bucket
+      - aws s3 sync scripts/ s3://$ASSETS_BUCKET_NAME/$SCRIPTS_S3_PREFIX --acl private
+      
+  post_build:
+    commands:
+      - echo Scripts deployment completed at `date`
+      - echo Scripts available at s3://$ASSETS_BUCKET_NAME/$SCRIPTS_S3_PREFIX
+
+artifacts:
+  files:
+    - scripts/*
+  discard-paths: no
+  base-directory: scripts
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
+    - '/root/.cache/pip/**/*' 

@@ -9,14 +9,8 @@ class EngineConfig:
         
         # Get configuration from environment variables with fallbacks
         self.api_key: Optional[str] = os.getenv('ELASTICSEARCH_API_KEY')
-        self.elasticsearch_url: str = os.getenv(
-            'ELASTICSEARCH_URL', 
-            'https://f4e7b79a4d854dceaa351824e58f2065.us-east-2.aws.elastic-cloud.com:443'
-        )
+        self.elasticsearch_url: str = os.getenv('ELASTICSEARCH_URL')
         self.index_name: str = os.getenv('ELASTICSEARCH_INDEX', 'financial_news')
-        
-        # Embedding configuration
-        self.embedding_dimensions: int = int(os.getenv('EMBEDDING_DIMENSIONS', '768'))
         
         self.index_settings: Dict = self._get_default_settings()
 
@@ -28,8 +22,6 @@ class EngineConfig:
             raise ValueError("ELASTICSEARCH_URL environment variable is required")
         if not self.index_name:
             raise ValueError("ELASTICSEARCH_INDEX environment variable is required")
-        if self.embedding_dimensions <= 0:
-            raise ValueError("EMBEDDING_DIMENSIONS must be a positive integer")
 
     def _get_default_settings(self) -> Dict:
         """Get default Elasticsearch index settings."""

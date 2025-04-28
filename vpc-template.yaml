@@ -1,0 +1,339 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'VPC Infrastructure for Financial News Engine'
+
+Parameters:
+  VPCName:
+    Description: Name of the VPC
+    Type: String
+    Default: FinancialNewsVPC
+  
+  EnvironmentName:
+    Description: Environment name
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+
+  VPCCidrBlock:
+    Description: CIDR block for the VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  ElasticsearchServiceName:
+    Description: The service name for the Elasticsearch service in the current region
+    Type: String
+    Default: com.amazonaws.us-east-1.elasticsearch
+
+Resources:
+  # The VPC
+  FinanceNewsVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidrBlock
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref VPCName
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Internet Gateway to allow internet access
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-IGW
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Attach the Internet Gateway to the VPC
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Create a Public Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Public-RT
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Create a Private Route Table
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Private-RT
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Public Route for Internet Access
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # Public Subnets - For load balancers and public-facing components
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Public-Subnet-1
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Public-Subnet-2
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Private Subnets - For application servers, databases, and Elasticsearch
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Private-Subnet-1
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref FinanceNewsVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Private-Subnet-2
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Associate Public Subnets with Public Route Table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # NAT Gateway for Private Subnets to access the internet
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-NAT-GW
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # Private Route for NAT Gateway
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  # Associate Private Subnets with Private Route Table
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Security Groups
+  AppServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for application servers
+      VpcId: !Ref FinanceNewsVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # In production, restrict this to your IP
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-AppServer-SG
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  ElasticsearchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Elasticsearch
+      VpcId: !Ref FinanceNewsVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 9200
+          ToPort: 9300
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 5601
+          ToPort: 5601
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-Elasticsearch-SG
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  # VPC Endpoints for AWS services
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - 's3:GetObject'
+              - 's3:PutObject'
+            Resource: '*'
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+        - !Ref PublicRouteTable
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId: !Ref FinanceNewsVPC
+      
+  # PrivateLink Endpoint for Elasticsearch
+  ElasticsearchVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: false
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref ElasticsearchEndpointSecurityGroup
+      ServiceName: !Ref ElasticsearchServiceName
+      VpcId: !Ref FinanceNewsVPC
+      
+  # Security Group for Elasticsearch PrivateLink Endpoint
+  ElasticsearchEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Elasticsearch PrivateLink endpoint
+      VpcId: !Ref FinanceNewsVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref AppServerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${VPCName}-ES-Endpoint-SG
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+Outputs:
+  VPC:
+    Description: VPC ID
+    Value: !Ref FinanceNewsVPC
+    Export:
+      Name: !Sub ${AWS::StackName}-VPCID
+
+  PublicSubnet1:
+    Description: Public Subnet 1 ID
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnet1ID
+
+  PublicSubnet2:
+    Description: Public Subnet 2 ID
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnet2ID
+
+  PrivateSubnet1:
+    Description: Private Subnet 1 ID
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnet1ID
+
+  PrivateSubnet2:
+    Description: Private Subnet 2 ID
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnet2ID
+
+  AppServerSecurityGroup:
+    Description: Security Group for Application Servers
+    Value: !Ref AppServerSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-AppServerSG
+
+  ElasticsearchSecurityGroup:
+    Description: Security Group for Elasticsearch
+    Value: !Ref ElasticsearchSecurityGroup
+    Export:
+      Name: !Sub ${AWS::StackName}-ElasticsearchSG
+
+  ElasticsearchVPCEndpoint:
+    Description: Elasticsearch PrivateLink Endpoint
+    Value: !Ref ElasticsearchVPCEndpoint
+    Export:
+      Name: !Sub ${AWS::StackName}-ElasticsearchEndpoint 
