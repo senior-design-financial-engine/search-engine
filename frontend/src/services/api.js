@@ -482,18 +482,22 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					let startDate;
 					
 					switch (time_range) {
-						case '1d': startDate = new Date(now.setDate(now.getDate() - 1)); break;
-						case '7d': startDate = new Date(now.setDate(now.getDate() - 7)); break;
-						case '30d': startDate = new Date(now.setDate(now.getDate() - 30)); break;
-						case '90d': startDate = new Date(now.setDate(now.getDate() - 90)); break;
-						default: startDate = new Date(now.setDate(now.getDate() - 30));
+						case '1d': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
+						case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+						case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+						case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+						default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 					}
 
-					console.log(startDate)
+					console.log('Date filtering:', {
+						timeRange: time_range,
+						startDate: startDate.toISOString(),
+						now: now.toISOString()
+					});
 
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
-						const articleDate = (new Date(article.published_at));
+						const articleDate = new Date(article.published_at);
 						return (articleDate >= startDate) && (articleDate <= now);
 					});
 				}
