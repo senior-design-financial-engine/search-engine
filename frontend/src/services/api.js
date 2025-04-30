@@ -478,27 +478,49 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 
 				// Add time range filtering if needed (as a backup)
 				if (time_range && (time_range !== 'All Time')) {
+					// Use UTC dates to avoid timezone issues
 					const now = new Date();
+					const nowUTC = new Date(Date.UTC(
+						now.getUTCFullYear(),
+						now.getUTCMonth(),
+						now.getUTCDate(),
+						now.getUTCHours(),
+						now.getUTCMinutes(),
+						now.getUTCSeconds()
+					));
+					
 					let startDate;
+					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					
 					switch (time_range) {
-						case '1d': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
-						case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-						case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
-						case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
-						default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+						case '1d': startDate = new Date(nowUTC.getTime() - MS_PER_DAY); break;
+						case '7d': startDate = new Date(nowUTC.getTime() - 7 * MS_PER_DAY); break;
+						case '30d': startDate = new Date(nowUTC.getTime() - 30 * MS_PER_DAY); break;
+						case '90d': startDate = new Date(nowUTC.getTime() - 90 * MS_PER_DAY); break;
+						default: startDate = new Date(nowUTC.getTime() - 30 * MS_PER_DAY);
 					}
 
 					console.log('Date filtering:', {
 						timeRange: time_range,
-						startDate: startDate.toISOString(),
-						now: now.toISOString()
+						startDateUTC: startDate.toISOString(),
+						nowUTC: nowUTC.toISOString(),
+						localStartDate: startDate.toString(),
+						localNow: now.toString()
 					});
 
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
 						const articleDate = new Date(article.published_at);
-						return (articleDate >= startDate) && (articleDate <= now);
+						// Convert article date to UTC for comparison
+						const articleUTC = new Date(Date.UTC(
+							articleDate.getUTCFullYear(),
+							articleDate.getUTCMonth(),
+							articleDate.getUTCDate(),
+							articleDate.getUTCHours(),
+							articleDate.getUTCMinutes(),
+							articleDate.getUTCSeconds()
+						));
+						return (articleUTC >= startDate) && (articleUTC <= nowUTC);
 					});
 				}
 				
