@@ -392,33 +392,68 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					const now = new Date();
 					let startDate;
 					
-					switch (time_range) {
-						case '1d': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
-						case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-						case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
-						case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
-						default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+					// Normalize time range value
+					const normalizedTimeRange = time_range.toLowerCase();
+					const timeRangeMap = {
+						'day': '1d',
+						'week': '7d',
+						'month': '30d',
+						'quarter': '90d'
+					};
+					
+					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
+					
+					// Use UTC dates to avoid timezone issues
+					const nowUTC = new Date(Date.UTC(
+						now.getUTCFullYear(),
+						now.getUTCMonth(),
+						now.getUTCDate(),
+						now.getUTCHours(),
+						now.getUTCMinutes(),
+						now.getUTCSeconds()
+					));
+					
+					const MS_PER_DAY = 24 * 60 * 60 * 1000;
+					let daysToSubtract = 30; // default to 30 days
+					
+					switch (effectiveTimeRange) {
+						case '1d': daysToSubtract = 1; break;
+						case '7d': daysToSubtract = 7; break;
+						case '30d': daysToSubtract = 30; break;
+						case '90d': daysToSubtract = 90; break;
 					}
 					
-					// Convert dates to ISO strings for exact matching with the enum field
-					must.push({
-						range: {
-							"published_at.enum": {
-								gte: startDate.toISOString(),
-								lte: now.toISOString(),
-								format: "strict_date_time"
+					startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
+					
+					// Add the date range filters to the must array
+					must.push(
+						{
+							range: {
+								"published_at.enum": {
+									gte: startDate.toISOString(),
+									lte: nowUTC.toISOString(),
+									format: "strict_date_time"
+								}
+							}
+						},
+						{
+							range: {
+								"updated_at": {
+									gte: startDate.toISOString(),
+									lte: nowUTC.toISOString()
+								}
 							}
 						}
-					});
+					);
 
-					// Add a backup filter using the updated_at field which is a proper date type
-					must.push({
-						range: {
-							"updated_at": {
-								gte: startDate.toISOString(),
-								lte: now.toISOString()
-							}
-						}
+					console.log('Date filtering:', {
+						originalTimeRange: time_range,
+						normalizedTimeRange: effectiveTimeRange,
+						daysToSubtract,
+						startDateUTC: startDate.toISOString(),
+						nowUTC: nowUTC.toISOString(),
+						localStartDate: startDate.toString(),
+						localNow: now.toString()
 					});
 				}
 				
