@@ -425,26 +425,16 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					
 					startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
 					
-					// Add the date range filters to the must array
-					must.push(
-						{
-							range: {
-								"published_at.enum": {
-									gte: startDate.toISOString(),
-									lte: nowUTC.toISOString(),
-									format: "strict_date_time"
-								}
-							}
-						},
-						{
-							range: {
-								"updated_at": {
-									gte: startDate.toISOString(),
-									lte: nowUTC.toISOString()
-								}
+					// Add the date range filter to the must array - only use published_at
+					must.push({
+						range: {
+							"published_at": {
+								gte: startDate.toISOString(),
+								lte: nowUTC.toISOString(),
+								format: "strict_date_time"
 							}
 						}
-					);
+					});
 
 					console.log('Date filtering:', {
 						originalTimeRange: time_range,
@@ -467,7 +457,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					},
 					sort: [
 						{ "_score": { "order": "desc" } },
-						{ "published_at.enum": { "order": "desc", "missing": "_last" } }
+						{ "published_at": { "order": "desc", "missing": "_last" } }
 					],
 					size: 20,
 					track_scores: true,
@@ -508,9 +498,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					);
 				}
 
-				console.log("currently here");
-				console.log(time_range);
-
 				// Add time range filtering if needed (as a backup)
 				if (time_range && (time_range !== 'All Time')) {
 					// Use UTC dates to avoid timezone issues
@@ -527,26 +514,38 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					let startDate;
 					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					
-					switch (time_range) {
-						case '1d': startDate = new Date(nowUTC.getTime() - MS_PER_DAY); break;
-						case '7d': startDate = new Date(nowUTC.getTime() - 7 * MS_PER_DAY); break;
-						case '30d': startDate = new Date(nowUTC.getTime() - 30 * MS_PER_DAY); break;
-						case '90d': startDate = new Date(nowUTC.getTime() - 90 * MS_PER_DAY); break;
-						default: startDate = new Date(nowUTC.getTime() - 30 * MS_PER_DAY);
+					// Use the same time range normalization as above
+					const normalizedTimeRange = time_range.toLowerCase();
+					const timeRangeMap = {
+						'day': '1d',
+						'week': '7d',
+						'month': '30d',
+						'quarter': '90d'
+					};
+					
+					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
+					let daysToSubtract = 30; // default to 30 days
+					
+					switch (effectiveTimeRange) {
+						case '1d': daysToSubtract = 1; break;
+						case '7d': daysToSubtract = 7; break;
+						case '30d': daysToSubtract = 30; break;
+						case '90d': daysToSubtract = 90; break;
 					}
+					
+					startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
 
-					console.log('Date filtering:', {
+					console.log('JavaScript date filtering:', {
 						timeRange: time_range,
 						startDateUTC: startDate.toISOString(),
-						nowUTC: nowUTC.toISOString(),
-						localStartDate: startDate.toString(),
-						localNow: now.toString()
+						nowUTC: nowUTC.toISOString()
 					});
 
 					formattedResults.articles = formattedResults.articles.filter(article => {
 						if (!article.published_at) return false;
-						const articleDate = new Date(article.published_at);
+						
 						// Convert article date to UTC for comparison
+						const articleDate = new Date(article.published_at);
 						const articleUTC = new Date(Date.UTC(
 							articleDate.getUTCFullYear(),
 							articleDate.getUTCMonth(),
@@ -555,7 +554,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 							articleDate.getUTCMinutes(),
 							articleDate.getUTCSeconds()
 						));
-						return (articleUTC >= startDate) && (articleUTC <= nowUTC);
+						
+						return articleUTC >= startDate && articleUTC <= nowUTC;
 					});
 				}
 				
