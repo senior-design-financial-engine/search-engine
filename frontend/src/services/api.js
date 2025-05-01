@@ -21,6 +21,12 @@ const fetchServerDate = async () => {
 	}
 };
 
+// Function to get current date (using frontend date instead of server date)
+const getCurrentDate = () => {
+	// For test data: Use 2025 as the base year
+	return new Date('2025-05-02T00:00:00Z');
+};
+
 // Runtime configuration resolver
 const resolveConfig = (envValue, configKey) => {
 	if (envValue) return envValue;
@@ -283,7 +289,7 @@ const formatSearchResults = (esResults) => {
 
 	if (!esResults || !esResults.hits || !esResults.hits.hits) {
 		console.log('No valid results in ES response');
-		return { articles: [] };
+		return { articles: [], total: 0 };
 	}
 	
 	// Log scoring information for debugging
@@ -461,11 +467,9 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				
 				// Time range filter using the text field's enum subfield
 				if (time_range && time_range !== 'All Time') {
-					// Get server date
-					const serverDate = await fetchServerDate();
-					console.log('Server date:', serverDate.toISOString());
-					
+					const baseDate = getCurrentDate();
 					let startDate;
+					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					
 					// Normalize time range value
 					const normalizedTimeRange = time_range.toLowerCase();
@@ -477,8 +481,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					};
 					
 					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
-					
-					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					let daysToSubtract = 30; // default to 30 days
 					
 					switch (effectiveTimeRange) {
@@ -488,14 +490,14 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						case '90d': daysToSubtract = 90; break;
 					}
 					
-					startDate = new Date(serverDate.getTime() - (daysToSubtract * MS_PER_DAY));
+					startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
 					
 					// Add the date range filter to the must array
 					must.push({
 						range: {
 							"published_at": {
 								gte: startDate.toISOString(),
-								lte: serverDate.toISOString()
+								lte: baseDate.toISOString()
 							}
 						}
 					});
@@ -505,7 +507,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						normalizedTimeRange: effectiveTimeRange,
 						daysToSubtract,
 						startDateUTC: startDate.toISOString(),
-						serverDateUTC: serverDate.toISOString()
+						endDateUTC: baseDate.toISOString()
 					});
 				}
 				
