@@ -152,14 +152,21 @@ function Home() {
 		time_range: 'all',
 		sentiment: 'all'
 	});
+	const [recentQueries, setRecentQueries] = useState([]);
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		// Load recent queries from localStorage
+		const savedQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
+		setRecentQueries(savedQueries);
+	}, []);
 
 	const saveRecentQuery = (searchQuery) => {
 		// Create query object with filters
 		const queryData = {
 			query: searchQuery,
 			filters: {},
-			timestamp: new Date().toISOString() // Add timestamp for when the search was performed
+			timestamp: new Date().toISOString()
 		};
 		
 		// Add filters that have non-default values
@@ -176,10 +183,10 @@ function Home() {
 		}
 		
 		// Get existing recent queries
-		const recentQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
+		const existingQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
 		
 		// Check if query exists (compare both query text and filters)
-		const queryExists = recentQueries.some(existingQuery => {
+		const queryExists = existingQueries.some(existingQuery => {
 			if (typeof existingQuery === 'string') {
 				return existingQuery === searchQuery && Object.keys(queryData.filters).length === 0;
 			}
@@ -190,13 +197,14 @@ function Home() {
 		
 		if (!queryExists) {
 			// Add new query at the beginning
-			const updatedQueries = [queryData, ...recentQueries.slice(0, 9)];
+			const updatedQueries = [queryData, ...existingQueries.slice(0, 9)];
 			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
+			setRecentQueries(updatedQueries);
 		} else {
 			// If query exists, move it to the top and update timestamp
 			const updatedQueries = [
 				queryData,
-				...recentQueries.filter(existingQuery => {
+				...existingQueries.filter(existingQuery => {
 					if (typeof existingQuery === 'string') {
 						return !(existingQuery === searchQuery && Object.keys(queryData.filters).length === 0);
 					}
@@ -206,6 +214,49 @@ function Home() {
 				})
 			].slice(0, 10);
 			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
+			setRecentQueries(updatedQueries);
+		}
+	};
+
+	const handleQueryClick = (queryData) => {
+		if (typeof queryData === 'string') {
+			setQuery(queryData);
+			setAdvancedQueries({
+				source: '',
+				time_range: 'all',
+				sentiment: 'all'
+			});
+			
+			// Automatically submit the form after selecting a recent query
+			setTimeout(() => {
+				const searchParams = new URLSearchParams({ query: queryData });
+				navigate(`/results?${searchParams.toString()}`);
+			}, 300);
+		} else {
+			setQuery(queryData.query);
+			
+			// Set filters from saved query
+			const newAdvancedQueries = {
+				source: '',
+				time_range: 'all',
+				sentiment: 'all',
+				...queryData.filters
+			};
+			setAdvancedQueries(newAdvancedQueries);
+			
+			// Automatically submit the form after selecting a recent query
+			setTimeout(() => {
+				const searchParams = new URLSearchParams({ query: queryData.query });
+				
+				// Add the filters to the search params
+				for (const [key, value] of Object.entries(queryData.filters)) {
+					if (value && value !== 'all') {
+						searchParams.append(key, value);
+					}
+				}
+				
+				navigate(`/results?${searchParams.toString()}`);
+			}, 300);
 		}
 	};
 
@@ -289,48 +340,6 @@ function Home() {
 			
 			navigate(`/results?${searchParams.toString()}`);
 		}, 300);
-	};
-
-	const handleRecentQuerySelect = (queryData) => {
-		if (typeof queryData === 'string') {
-			setQuery(queryData);
-			setAdvancedQueries({
-				source: '',
-				time_range: 'all',
-				sentiment: 'all'
-			});
-			
-			// Automatically submit the form after selecting a recent query
-			setTimeout(() => {
-				const searchParams = new URLSearchParams({ query: queryData });
-				navigate(`/results?${searchParams.toString()}`);
-			}, 300);
-		} else {
-			setQuery(queryData.query);
-			
-			// Set filters from saved query
-			const newAdvancedQueries = {
-				source: '',
-				time_range: 'all',
-				sentiment: 'all',
-				...queryData.filters
-			};
-			setAdvancedQueries(newAdvancedQueries);
-			
-			// Automatically submit the form after selecting a recent query
-			setTimeout(() => {
-				const searchParams = new URLSearchParams({ query: queryData.query });
-				
-				// Add the filters to the search params
-				for (const [key, value] of Object.entries(queryData.filters)) {
-					if (value && value !== 'all') {
-						searchParams.append(key, value);
-					}
-				}
-				
-				navigate(`/results?${searchParams.toString()}`);
-			}, 300);
-		}
 	};
 
 	return (
