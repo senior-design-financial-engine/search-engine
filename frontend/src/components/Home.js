@@ -97,20 +97,20 @@ const RecentQueries = ({ onSelectQuery }) => {
 	};
 
 	return (
-		<Card className="mt-3 shadow-sm border-0 rounded-3">
-			<Card.Header className="d-flex justify-content-between align-items-center bg-white border-bottom py-3">
-				<span className="fw-bold">
-					<i className="bi bi-clock-history me-2 text-primary"></i>
+		<Card className="shadow-sm border-0 rounded-4">
+			<Card.Header className="d-flex justify-content-between align-items-center bg-white border-0 p-4">
+				<span className="fw-bold text-primary">
+					<i className="bi bi-clock-history me-2"></i>
 					Recent Searches
 				</span>
 				<Button 
 					variant="outline-danger" 
 					size="sm" 
 					onClick={clearRecentQueries}
-					className="rounded-pill px-3"
+					className="rounded-pill px-4"
 				>
 					<i className="bi bi-trash me-1"></i>
-					Clear
+					Clear History
 				</Button>
 			</Card.Header>
 			<ListGroup variant="flush">
@@ -119,7 +119,7 @@ const RecentQueries = ({ onSelectQuery }) => {
 						key={index} 
 						action 
 						onClick={() => handleQueryClick(queryData)}
-						className="d-flex flex-column align-items-start py-3 transition-bg"
+						className="d-flex flex-column align-items-start p-4 border-0"
 						title={typeof queryData !== 'string' ? getFilterSummary(queryData.filters) : "No filters applied"}
 					>
 						<div className="d-flex align-items-center w-100">
@@ -128,12 +128,12 @@ const RecentQueries = ({ onSelectQuery }) => {
 							</div>
 							<div className="ms-auto">
 								{typeof queryData !== 'string' && Object.keys(queryData.filters || {}).length > 0 && (
-									<Badge bg="light" text="dark" className="me-2 border">
-										<i className="bi bi-funnel-fill me-1 text-secondary"></i>
+									<Badge bg="light" text="dark" className="me-2 border shadow-sm">
+										<i className="bi bi-funnel-fill me-1 text-primary"></i>
 										{Object.keys(queryData.filters || {}).length}
 									</Badge>
 								)}
-								<i className="bi bi-search text-muted"></i>
+								<i className="bi bi-search text-primary"></i>
 							</div>
 						</div>
 						{typeof queryData !== 'string' && renderFilterBadges(queryData.filters)}
@@ -338,7 +338,7 @@ function Home() {
 			<Row className="justify-content-center mb-5">
 				<Col md={8} className="text-center">
 					<h1 className="display-4 mb-3 fw-bold">Financial Search Engine</h1>
-					<p className="lead text-secondary">
+					<p className="lead text-secondary mb-4">
 						Search for financial news across multiple sources with advanced filtering
 					</p>
 					{IS_PRODUCTION && USE_MOCK_API && (
@@ -349,12 +349,13 @@ function Home() {
 				</Col>
 			</Row>
 			
-			<Row className="justify-content-center">
+			<Row className="justify-content-center mb-5">
 				<Col md={10}>
-					<Card className="shadow-lg border-0 rounded-4">
+					<Card className="shadow-lg border-0 rounded-4 overflow-hidden">
 						<Card.Body className="p-4">
 							<Form onSubmit={handleSearch}>
-								<Row className="align-items-center mb-3">
+								{/* Search Input Section */}
+								<Row className="align-items-center mb-4">
 									<Col>
 										<div className="search-input-wrapper position-relative">
 											<i className="bi bi-search position-absolute start-0 top-50 translate-middle-y ms-3 text-secondary"></i>
@@ -363,101 +364,156 @@ function Home() {
 												placeholder="Enter your search query (e.g. 'Apple' or 'AI')"
 												value={query}
 												onChange={(e) => setQuery(e.target.value)}
-												className="form-control-lg rounded-pill ps-5"
+												className="form-control-lg rounded-pill ps-5 shadow-sm border-0"
 												required
 											/>
 										</div>
 									</Col>
 									<Col xs="auto">
-										<Button type="submit" variant="primary" size="lg" className="rounded-pill px-4">
+										<Button 
+											type="submit" 
+											variant="primary" 
+											size="lg" 
+											className="rounded-pill px-4 shadow-sm"
+										>
 											<i className="bi bi-search me-1"></i> Search
 										</Button>
 									</Col>
 								</Row>
 
+								{/* Advanced Options Toggle */}
 								<div className="d-flex justify-content-end mb-3">
 									<Button 
 										variant="link" 
 										onClick={() => setShowAdvanced(!showAdvanced)}
-										className="text-decoration-none"
+										className="text-decoration-none text-primary px-0"
 									>
 										<i className={`bi bi-sliders me-1 ${showAdvanced ? 'text-primary' : ''}`}></i>
 										{showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options'}
 									</Button>
 								</div>
 
+								{/* Advanced Options Section */}
 								{showAdvanced && (
-									<Card className="bg-light mb-3 border-0 rounded-3">
-										<Card.Body>
-											<Row>
-												<Col md={4}>
-													<Form.Group className="mb-3">
-														<Form.Label>Source</Form.Label>
-														<Form.Select
-															value={advancedQueries.source}
-															onChange={(e) => handleAdvancedChange('source', e.target.value)}
-															className="rounded-3"
-														>
-															<option value="">All Sources</option>
-															{availableSources.map(source => (
-																<option key={source} value={source}>{source}</option>
-															))}
-														</Form.Select>
-													</Form.Group>
-												</Col>
-												<Col md={4}>
-													<Form.Group className="mb-3">
-														<Form.Label>Time Range</Form.Label>
-														<Form.Select
-															value={advancedQueries.time_range}
-															onChange={(e) => handleAdvancedChange('time_range', e.target.value)}
-															className="rounded-3"
-														>
-															{timeRanges.map(range => (
-																<option key={range.value} value={range.value}>{range.label}</option>
-															))}
-														</Form.Select>
-													</Form.Group>
-												</Col>
-												<Col md={4}>
-													<Form.Group className="mb-3">
-														<Form.Label>Sentiment</Form.Label>
-														<Form.Select
-															value={advancedQueries.sentiment}
-															onChange={(e) => handleAdvancedChange('sentiment', e.target.value)}
-															className="rounded-3"
-														>
-															{sentiments.map(sentiment => (
-																<option key={sentiment.value} value={sentiment.value}>{sentiment.label}</option>
-															))}
-														</Form.Select>
-													</Form.Group>
-												</Col>
-											</Row>
-										</Card.Body>
-									</Card>
+									<div className="mb-4">
+										<Card className="shadow-sm border-0 rounded-4">
+											<Card.Body className="p-4">
+												<Row>
+													<Col md={4}>
+														<Form.Group className="mb-3 mb-md-0">
+															<Form.Label className="fw-medium">Source</Form.Label>
+															<Form.Select
+																value={advancedQueries.source}
+																onChange={(e) => handleAdvancedChange('source', e.target.value)}
+																className="rounded-pill border-0 shadow-sm py-2"
+															>
+																<option value="">All Sources</option>
+																{availableSources.map(source => (
+																	<option key={source} value={source}>{source}</option>
+																))}
+															</Form.Select>
+														</Form.Group>
+													</Col>
+													<Col md={4}>
+														<Form.Group className="mb-3 mb-md-0">
+															<Form.Label className="fw-medium">Time Range</Form.Label>
+															<Form.Select
+																value={advancedQueries.time_range}
+																onChange={(e) => handleAdvancedChange('time_range', e.target.value)}
+																className="rounded-pill border-0 shadow-sm py-2"
+															>
+																{timeRanges.map(range => (
+																	<option key={range.value} value={range.value}>{range.label}</option>
+																))}
+															</Form.Select>
+														</Form.Group>
+													</Col>
+													<Col md={4}>
+														<Form.Group>
+															<Form.Label className="fw-medium">Sentiment</Form.Label>
+															<Form.Select
+																value={advancedQueries.sentiment}
+																onChange={(e) => handleAdvancedChange('sentiment', e.target.value)}
+																className="rounded-pill border-0 shadow-sm py-2"
+															>
+																{sentiments.map(sentiment => (
+																	<option key={sentiment.value} value={sentiment.value}>{sentiment.label}</option>
+																))}
+															</Form.Select>
+														</Form.Group>
+													</Col>
+												</Row>
+											</Card.Body>
+										</Card>
+									</div>
 								)}
-								
-								{/* Recent Queries Component */}
-								<RecentQueries onSelectQuery={handleRecentQuerySelect} />
+
+								{/* Recent Queries Section */}
+								<div className="mt-4">
+									<Card className="shadow-sm border-0 rounded-4">
+										<Card.Header className="d-flex justify-content-between align-items-center bg-white border-0 p-4">
+											<span className="fw-bold text-primary">
+												<i className="bi bi-clock-history me-2"></i>
+												Recent Searches
+											</span>
+											<Button 
+												variant="outline-danger" 
+												size="sm" 
+												onClick={clearRecentQueries}
+												className="rounded-pill px-4 shadow-sm"
+											>
+												<i className="bi bi-trash me-1"></i>
+												Clear History
+											</Button>
+										</Card.Header>
+										<ListGroup variant="flush">
+											{recentQueries.slice(0, 5).map((queryData, index) => (
+												<ListGroup.Item 
+													key={index} 
+													action 
+													onClick={() => handleQueryClick(queryData)}
+													className="d-flex flex-column align-items-start p-4 border-0 hover-bg-light"
+													title={typeof queryData !== 'string' ? getFilterSummary(queryData.filters) : "No filters applied"}
+												>
+													<div className="d-flex align-items-center w-100">
+														<div className="search-query-text fw-medium">
+															{typeof queryData === 'string' ? queryData : queryData.query}
+														</div>
+														<div className="ms-auto">
+															{typeof queryData !== 'string' && Object.keys(queryData.filters || {}).length > 0 && (
+																<Badge bg="light" text="dark" className="me-2 border shadow-sm">
+																	<i className="bi bi-funnel-fill me-1 text-primary"></i>
+																	{Object.keys(queryData.filters || {}).length}
+																</Badge>
+															)}
+															<i className="bi bi-search text-primary"></i>
+														</div>
+													</div>
+													{typeof queryData !== 'string' && renderFilterBadges(queryData.filters)}
+												</ListGroup.Item>
+											))}
+										</ListGroup>
+									</Card>
+								</div>
 							</Form>
 						</Card.Body>
 					</Card>
 				</Col>
 			</Row>
 
-			<Row className="mt-5">
-				<Col>
+			{/* Quick Search Examples Section */}
+			<Row className="justify-content-center mb-5">
+				<Col md={10}>
 					<h3 className="text-center mb-4 fw-bold">
 						<i className="bi bi-lightning-charge text-primary me-2"></i>
 						Quick Search Examples
 					</h3>
-					<div className="d-flex justify-content-center flex-wrap">
+					<div className="d-flex justify-content-center flex-wrap gap-2">
 						{['Apple', 'Tesla', 'AI', 'Market', 'Earnings'].map((term) => (
 							<Button 
 								key={term}
 								variant="outline-primary" 
-								className="m-1 rounded-pill px-4"
+								className="rounded-pill px-4 shadow-sm"
 								onClick={() => handleExampleSearch(term)}
 							>
 								{term}

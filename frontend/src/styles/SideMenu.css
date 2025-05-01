@@ -319,6 +319,9 @@
 @media (max-width: 767px) {
   .side-menu {
     padding: 12px 8px;
+    width: 100% !important; /* Force full width on mobile */
+    min-width: 100% !important;
+    max-width: 100% !important;
   }
   
   .side-menu-toggle {
@@ -328,38 +331,64 @@
   }
   
   .side-menu-toggle.open {
-    right: 280px;
+    right: 0; /* Align with the edge when menu is open */
   }
   
   .chart-container {
-    height: 160px;
+    height: auto;
+    min-height: 200px;
+    max-height: 300px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .analytics-card {
+    margin-bottom: 16px;
+  }
+
+  .analytics-card .card-body {
+    padding: 12px 8px;
   }
 }
 
 @media (max-width: 576px) {
   .side-menu {
-    padding: 12px 8px;
+    padding: 8px 4px;
   }
   
   .side-menu-toggle {
     top: 60px;
-    width: 40px !important;
-    height: 40px !important;
-  }
-  
-  .side-menu-toggle.open {
-    right: 100%;
-  }
-  
-  .side-menu-resize-handle {
-    display: none;
+    width: 38px !important;
+    height: 38px !important;
   }
   
   .chart-container {
-    height: 140px;
+    min-height: 180px;
+    max-height: 250px;
+  }
+  
+  .analytics-card .card-header {
+    padding: 8px;
   }
   
   .analytics-card .card-header h5 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+  }
+
+  .analytics-card .card-body {
+    padding: 8px 4px;
+  }
+}
+
+/* Add orientation specific styles */
+@media screen and (orientation: landscape) and (max-height: 576px) {
+  .side-menu {
+    height: 100%;
+    max-height: 100vh;
+  }
+
+  .chart-container {
+    min-height: 150px;
+    max-height: 200px;
   }
 } 

@@ -29,6 +29,9 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const sideMenuRef = useRef(null);
   const [tooltipText, setTooltipText] = useState('Open Analytics');
   
+  // Add mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -179,23 +182,24 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   // Calculate total for percentages
   const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
   
-  // Prepare chart options with more accessible colors and reduced padding
+  // Update chart options with mobile configurations
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom',
+        position: isMobile ? 'bottom' : 'bottom',
         align: 'start',
         labels: {
-          boxWidth: 10,
-          padding: 8,
+          boxWidth: isMobile ? 8 : 10,
+          padding: isMobile ? 4 : 8,
           font: {
-            size: 11
+            size: isMobile ? 10 : 11
           },
           color: '#495057',
           usePointStyle: true
         },
+        maxItems: isMobile ? 3 : undefined,
         margin: 0
       },
       tooltip: {
@@ -208,21 +212,21 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         borderColor: '#dee2e6',
         borderWidth: 1,
         titleFont: {
-          size: 11
+          size: isMobile ? 10 : 11
         },
         bodyFont: {
-          size: 11
+          size: isMobile ? 10 : 11
         },
-        padding: 6,
+        padding: isMobile ? 4 : 6,
         displayColors: true
       }
     },
     layout: {
       padding: {
-        left: 0,
-        right: 0,
-        top: 4,
-        bottom: 0
+        left: isMobile ? 0 : 0,
+        right: isMobile ? 0 : 0,
+        top: isMobile ? 2 : 4,
+        bottom: isMobile ? 2 : 0
       },
       autoPadding: true
     },
@@ -231,15 +235,17 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         beginAtZero: true,
         grid: {
           color: '#f0f0f0',
-          drawBorder: false
+          drawBorder: false,
+          display: !isMobile
         },
         ticks: {
           color: '#495057',
           font: {
-            size: 10
+            size: isMobile ? 9 : 10
           },
-          padding: 4,
-          maxTicksLimit: 5
+          padding: isMobile ? 2 : 4,
+          maxTicksLimit: isMobile ? 4 : 5,
+          display: true
         }
       },
       x: {
@@ -250,13 +256,13 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         ticks: {
           color: '#495057',
           font: {
-            size: 10
+            size: isMobile ? 9 : 10
           },
-          padding: 4,
-          maxRotation: 45,
-          minRotation: 45,
+          padding: isMobile ? 2 : 4,
+          maxRotation: isMobile ? 45 : 45,
+          minRotation: isMobile ? 45 : 45,
           autoSkip: true,
-          maxTicksLimit: 8
+          maxTicksLimit: isMobile ? 6 : 8
         }
       }
     }
@@ -313,8 +319,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         tension: 0.3,
         fill: true,
         pointBackgroundColor: 'rgba(67, 97, 238, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
     ],
   };
@@ -329,8 +335,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         backgroundColor: 'rgba(40, 167, 69, 0.1)',
         tension: 0.3,
         pointBackgroundColor: 'rgba(40, 167, 69, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
       {
         label: 'Neutral',
@@ -339,8 +345,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         backgroundColor: 'rgba(108, 117, 125, 0.1)',
         tension: 0.3,
         pointBackgroundColor: 'rgba(108, 117, 125, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
       {
         label: 'Negative',
@@ -349,8 +355,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         backgroundColor: 'rgba(220, 53, 69, 0.1)',
         tension: 0.3,
         pointBackgroundColor: 'rgba(220, 53, 69, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
     ],
   };
@@ -384,6 +390,16 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       </div>
     );
   };
+
+  // Add mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <>
