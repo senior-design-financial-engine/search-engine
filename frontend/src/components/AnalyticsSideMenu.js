@@ -21,8 +21,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [sentimentCounts, setSentimentCounts] = useState({ positive: 0, negative: 0, neutral: 0 });
   const [sourceCounts, setSourceCounts] = useState({});
   const [timeDistribution, setTimeDistribution] = useState({});
-  const [topCompanies, setTopCompanies] = useState([]);
-  const [topCategories, setTopCategories] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState({});
 
   const sideMenuRef = useRef(null);
@@ -114,69 +112,18 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       
       setTimeDistribution(times);
       setMonthlyTrends(monthlyData);
-
-      // Find top companies mentioned
-      const companies = {};
-      results.forEach(article => {
-        const articleCompanies = getCompanyData(article);
-        articleCompanies.forEach(company => {
-          const companyName = typeof company === 'string' ? company : company.name;
-          if (companyName) {
-            companies[companyName] = (companies[companyName] || 0) + 1;
-          }
-        });
-      });
-      
-      const sortedCompanies = Object.entries(companies)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ name, count }));
-      
-      setTopCompanies(sortedCompanies);
-
-      // Find top categories
-      const categories = {};
-      results.forEach(article => {
-        const articleCategories = getCategories(article);
-        articleCategories.forEach(category => {
-          if (category) {
-            categories[category] = (categories[category] || 0) + 1;
-          }
-        });
-      });
-      
-      const sortedCategories = Object.entries(categories)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ name, count }));
-      
-      setTopCategories(sortedCategories);
     }
   }, [results]);
 
-  // Helper function to extract company data from an article
-  const getCompanyData = (article) => {
-    if (article.companies && Array.isArray(article.companies)) {
-      return article.companies;
-    } else if (article.company_mentions && Array.isArray(article.company_mentions)) {
-      return article.company_mentions;
-    } else if (article.entities && Array.isArray(article.entities)) {
-      return article.entities.filter(entity => entity.type === 'ORGANIZATION');
-    }
-    return [];
-  };
+  // Add mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
 
-  // Helper function to extract categories from an article
-  const getCategories = (article) => {
-    if (article.categories && Array.isArray(article.categories)) {
-      return article.categories;
-    } else if (article.topics && Array.isArray(article.topics)) {
-      return article.topics;
-    } else if (article.tags && Array.isArray(article.tags)) {
-      return article.tags;
-    }
-    return [];
-  };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Calculate total for percentages
   const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
@@ -367,38 +314,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       <p className="text-muted mb-0">{message}</p>
     </div>
   );
-  
-  // Update the renderBadges function to be more compact
-  const renderBadges = (items, colorClass) => {
-    if (!items || items.length === 0) {
-      return <EmptyState icon="bi-tag" message="No data available" />;
-    }
-    
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {items.map((item, index) => (
-          <Badge 
-            key={index} 
-            bg={colorClass} 
-            text={colorClass === 'light' ? 'dark' : 'white'} 
-            className="border-0 rounded-pill py-1 px-2"
-          >
-            {item.name} <span className="opacity-75">({item.count})</span>
-          </Badge>
-        ))}
-      </div>
-    );
-  };
-
-  // Add mobile detection
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   return (
     <>
@@ -501,32 +416,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                 ) : (
                   <EmptyState icon="bi-newspaper" message="No source data available" />
                 )}
-              </Card.Body>
-            </Card>
-
-            {/* Top Companies */}
-              <Card className="analytics-card">
-                <Card.Header>
-                <h5 className="mb-0">
-                  <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Companies</span>
-                </h5>
-              </Card.Header>
-                <Card.Body className="d-flex align-items-center">
-                {renderBadges(topCompanies, 'light')}
-              </Card.Body>
-            </Card>
-
-            {/* Top Categories */}
-              <Card className="analytics-card">
-                <Card.Header>
-                <h5 className="mb-0">
-                  <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Categories</span>
-                </h5>
-              </Card.Header>
-                <Card.Body className="d-flex align-items-center">
-                {renderBadges(topCategories, 'info')}
               </Card.Body>
             </Card>
 
