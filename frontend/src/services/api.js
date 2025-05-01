@@ -653,40 +653,30 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		try {
 			console.log('Attempting primary request');
 			response = await primaryRequest();
+			
+			// Log the response structure for debugging
+			console.log('Primary request response:', {
+				hasArticles: !!response?.articles,
+				articleCount: response?.articles?.length || 0,
+				total: response?.total || 0
+			});
+			
+			// Since primaryRequest already returns formatted results, just return them
+			return response;
 		} catch (error) {
 			console.log('Primary failed, trying fallback');
 			console.log('Failure reason:', error.message);
 			response = await fallbackRequest();
+			
+			// Normalize fallback response
+			if (response.data && response.data.articles) {
+				return response.data;
+			}
+			return { articles: [], total: 0 };
 		}
-		
-		// Normalize the response format
-		console.log('Response received, normalizing format 3 ');
-		
-		let normalizedResponse;
-		if (Array.isArray(response)) {
-			normalizedResponse = { articles: response };
-		} else if (Array.isArray(response.data)) {
-			normalizedResponse = { articles: response.data };
-		} else if (response.data && response.data.articles) {
-			normalizedResponse = response.data;
-		} else {
-			console.log('No valid articles in response, returning empty array');
-			normalizedResponse = { articles: [] };
-		}
-		
-		// Log the scores to verify they're being passed through
-		if (normalizedResponse.articles && normalizedResponse.articles.length > 0) {
-			console.log('First 3 article scores:', normalizedResponse.articles.slice(0, 3).map(a => ({
-				id: a.id,
-				title: a.title?.substring(0, 30),
-				score: a.score
-			})));
-		}
-		
-		return normalizedResponse;
 	} catch (error) {
 		console.error('Search failed:', error.message);
-		return { articles: [] }; // Return empty results on error
+		return { articles: [], total: 0 }; // Return empty results on error
 	}
 };
 
