@@ -252,7 +252,18 @@ const queryElasticsearch = async (body) => {
 		}
 		
 		console.log(`Query successful with status: ${response.status}`);
-		return await safeJsonParse(response);
+		const parsedResponse = await safeJsonParse(response);
+		console.log('Raw Elasticsearch response:', {
+			hasHits: !!parsedResponse.hits,
+			totalHits: parsedResponse.hits?.total?.value,
+			numHits: parsedResponse.hits?.hits?.length,
+			firstHit: parsedResponse.hits?.hits?.[0] ? {
+				id: parsedResponse.hits.hits[0]._id,
+				score: parsedResponse.hits.hits[0]._score,
+				source: Object.keys(parsedResponse.hits.hits[0]._source || {})
+			} : null
+		});
+		return parsedResponse;
 	} catch (error) {
 		console.error(`Query failed:`, {
 			message: error.message
@@ -263,6 +274,13 @@ const queryElasticsearch = async (body) => {
 
 // Format ES results to match API response format
 const formatSearchResults = (esResults) => {
+	console.log('Formatting search results:', {
+		hasResults: !!esResults,
+		hasHits: !!esResults?.hits,
+		hasHitsArray: !!esResults?.hits?.hits,
+		numHits: esResults?.hits?.hits?.length || 0
+	});
+
 	if (!esResults || !esResults.hits || !esResults.hits.hits) {
 		console.log('No valid results in ES response');
 		return { articles: [] };
@@ -306,10 +324,23 @@ const formatSearchResults = (esResults) => {
 		};
 	});
 	
-	return {
+	const result = {
 		articles,
 		total: esResults.hits.total?.value || 0
 	};
+	
+	console.log('Formatted results:', {
+		numArticles: result.articles.length,
+		total: result.total,
+		firstArticle: result.articles[0] ? {
+			id: result.articles[0].id,
+			headline: result.articles[0].headline,
+			score: result.articles[0].score,
+			relevance_score: result.articles[0].relevance_score
+		} : null
+	});
+	
+	return result;
 };
 
 // Helper function to retry failed requests with fallback
@@ -656,9 +687,16 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			
 			// Log the response structure for debugging
 			console.log('Primary request response:', {
+				hasResponse: !!response,
 				hasArticles: !!response?.articles,
 				articleCount: response?.articles?.length || 0,
-				total: response?.total || 0
+				total: response?.total || 0,
+				firstArticle: response?.articles?.[0] ? {
+					id: response.articles[0].id,
+					headline: response.articles[0].headline,
+					score: response.articles[0].score,
+					relevance_score: response.articles[0].relevance_score
+				} : null
 			});
 			
 			// Since primaryRequest already returns formatted results, just return them
@@ -667,6 +705,14 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 			console.log('Primary failed, trying fallback');
 			console.log('Failure reason:', error.message);
 			response = await fallbackRequest();
+			
+			// Log fallback response
+			console.log('Fallback response:', {
+				hasResponse: !!response,
+				hasData: !!response?.data,
+				hasArticles: !!response?.data?.articles,
+				articleCount: response?.data?.articles?.length || 0
+			});
 			
 			// Normalize fallback response
 			if (response.data && response.data.articles) {
