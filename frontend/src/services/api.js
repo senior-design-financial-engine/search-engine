@@ -430,8 +430,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						range: {
 							"published_at": {
 								gte: startDate.toISOString(),
-								lte: nowUTC.toISOString(),
-								format: "strict_date_time"
+								lte: nowUTC.toISOString()
 							}
 						}
 					});
@@ -441,9 +440,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						normalizedTimeRange: effectiveTimeRange,
 						daysToSubtract,
 						startDateUTC: startDate.toISOString(),
-						nowUTC: nowUTC.toISOString(),
-						localStartDate: startDate.toString(),
-						localNow: now.toString()
+						nowUTC: nowUTC.toISOString()
 					});
 				}
 				
@@ -456,8 +453,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						}
 					},
 					sort: [
-						{ "_score": { "order": "desc" } },
-						{ "published_at": { "order": "desc", "missing": "_last" } }
+						{ "_score": { "order": "desc" } }
 					],
 					size: 20,
 					track_scores: true,
@@ -478,11 +474,33 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					results = await queryElasticsearch(esQuery);
 				} catch (error) {
 					console.error('Elasticsearch query failed:', error);
-					// If the error is related to mapping, try without date sorting
-					if (error.message.includes('No mapping found') || error.message.includes('fielddata')) {
-						console.log('Retrying without date sorting...');
-						esQuery.sort = [{ "_score": { "order": "desc" } }]; // Only sort by score
-						results = await queryElasticsearch(esQuery);
+					
+					// If we get a fielddata error, try a simpler query
+					if (error.message.includes('fielddata') || error.message.includes('No mapping found')) {
+						console.log('Retrying with simpler query...');
+						// Simplify the query to just basic matching and date range
+						const simpleQuery = {
+							query: {
+								bool: {
+									must: [
+										{
+											multi_match: {
+												query: query,
+												fields: ["headline^2", "content"]
+											}
+										}
+									]
+								}
+							},
+							size: 20
+						};
+						
+						// Add date range if present
+						if (must.length > 0) {
+							simpleQuery.query.bool.must.push(...must);
+						}
+						
+						results = await queryElasticsearch(simpleQuery);
 					} else {
 						throw error;
 					}
