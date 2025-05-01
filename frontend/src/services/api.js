@@ -264,6 +264,7 @@ const queryElasticsearch = async (body) => {
 // Format ES results to match API response format
 const formatSearchResults = (esResults) => {
 	if (!esResults || !esResults.hits || !esResults.hits.hits) {
+		console.log('No valid results in ES response');
 		return { articles: [] };
 	}
 	
@@ -276,13 +277,37 @@ const formatSearchResults = (esResults) => {
 		})));
 	}
 	
-	return {
-		articles: esResults.hits.hits.map(hit => ({
+	// Get max score for normalization
+	const maxScore = Math.max(...esResults.hits.hits.map(hit => hit._score || 0));
+	
+	// Transform hits into articles
+	const articles = esResults.hits.hits.map(hit => {
+		// Extract source data
+		const source = hit._source || {};
+		
+		// Normalize score to percentage
+		const normalizedScore = maxScore > 0 ? 
+			((hit._score || 0) / maxScore * 100).toFixed(1) : 0;
+		
+		return {
 			id: hit._id,
-			relevance_score: hit._score ? (hit._score / Math.max(...esResults.hits.hits.map(h => h._score)) * 100).toFixed(1) : 0, // Normalize score to percentage
+			relevance_score: parseFloat(normalizedScore),
 			score: hit._score || 0,
-			...hit._source
-		})),
+			headline: source.headline || '',
+			content: source.content || '',
+			summary: source.summary || '',
+			url: source.url || '',
+			source: source.source || '',
+			published_at: source.published_at || '',
+			sentiment: source.sentiment || '',
+			sentiment_score: source.sentiment_score || 0,
+			categories: source.categories || [],
+			companies: source.companies || []
+		};
+	});
+	
+	return {
+		articles,
 		total: esResults.hits.total?.value || 0
 	};
 };

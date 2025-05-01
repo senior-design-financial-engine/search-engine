@@ -48,11 +48,9 @@ function Results() {
             activeFilters.sentiment || undefined
           );
           
-          // Transform results to ensure consistent structure
-          const normalizedResults = Array.isArray(searchResults) ? searchResults : 
-            (searchResults.articles || []);
-          
-          setResults(normalizedResults);
+          // Ensure we're getting the articles array from the response
+          const articles = searchResults?.articles || [];
+          setResults(articles);
         }
       } catch (error) {
         console.error('Error fetching search results:', error);
