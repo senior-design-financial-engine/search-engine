@@ -361,28 +361,28 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
     ],
   };
 
-  // Empty state component
+  // Update the EmptyState component to be more compact
   const EmptyState = ({ icon, message }) => (
     <div className="empty-state">
-      <i className={`bi ${icon}`} aria-hidden="true"></i>
-      <p className="text-muted mb-0 text-center">{message}</p>
+      <i className={`bi ${icon} mb-2 d-block`} style={{ fontSize: '1.5rem', opacity: 0.6 }} aria-hidden="true"></i>
+      <p className="text-muted mb-0">{message}</p>
     </div>
   );
   
-  // Function to render badge items
+  // Update the renderBadges function to be more compact
   const renderBadges = (items, colorClass) => {
     if (!items || items.length === 0) {
       return <EmptyState icon="bi-tag" message="No data available" />;
     }
     
     return (
-      <div className="d-flex flex-wrap">
+      <div className="d-flex flex-wrap gap-2">
         {items.map((item, index) => (
           <Badge 
             key={index} 
             bg={colorClass} 
             text={colorClass === 'light' ? 'dark' : 'white'} 
-            className="me-2 mb-2 border-0 rounded-pill py-1 px-2"
+            className="border-0 rounded-pill py-1 px-2"
           >
             {item.name} <span className="opacity-75">({item.count})</span>
           </Badge>
@@ -451,11 +451,11 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           {results && results.length > 0 ? (
             <>
               {/* Sentiment Distribution */}
-              <Card className="analytics-card primary">
+              <Card className="analytics-card">
                 <Card.Header>
                   <h5 className="mb-0">
                     <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
-                    <span>Sentiment Distribution</span>
+                    Sentiment Distribution
                   </h5>
                 </Card.Header>
                 <Card.Body>
@@ -466,7 +466,10 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                         options={{
                           ...chartOptions,
                           maintainAspectRatio: false,
-                          responsive: true
+                          responsive: true,
+                          layout: {
+                            padding: 0
+                          }
                         }} 
                       />
                     </div>
@@ -582,7 +585,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
             </>
           ) : (
             <div className="text-center py-4">
-              <i className="bi bi-bar-chart text-muted" style={{fontSize: "2.5rem", opacity: 0.4}} aria-hidden="true"></i>
+              <i className="bi bi-bar-chart text-muted" style={{fontSize: "2rem", opacity: 0.4}} aria-hidden="true"></i>
               <p className="mt-2 text-muted">No data available for analytics</p>
               <small className="text-muted d-block">Search for results to see analysis</small>
             </div>

@@ -227,8 +227,20 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
 }
 
+.analytics-card .card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.analytics-card .card-header h5 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+}
+
 .analytics-card .card-body {
   padding: 16px;
+  height: auto;
 }
 
 /* Chart container styles */
@@ -237,43 +249,17 @@
   width: 100%;
   height: 300px;
   margin: 0;
-  padding: 8px 0;
 }
 
-/* Special handling for badge containers */
+/* Badge containers */
 .analytics-card .card-body.d-flex.align-items-center {
-  min-height: auto;
-  padding: 16px;
+  padding: 12px 16px;
 }
 
-/* Add spacing between chart and legend */
-.chart-container canvas {
-  margin: 0;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Ensure proper spacing for badge containers */
-.d-flex.flex-wrap {
-  gap: 6px;
-  padding: 4px 0;
-}
-
-/* Adjust empty state padding */
+/* Empty state styles */
 .empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  color: #6c757d;
-  height: 100%;
-}
-
-.empty-state i {
-  font-size: 2rem;
-  margin-bottom: 8px;
-  opacity: 0.6;
+  padding: 24px 16px;
+  text-align: center;
 }
 
 /* Active state styles */
@@ -325,6 +311,10 @@
 
   .analytics-card .card-body {
     padding: 12px;
+  }
+
+  .analytics-card .card-header {
+    padding: 10px 12px;
   }
 }
 
