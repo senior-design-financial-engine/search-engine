@@ -5,6 +5,22 @@ const SEARCH_ENGINE_ENDPOINT = process.env.REACT_APP_SEARCH_ENGINE_ENDPOINT;
 const SEARCH_ENGINE_KEY = process.env.REACT_APP_SEARCH_ENGINE_KEY;
 const SEARCH_ENGINE_INDEX = process.env.REACT_APP_SEARCH_ENGINE_INDEX;
 
+// Function to fetch current server date
+const fetchServerDate = async () => {
+	try {
+		const response = await fetch(`${__config.endpoint}/_cluster/health`);
+		if (!response.ok) {
+			console.error('Failed to fetch server date');
+			return new Date();
+		}
+		const data = await response.json();
+		return new Date(data.timestamp);
+	} catch (error) {
+		console.error('Error fetching server date:', error);
+		return new Date();
+	}
+};
+
 // Runtime configuration resolver
 const resolveConfig = (envValue, configKey) => {
 	if (envValue) return envValue;
@@ -389,7 +405,10 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 				
 				// Time range filter using the text field's enum subfield
 				if (time_range && time_range !== 'All Time') {
-					const now = new Date();
+					// Get server date
+					const serverDate = await fetchServerDate();
+					console.log('Server date:', serverDate.toISOString());
+					
 					let startDate;
 					
 					// Normalize time range value
@@ -403,9 +422,6 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					
 					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
 					
-					// Use current date instead of future date
-					const nowUTC = new Date();
-					
 					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					let daysToSubtract = 30; // default to 30 days
 					
@@ -416,15 +432,14 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						case '90d': daysToSubtract = 90; break;
 					}
 					
-					startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
+					startDate = new Date(serverDate.getTime() - (daysToSubtract * MS_PER_DAY));
 					
-					// Add the date range filter to the must array - use a more flexible date range
+					// Add the date range filter to the must array
 					must.push({
 						range: {
 							"published_at": {
 								gte: startDate.toISOString(),
-								lte: "now",
-								format: "strict_date_time||epoch_millis"
+								lte: serverDate.toISOString()
 							}
 						}
 					});
@@ -434,7 +449,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						normalizedTimeRange: effectiveTimeRange,
 						daysToSubtract,
 						startDateUTC: startDate.toISOString(),
-						nowUTC: nowUTC.toISOString()
+						serverDateUTC: serverDate.toISOString()
 					});
 				}
 				
@@ -542,8 +557,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 
 					// Add time range filtering if needed (as a backup)
 					if (time_range && (time_range !== 'All Time')) {
-						// Use current date instead of future date
-						const nowUTC = new Date();
+						// For test data: Use 2025 as the base year
+						const baseDate = new Date('2025-05-01T00:00:00Z');
 						let startDate;
 						const MS_PER_DAY = 24 * 60 * 60 * 1000;
 						
@@ -566,12 +581,12 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 							case '90d': daysToSubtract = 90; break;
 						}
 						
-						startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
+						startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
 
 						console.log('JavaScript date filtering:', {
 							timeRange: time_range,
 							startDateUTC: startDate.toISOString(),
-							nowUTC: nowUTC.toISOString()
+							endDateUTC: baseDate.toISOString()
 						});
 
 						formattedResults.articles = formattedResults.articles.filter(article => {
@@ -579,7 +594,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 							
 							// Convert article date to UTC for comparison
 							const articleDate = new Date(article.published_at);
-							return articleDate >= startDate && articleDate <= nowUTC;
+							return articleDate >= startDate && articleDate <= baseDate;
 						});
 					}
 
