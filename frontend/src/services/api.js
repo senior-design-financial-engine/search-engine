@@ -470,10 +470,16 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					});
 				}
 				
-				// Keep sentiment as dummy variable but don't actually filter
+				// Sentiment filter
 				if (sentiment && sentiment !== 'All Sentiments') {
-					// We keep the sentiment check in the code but it won't affect results
-					console.log('Sentiment filter applied:', sentiment);
+					must.push({
+						term: {
+							"sentiment.enum": {
+								value: sentiment.toLowerCase(),
+								case_insensitive: true
+							}
+						}
+					});
 				}
 				
 				// Time range filter using the text field's enum subfield
@@ -673,6 +679,13 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 							const articleDate = article.published_at;
 							return articleDate >= startDateFormatted && articleDate <= endDateFormatted;
 						});
+					}
+
+					// Add sentiment filtering as a backup
+					if (sentiment && sentiment !== 'All Sentiments') {
+						formattedResults.articles = formattedResults.articles.filter(article => 
+							article.sentiment && article.sentiment.toLowerCase() === sentiment.toLowerCase()
+						);
 					}
 
 					return formattedResults;
