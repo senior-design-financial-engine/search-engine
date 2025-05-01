@@ -10,11 +10,13 @@
   transition: all 0.3s ease;
   z-index: 1030;
   overflow-y: auto;
-  padding: 16px;
+  padding: 12px;
   border-left: 1px solid var(--border, #e9ecef);
   resize: horizontal;
   max-width: 600px;
   min-width: 280px;
+  display: flex;
+  flex-direction: column;
 }
 
 .side-menu.open {
@@ -159,9 +161,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border, #eee);
+  flex-shrink: 0;
 }
 
 .side-menu-resize-handle {
@@ -209,12 +212,14 @@
 
 /* Card styles with reduced spacing */
 .analytics-card {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border-radius: var(--radius-md, 8px);
   overflow: hidden;
   transition: all 0.2s ease;
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  display: flex;
+  flex-direction: column;
 }
 
 .analytics-card:hover {
@@ -227,13 +232,17 @@
 }
 
 .analytics-card .card-header {
-  padding: 12px;
+  padding: 8px 12px;
   background-color: var(--white, #fff);
   border-bottom: 1px solid rgba(0,0,0,0.05);
+  flex-shrink: 0;
 }
 
 .analytics-card .card-body {
-  padding: 12px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .analytics-card .card-header h5 {
@@ -242,19 +251,26 @@
 }
 
 .chart-container {
-  height: 200px;
-  margin-bottom: 0;
+  height: 180px;
+  margin: 0;
   position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 /* Add spacing between chart and legend */
 .chart-container canvas {
-  margin-bottom: 8px;
+  margin: 0;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Ensure proper spacing for badge containers */
 .d-flex.flex-wrap {
-  gap: 8px;
+  gap: 6px;
   padding: 4px 0;
 }
 
@@ -264,8 +280,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: 16px;
   color: #6c757d;
+  height: 100%;
 }
 
 .empty-state i {
@@ -301,8 +318,7 @@
 /* Responsive adjustments with more breakpoints */
 @media (max-width: 767px) {
   .side-menu {
-    width: 280px;
-    padding: 16px 12px;
+    padding: 12px 8px;
   }
   
   .side-menu-toggle {
@@ -316,16 +332,13 @@
   }
   
   .chart-container {
-    height: 180px;
+    height: 160px;
   }
 }
 
 @media (max-width: 576px) {
   .side-menu {
-    width: 100%;
-    right: -100%;
-    padding: 16px 12px;
-    resize: none;
+    padding: 12px 8px;
   }
   
   .side-menu-toggle {
@@ -343,7 +356,7 @@
   }
   
   .chart-container {
-    height: 160px;
+    height: 140px;
   }
   
   .analytics-card .card-header h5 {

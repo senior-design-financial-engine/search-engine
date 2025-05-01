@@ -259,35 +259,21 @@
 
 /* Search header */
 .search-header {
-  background-color: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  z-index: 1010;
-  padding: 1.25rem 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
+  background-color: white;
+  padding: 2rem 0;
+  border-bottom: 1px solid #e9ecef;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 /* Fix for filter overlapping */
 .filter-row {
-  background-color: #ffffff;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
-  margin-top: 20px;
-  margin-bottom: 15px;
   display: flex;
+  gap: 1rem;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
 }
 
 .filter-col {
-  margin-bottom: 10px;
-  flex: 0 0 auto;
+  flex: 1;
   min-width: 200px;
 }
 
@@ -305,23 +291,12 @@
 
 /* Search Results Title */
 .results-title {
-  margin-top: 25px;
-  margin-bottom: 25px;
-  font-weight: 600;
+  margin-bottom: 1.5rem;
 }
 
 /* Back button styling */
 .back-button {
-  margin-bottom: 20px;
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.back-button:hover {
-  transform: translateX(-3px);
+  margin-bottom: 1rem;
 }
 
 /* Empty state */
@@ -422,9 +397,10 @@
 
 /* Search Header Enhancement */
 .search-header {
-  background-color: rgba(255, 255, 255, 0.95);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  background-color: white;
+  padding: 2rem 0;
+  border-bottom: 1px solid #e9ecef;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 /* Filter Section Enhancement */
@@ -448,4 +424,19 @@
   background-color: #ffffff;
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
   transition: all 0.2s ease-in-out;
+}
+
+/* Collapse animation */
+.collapse {
+  transition: height 0.35s ease;
+}
+
+.collapse:not(.show) {
+  display: none;
+}
+
+.collapsing {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.35s ease;
 }

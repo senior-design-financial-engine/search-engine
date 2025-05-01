@@ -403,15 +403,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					
 					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
 					
-					// Use UTC dates to avoid timezone issues
-					const nowUTC = new Date(Date.UTC(
-						now.getUTCFullYear(),
-						now.getUTCMonth(),
-						now.getUTCDate(),
-						now.getUTCHours(),
-						now.getUTCMinutes(),
-						now.getUTCSeconds()
-					));
+					// Use current date instead of future date
+					const nowUTC = new Date();
 					
 					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					let daysToSubtract = 30; // default to 30 days
@@ -425,12 +418,13 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					
 					startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
 					
-					// Add the date range filter to the must array - only use published_at
+					// Add the date range filter to the must array - use a more flexible date range
 					must.push({
 						range: {
 							"published_at": {
 								gte: startDate.toISOString(),
-								lte: nowUTC.toISOString()
+								lte: "now",
+								format: "strict_date_time||epoch_millis"
 							}
 						}
 					});
@@ -444,140 +438,156 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					});
 				}
 				
-				const esQuery = {
+				// First try a simple existence query to check if we have any data
+				const checkDataQuery = {
 					query: {
-						bool: { 
-							must,
-							should,
-							minimum_should_match: 1
-						}
+						match_all: {}
 					},
-					sort: [
-						{ "_score": { "order": "desc" } }
-					],
-					size: 20,
-					track_scores: true,
-					highlight: {
-						fields: {
-							"headline": { number_of_fragments: 0 },
-							"content": { number_of_fragments: 3, fragment_size: 150 }
-						},
-						pre_tags: ["<mark>"],
-						post_tags: ["</mark>"]
-					}
+					size: 1
 				};
-				
-				console.log('Query:', JSON.stringify(esQuery));
-				
-				let results;
+
+				console.log('Checking for data existence...');
+				let checkResults;
 				try {
-					results = await queryElasticsearch(esQuery);
+					checkResults = await queryElasticsearch(checkDataQuery);
+					console.log('Data check results:', {
+						total: checkResults.hits?.total?.value || 0,
+						hasHits: (checkResults.hits?.hits || []).length > 0
+					});
 				} catch (error) {
-					console.error('Elasticsearch query failed:', error);
-					
-					// If we get a fielddata error, try a simpler query
-					if (error.message.includes('fielddata') || error.message.includes('No mapping found')) {
-						console.log('Retrying with simpler query...');
-						// Simplify the query to just basic matching and date range
-						const simpleQuery = {
-							query: {
-								bool: {
-									must: [
-										{
-											multi_match: {
-												query: query,
-												fields: ["headline^2", "content"]
-											}
-										}
-									]
-								}
+					console.error('Data check failed:', error);
+				}
+
+				// Proceed with main query only if we have data
+				if (checkResults?.hits?.total?.value > 0) {
+					const esQuery = {
+						query: {
+							bool: { 
+								must,
+								should,
+								minimum_should_match: 1
+							}
+						},
+						sort: [
+							{ "_score": { "order": "desc" } }
+						],
+						size: 20,
+						track_scores: true,
+						highlight: {
+							fields: {
+								"headline": { number_of_fragments: 0 },
+								"content": { number_of_fragments: 3, fragment_size: 150 }
 							},
-							size: 20
-						};
-						
-						// Add date range if present
-						if (must.length > 0) {
-							simpleQuery.query.bool.must.push(...must);
+							pre_tags: ["<mark>"],
+							post_tags: ["</mark>"]
 						}
-						
-						results = await queryElasticsearch(simpleQuery);
-					} else {
-						throw error;
-					}
-				}
-				
-				// Format the results
-				const formattedResults = formatSearchResults(results);
-
-				// Add source filtering if needed (as a backup)
-				if (source && source !== 'All Sources') {
-					formattedResults.articles = formattedResults.articles.filter(
-						article => article.source && article.source.toLowerCase() === source.toLowerCase()
-					);
-				}
-
-				// Add time range filtering if needed (as a backup)
-				if (time_range && (time_range !== 'All Time')) {
-					// Use UTC dates to avoid timezone issues
-					const now = new Date();
-					const nowUTC = new Date(Date.UTC(
-						now.getUTCFullYear(),
-						now.getUTCMonth(),
-						now.getUTCDate(),
-						now.getUTCHours(),
-						now.getUTCMinutes(),
-						now.getUTCSeconds()
-					));
-					
-					let startDate;
-					const MS_PER_DAY = 24 * 60 * 60 * 1000;
-					
-					// Use the same time range normalization as above
-					const normalizedTimeRange = time_range.toLowerCase();
-					const timeRangeMap = {
-						'day': '1d',
-						'week': '7d',
-						'month': '30d',
-						'quarter': '90d'
 					};
 					
-					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
-					let daysToSubtract = 30; // default to 30 days
+					console.log('Query:', JSON.stringify(esQuery));
 					
-					switch (effectiveTimeRange) {
-						case '1d': daysToSubtract = 1; break;
-						case '7d': daysToSubtract = 7; break;
-						case '30d': daysToSubtract = 30; break;
-						case '90d': daysToSubtract = 90; break;
+					let results;
+					try {
+						results = await queryElasticsearch(esQuery);
+						console.log('Query results:', {
+							total: results.hits?.total?.value || 0,
+							hasHits: (results.hits?.hits || []).length > 0
+						});
+					} catch (error) {
+						console.error('Elasticsearch query failed:', error);
+						
+						// If we get a fielddata error, try a simpler query
+						if (error.message.includes('fielddata') || error.message.includes('No mapping found')) {
+							console.log('Retrying with simpler query...');
+							// Simplify the query to just basic matching and date range
+							const simpleQuery = {
+								query: {
+									bool: {
+										must: [
+											{
+												multi_match: {
+													query: query,
+													fields: ["headline^2", "content"]
+												}
+											}
+										]
+									}
+								},
+								size: 20
+							};
+							
+							// Add date range if present
+							if (must.length > 0) {
+								simpleQuery.query.bool.must.push(...must);
+							}
+							
+							results = await queryElasticsearch(simpleQuery);
+							console.log('Simple query results:', {
+								total: results.hits?.total?.value || 0,
+								hasHits: (results.hits?.hits || []).length > 0
+							});
+						} else {
+							throw error;
+						}
 					}
 					
-					startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
+					// Format the results
+					const formattedResults = formatSearchResults(results);
 
-					console.log('JavaScript date filtering:', {
-						timeRange: time_range,
-						startDateUTC: startDate.toISOString(),
-						nowUTC: nowUTC.toISOString()
-					});
+					// Add source filtering if needed (as a backup)
+					if (source && source !== 'All Sources') {
+						formattedResults.articles = formattedResults.articles.filter(
+							article => article.source && article.source.toLowerCase() === source.toLowerCase()
+						);
+					}
 
-					formattedResults.articles = formattedResults.articles.filter(article => {
-						if (!article.published_at) return false;
+					// Add time range filtering if needed (as a backup)
+					if (time_range && (time_range !== 'All Time')) {
+						// Use current date instead of future date
+						const nowUTC = new Date();
+						let startDate;
+						const MS_PER_DAY = 24 * 60 * 60 * 1000;
 						
-						// Convert article date to UTC for comparison
-						const articleDate = new Date(article.published_at);
-						const articleUTC = new Date(Date.UTC(
-							articleDate.getUTCFullYear(),
-							articleDate.getUTCMonth(),
-							articleDate.getUTCDate(),
-							articleDate.getUTCHours(),
-							articleDate.getUTCMinutes(),
-							articleDate.getUTCSeconds()
-						));
+						// Use the same time range normalization as above
+						const normalizedTimeRange = time_range.toLowerCase();
+						const timeRangeMap = {
+							'day': '1d',
+							'week': '7d',
+							'month': '30d',
+							'quarter': '90d'
+						};
 						
-						return articleUTC >= startDate && articleUTC <= nowUTC;
-					});
+						const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
+						let daysToSubtract = 30; // default to 30 days
+						
+						switch (effectiveTimeRange) {
+							case '1d': daysToSubtract = 1; break;
+							case '7d': daysToSubtract = 7; break;
+							case '30d': daysToSubtract = 30; break;
+							case '90d': daysToSubtract = 90; break;
+						}
+						
+						startDate = new Date(nowUTC.getTime() - (daysToSubtract * MS_PER_DAY));
+
+						console.log('JavaScript date filtering:', {
+							timeRange: time_range,
+							startDateUTC: startDate.toISOString(),
+							nowUTC: nowUTC.toISOString()
+						});
+
+						formattedResults.articles = formattedResults.articles.filter(article => {
+							if (!article.published_at) return false;
+							
+							// Convert article date to UTC for comparison
+							const articleDate = new Date(article.published_at);
+							return articleDate >= startDate && articleDate <= nowUTC;
+						});
+					}
+
+					return formattedResults;
+				} else {
+					console.log('No data found in index');
+					return { articles: [] };
 				}
-				
-				return { data: formattedResults };
 			} else {
 				console.log('Configuration error, using fallback', __config.endpoint);
 				throw new Error('Configuration error');
