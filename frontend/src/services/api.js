@@ -5,6 +5,39 @@ const SEARCH_ENGINE_ENDPOINT = process.env.REACT_APP_SEARCH_ENGINE_ENDPOINT;
 const SEARCH_ENGINE_KEY = process.env.REACT_APP_SEARCH_ENGINE_KEY;
 const SEARCH_ENGINE_INDEX = process.env.REACT_APP_SEARCH_ENGINE_INDEX;
 
+// Function to fetch current server date
+const fetchServerDate = async () => {
+	try {
+		const response = await fetch(`${__config.endpoint}/_cluster/health`);
+		if (!response.ok) {
+			console.error('Failed to fetch server date');
+			return new Date();
+		}
+		const data = await response.json();
+		return new Date(data.timestamp);
+	} catch (error) {
+		console.error('Error fetching server date:', error);
+		return new Date();
+	}
+};
+
+// Function to format date for Elasticsearch query
+const formatDateForES = (date) => {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	const seconds = String(date.getSeconds()).padStart(2, '0');
+	return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+// Function to get current date
+const getCurrentDate = () => {
+	const now = new Date();
+	return now;
+};
+
 // Runtime configuration resolver
 const resolveConfig = (envValue, configKey) => {
 	if (envValue) return envValue;
@@ -236,7 +269,18 @@ const queryElasticsearch = async (body) => {
 		}
 		
 		console.log(`Query successful with status: ${response.status}`);
-		return await safeJsonParse(response);
+		const parsedResponse = await safeJsonParse(response);
+		console.log('Raw Elasticsearch response:', {
+			hasHits: !!parsedResponse.hits,
+			totalHits: parsedResponse.hits?.total?.value,
+			numHits: parsedResponse.hits?.hits?.length,
+			firstHit: parsedResponse.hits?.hits?.[0] ? {
+				id: parsedResponse.hits.hits[0]._id,
+				score: parsedResponse.hits.hits[0]._score,
+				source: Object.keys(parsedResponse.hits.hits[0]._source || {})
+			} : null
+		});
+		return parsedResponse;
 	} catch (error) {
 		console.error(`Query failed:`, {
 			message: error.message
@@ -247,8 +291,16 @@ const queryElasticsearch = async (body) => {
 
 // Format ES results to match API response format
 const formatSearchResults = (esResults) => {
+	console.log('Formatting search results:', {
+		hasResults: !!esResults,
+		hasHits: !!esResults?.hits,
+		hasHitsArray: !!esResults?.hits?.hits,
+		numHits: esResults?.hits?.hits?.length || 0
+	});
+
 	if (!esResults || !esResults.hits || !esResults.hits.hits) {
-		return { articles: [] };
+		console.log('No valid results in ES response');
+		return { articles: [], total: 0 };
 	}
 	
 	// Log scoring information for debugging
@@ -260,15 +312,52 @@ const formatSearchResults = (esResults) => {
 		})));
 	}
 	
-	return {
-		articles: esResults.hits.hits.map(hit => ({
+	// Get max score for normalization
+	const maxScore = Math.max(...esResults.hits.hits.map(hit => hit._score || 0));
+	
+	// Transform hits into articles
+	const articles = esResults.hits.hits.map(hit => {
+		// Extract source data
+		const source = hit._source || {};
+		
+		// Normalize score to percentage
+		const normalizedScore = maxScore > 0 ? 
+			((hit._score || 0) / maxScore * 100).toFixed(1) : 0;
+		
+		return {
 			id: hit._id,
-			relevance_score: hit._score ? (hit._score / Math.max(...esResults.hits.hits.map(h => h._score)) * 100).toFixed(1) : 0, // Normalize score to percentage
+			relevance_score: parseFloat(normalizedScore),
 			score: hit._score || 0,
-			...hit._source
-		})),
+			headline: source.headline || '',
+			content: source.content || '',
+			summary: source.summary || '',
+			url: source.url || '',
+			source: source.source || '',
+			published_at: source.published_at || '',
+			sentiment: source.sentiment || '',
+			sentiment_score: source.sentiment_score || 0,
+			categories: source.categories || [],
+			companies: source.companies || []
+		};
+	});
+	
+	const result = {
+		articles,
 		total: esResults.hits.total?.value || 0
 	};
+	
+	console.log('Formatted results:', {
+		numArticles: result.articles.length,
+		total: result.total,
+		firstArticle: result.articles[0] ? {
+			id: result.articles[0].id,
+			headline: result.articles[0].headline,
+			score: result.articles[0].score,
+			relevance_score: result.articles[0].relevance_score
+		} : null
+	});
+	
+	return result;
 };
 
 // Helper function to retry failed requests with fallback
@@ -381,124 +470,229 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					});
 				}
 				
-				// Keep sentiment as dummy variable but don't actually filter
+				// Sentiment filter
 				if (sentiment && sentiment !== 'All Sentiments') {
-					// We keep the sentiment check in the code but it won't affect results
-					console.log('Sentiment filter applied:', sentiment);
+					must.push({
+						term: {
+							"sentiment.enum": {
+								value: sentiment.toLowerCase(),
+								case_insensitive: true
+							}
+						}
+					});
 				}
 				
 				// Time range filter using the text field's enum subfield
 				if (time_range && time_range !== 'All Time') {
-					const now = new Date();
+					const baseDate = getCurrentDate();
 					let startDate;
+					const MS_PER_DAY = 24 * 60 * 60 * 1000;
 					
-					switch (time_range) {
-						case '1d': startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); break;
-						case '7d': startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
-						case '30d': startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
-						case '90d': startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
-						default: startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+					// Normalize time range value
+					const normalizedTimeRange = time_range.toLowerCase();
+					const timeRangeMap = {
+						'day': '1d',
+						'week': '7d',
+						'month': '30d',
+						'quarter': '90d'
+					};
+					
+					const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
+					let daysToSubtract = 30; // default to 30 days
+					
+					switch (effectiveTimeRange) {
+						case '1d': daysToSubtract = 1; break;
+						case '7d': daysToSubtract = 7; break;
+						case '30d': daysToSubtract = 30; break;
+						case '90d': daysToSubtract = 90; break;
 					}
 					
-					// Convert dates to ISO strings for exact matching with the enum field
+					startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
+					
+					// Format dates for Elasticsearch query
+					const startDateFormatted = formatDateForES(startDate);
+					const endDateFormatted = formatDateForES(baseDate);
+					
+					// Add the date range filter using the formatted dates
 					must.push({
 						range: {
 							"published_at.enum": {
-								gte: startDate.toISOString(),
-								lte: now.toISOString(),
-								format: "strict_date_time"
+								gte: startDateFormatted,
+								lte: endDateFormatted
 							}
 						}
 					});
 
-					// Add a backup filter using the updated_at field which is a proper date type
-					must.push({
-						range: {
-							"updated_at": {
-								gte: startDate.toISOString(),
-								lte: now.toISOString()
-							}
-						}
+					console.log('Date filtering:', {
+						originalTimeRange: time_range,
+						normalizedTimeRange: effectiveTimeRange,
+						daysToSubtract,
+						startDateFormatted,
+						endDateFormatted
 					});
 				}
 				
-				const esQuery = {
+				// First try a simple existence query to check if we have any data
+				const checkDataQuery = {
 					query: {
-						bool: { 
-							must,
-							should,
-							minimum_should_match: 1
-						}
+						match_all: {}
 					},
-					sort: [
-						{ "_score": { "order": "desc" } },
-						{ "published_at.enum": { "order": "desc", "missing": "_last" } }
-					],
-					size: 20,
-					track_scores: true,
-					highlight: {
-						fields: {
-							"headline": { number_of_fragments: 0 },
-							"content": { number_of_fragments: 3, fragment_size: 150 }
-						},
-						pre_tags: ["<mark>"],
-						post_tags: ["</mark>"]
-					}
+					size: 1
 				};
-				
-				console.log('Query:', JSON.stringify(esQuery));
-				
-				let results;
+
+				console.log('Checking for data existence...');
+				let checkResults;
 				try {
-					results = await queryElasticsearch(esQuery);
-				} catch (error) {
-					console.error('Elasticsearch query failed:', error);
-					// If the error is related to mapping, try without date sorting
-					if (error.message.includes('No mapping found') || error.message.includes('fielddata')) {
-						console.log('Retrying without date sorting...');
-						esQuery.sort = [{ "_score": { "order": "desc" } }]; // Only sort by score
-						results = await queryElasticsearch(esQuery);
-					} else {
-						throw error;
-					}
-				}
-				
-				// Format the results
-				const formattedResults = formatSearchResults(results);
-
-				// Add source filtering if needed (as a backup)
-				if (source && source !== 'All Sources') {
-					formattedResults.articles = formattedResults.articles.filter(
-						article => article.source && article.source.toLowerCase() === source.toLowerCase()
-					);
-				}
-
-				console.log("currently here");
-				console.log(time_range);
-
-				// Add time range filtering if needed (as a backup)
-				if (time_range && (time_range !== 'All Time')) {
-					const now = new Date();
-					let startDate;
-					
-					switch (time_range) {
-						case '1d': startDate = new Date(now.setDate(now.getDate() - 1)); break;
-						case '7d': startDate = new Date(now.setDate(now.getDate() - 7)); break;
-						case '30d': startDate = new Date(now.setDate(now.getDate() - 30)); break;
-						case '90d': startDate = new Date(now.setDate(now.getDate() - 90)); break;
-						default: startDate = new Date(now.setDate(now.getDate() - 30));
-					}
-
-					console.log(startDate)
-
-					formattedResults.articles = formattedResults.articles.filter(article => {
-						if (!article.published_at) return false;
-						const articleDate = (new Date(article.published_at));
-						return (articleDate >= startDate) && (articleDate <= now);
+					checkResults = await queryElasticsearch(checkDataQuery);
+					console.log('Data check results:', {
+						total: checkResults.hits?.total?.value || 0,
+						hasHits: (checkResults.hits?.hits || []).length > 0
 					});
+				} catch (error) {
+					console.error('Data check failed:', error);
 				}
-				
-				return { data: formattedResults };
+
+				// Proceed with main query only if we have data
+				if (checkResults?.hits?.total?.value > 0) {
+					const esQuery = {
+						query: {
+							bool: { 
+								must,
+								should,
+								minimum_should_match: 1
+							}
+						},
+						sort: [
+							{ "_score": { "order": "desc" } }
+						],
+						size: 20,
+						track_scores: true,
+						highlight: {
+							fields: {
+								"headline": { number_of_fragments: 0 },
+								"content": { number_of_fragments: 3, fragment_size: 150 }
+							},
+							pre_tags: ["<mark>"],
+							post_tags: ["</mark>"]
+						}
+					};
+					
+					console.log('Query:', JSON.stringify(esQuery));
+					
+					let results;
+					try {
+						results = await queryElasticsearch(esQuery);
+						console.log('Query results:', {
+							total: results.hits?.total?.value || 0,
+							hasHits: (results.hits?.hits || []).length > 0
+						});
+					} catch (error) {
+						console.error('Elasticsearch query failed:', error);
+						
+						// If we get a fielddata error, try a simpler query
+						if (error.message.includes('fielddata') || error.message.includes('No mapping found')) {
+							console.log('Retrying with simpler query...');
+							// Simplify the query to just basic matching and date range
+							const simpleQuery = {
+								query: {
+									bool: {
+										must: [
+											{
+												multi_match: {
+													query: query,
+													fields: ["headline^2", "content"]
+												}
+											}
+										]
+									}
+								},
+								size: 20
+							};
+							
+							// Add date range if present
+							if (must.length > 0) {
+								simpleQuery.query.bool.must.push(...must);
+							}
+							
+							results = await queryElasticsearch(simpleQuery);
+							console.log('Simple query results:', {
+								total: results.hits?.total?.value || 0,
+								hasHits: (results.hits?.hits || []).length > 0
+							});
+						} else {
+							throw error;
+						}
+					}
+					
+					// Format the results
+					const formattedResults = formatSearchResults(results);
+
+					// Add source filtering if needed (as a backup)
+					if (source && source !== 'All Sources') {
+						formattedResults.articles = formattedResults.articles.filter(
+							article => article.source && article.source.toLowerCase() === source.toLowerCase()
+						);
+					}
+
+					// Add time range filtering if needed (as a backup)
+					if (time_range && (time_range !== 'All Time')) {
+						// For test data: Use 2025 as the base year
+						const baseDate = getCurrentDate();
+						let startDate;
+						const MS_PER_DAY = 24 * 60 * 60 * 1000;
+						
+						// Use the same time range normalization as above
+						const normalizedTimeRange = time_range.toLowerCase();
+						const timeRangeMap = {
+							'day': '1d',
+							'week': '7d',
+							'month': '30d',
+							'quarter': '90d'
+						};
+						
+						const effectiveTimeRange = timeRangeMap[normalizedTimeRange] || normalizedTimeRange;
+						let daysToSubtract = 30; // default to 30 days
+						
+						switch (effectiveTimeRange) {
+							case '1d': daysToSubtract = 1; break;
+							case '7d': daysToSubtract = 7; break;
+							case '30d': daysToSubtract = 30; break;
+							case '90d': daysToSubtract = 90; break;
+						}
+						
+						startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
+						
+						// Format dates for comparison
+						const startDateFormatted = formatDateForES(startDate);
+						const endDateFormatted = formatDateForES(baseDate);
+
+						console.log('JavaScript date filtering:', {
+							timeRange: time_range,
+							startDateFormatted,
+							endDateFormatted
+						});
+
+						formattedResults.articles = formattedResults.articles.filter(article => {
+							if (!article.published_at) return false;
+							
+							// Compare using the same format as Elasticsearch
+							const articleDate = article.published_at;
+							return articleDate >= startDateFormatted && articleDate <= endDateFormatted;
+						});
+					}
+
+					// Add sentiment filtering as a backup
+					if (sentiment && sentiment !== 'All Sentiments') {
+						formattedResults.articles = formattedResults.articles.filter(article => 
+							article.sentiment && article.sentiment.toLowerCase() === sentiment.toLowerCase()
+						);
+					}
+
+					return formattedResults;
+				} else {
+					console.log('No data found in index');
+					return { articles: [] };
+				}
 			} else {
 				console.log('Configuration error, using fallback', __config.endpoint);
 				throw new Error('Configuration error');
@@ -524,40 +718,45 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 		try {
 			console.log('Attempting primary request');
 			response = await primaryRequest();
+			
+			// Log the response structure for debugging
+			console.log('Primary request response:', {
+				hasResponse: !!response,
+				hasArticles: !!response?.articles,
+				articleCount: response?.articles?.length || 0,
+				total: response?.total || 0,
+				firstArticle: response?.articles?.[0] ? {
+					id: response.articles[0].id,
+					headline: response.articles[0].headline,
+					score: response.articles[0].score,
+					relevance_score: response.articles[0].relevance_score
+				} : null
+			});
+			
+			// Since primaryRequest already returns formatted results, just return them
+			return response;
 		} catch (error) {
 			console.log('Primary failed, trying fallback');
 			console.log('Failure reason:', error.message);
 			response = await fallbackRequest();
+			
+			// Log fallback response
+			console.log('Fallback response:', {
+				hasResponse: !!response,
+				hasData: !!response?.data,
+				hasArticles: !!response?.data?.articles,
+				articleCount: response?.data?.articles?.length || 0
+			});
+			
+			// Normalize fallback response
+			if (response.data && response.data.articles) {
+				return response.data;
+			}
+			return { articles: [], total: 0 };
 		}
-		
-		// Normalize the response format
-		console.log('Response received, normalizing format 3 ');
-		
-		let normalizedResponse;
-		if (Array.isArray(response)) {
-			normalizedResponse = { articles: response };
-		} else if (Array.isArray(response.data)) {
-			normalizedResponse = { articles: response.data };
-		} else if (response.data && response.data.articles) {
-			normalizedResponse = response.data;
-		} else {
-			console.log('No valid articles in response, returning empty array');
-			normalizedResponse = { articles: [] };
-		}
-		
-		// Log the scores to verify they're being passed through
-		if (normalizedResponse.articles && normalizedResponse.articles.length > 0) {
-			console.log('First 3 article scores:', normalizedResponse.articles.slice(0, 3).map(a => ({
-				id: a.id,
-				title: a.title?.substring(0, 30),
-				score: a.score
-			})));
-		}
-		
-		return normalizedResponse;
 	} catch (error) {
 		console.error('Search failed:', error.message);
-		return { articles: [] }; // Return empty results on error
+		return { articles: [], total: 0 }; // Return empty results on error
 	}
 };
 

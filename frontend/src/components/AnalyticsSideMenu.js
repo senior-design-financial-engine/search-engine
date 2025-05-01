@@ -3,7 +3,6 @@ import { Card, Button, ProgressBar, Badge } from 'react-bootstrap';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title, PointElement, LineElement } from 'chart.js';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import '../styles/SideMenu.css';
-import './AnalyticsSideMenu.css';
 
 // Register Chart.js components
 ChartJS.register(
@@ -22,12 +21,13 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   const [sentimentCounts, setSentimentCounts] = useState({ positive: 0, negative: 0, neutral: 0 });
   const [sourceCounts, setSourceCounts] = useState({});
   const [timeDistribution, setTimeDistribution] = useState({});
-  const [topCompanies, setTopCompanies] = useState([]);
-  const [topCategories, setTopCategories] = useState([]);
   const [monthlyTrends, setMonthlyTrends] = useState({});
 
   const sideMenuRef = useRef(null);
   const [tooltipText, setTooltipText] = useState('Open Analytics');
+  
+  // Add mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -112,88 +112,41 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       
       setTimeDistribution(times);
       setMonthlyTrends(monthlyData);
-
-      // Find top companies mentioned
-      const companies = {};
-      results.forEach(article => {
-        const articleCompanies = getCompanyData(article);
-        articleCompanies.forEach(company => {
-          const companyName = typeof company === 'string' ? company : company.name;
-          if (companyName) {
-            companies[companyName] = (companies[companyName] || 0) + 1;
-          }
-        });
-      });
-      
-      const sortedCompanies = Object.entries(companies)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ name, count }));
-      
-      setTopCompanies(sortedCompanies);
-
-      // Find top categories
-      const categories = {};
-      results.forEach(article => {
-        const articleCategories = getCategories(article);
-        articleCategories.forEach(category => {
-          if (category) {
-            categories[category] = (categories[category] || 0) + 1;
-          }
-        });
-      });
-      
-      const sortedCategories = Object.entries(categories)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ name, count }));
-      
-      setTopCategories(sortedCategories);
     }
   }, [results]);
 
-  // Helper function to extract company data from an article
-  const getCompanyData = (article) => {
-    if (article.companies && Array.isArray(article.companies)) {
-      return article.companies;
-    } else if (article.company_mentions && Array.isArray(article.company_mentions)) {
-      return article.company_mentions;
-    } else if (article.entities && Array.isArray(article.entities)) {
-      return article.entities.filter(entity => entity.type === 'ORGANIZATION');
-    }
-    return [];
-  };
+  // Add mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
 
-  // Helper function to extract categories from an article
-  const getCategories = (article) => {
-    if (article.categories && Array.isArray(article.categories)) {
-      return article.categories;
-    } else if (article.topics && Array.isArray(article.topics)) {
-      return article.topics;
-    } else if (article.tags && Array.isArray(article.tags)) {
-      return article.tags;
-    }
-    return [];
-  };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Calculate total for percentages
   const totalSentiments = Object.values(sentimentCounts).reduce((acc, count) => acc + count, 0);
   
-  // Prepare chart options with more accessible colors and reduced padding
+  // Update chart options with mobile configurations
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'bottom',
+        position: isMobile ? 'bottom' : 'bottom',
+        align: 'start',
         labels: {
-          boxWidth: 12,
-          padding: 8,
+          boxWidth: isMobile ? 8 : 10,
+          padding: isMobile ? 4 : 8,
           font: {
-            size: 11
+            size: isMobile ? 10 : 11
           },
-          color: '#495057'
-        }
+          color: '#495057',
+          usePointStyle: true
+        },
+        maxItems: isMobile ? 3 : undefined,
+        margin: 0
       },
       tooltip: {
         enabled: true,
@@ -203,33 +156,59 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         titleColor: '#495057',
         bodyColor: '#495057',
         borderColor: '#dee2e6',
-        borderWidth: 1
+        borderWidth: 1,
+        titleFont: {
+          size: isMobile ? 10 : 11
+        },
+        bodyFont: {
+          size: isMobile ? 10 : 11
+        },
+        padding: isMobile ? 4 : 6,
+        displayColors: true
       }
     },
     layout: {
       padding: {
-        left: 10,
-        right: 10,
-        top: 10,
-        bottom: 10
-      }
+        left: isMobile ? 0 : 0,
+        right: isMobile ? 0 : 0,
+        top: isMobile ? 2 : 4,
+        bottom: isMobile ? 2 : 0
+      },
+      autoPadding: true
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: {
-          color: '#f0f0f0'
+          color: '#f0f0f0',
+          drawBorder: false,
+          display: !isMobile
         },
         ticks: {
-          color: '#495057'
+          color: '#495057',
+          font: {
+            size: isMobile ? 9 : 10
+          },
+          padding: isMobile ? 2 : 4,
+          maxTicksLimit: isMobile ? 4 : 5,
+          display: true
         }
       },
       x: {
         grid: {
-          display: false
+          display: false,
+          drawBorder: false
         },
         ticks: {
-          color: '#495057'
+          color: '#495057',
+          font: {
+            size: isMobile ? 9 : 10
+          },
+          padding: isMobile ? 2 : 4,
+          maxRotation: isMobile ? 45 : 45,
+          minRotation: isMobile ? 45 : 45,
+          autoSkip: true,
+          maxTicksLimit: isMobile ? 6 : 8
         }
       }
     }
@@ -286,8 +265,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         tension: 0.3,
         fill: true,
         pointBackgroundColor: 'rgba(67, 97, 238, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
     ],
   };
@@ -302,8 +281,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         backgroundColor: 'rgba(40, 167, 69, 0.1)',
         tension: 0.3,
         pointBackgroundColor: 'rgba(40, 167, 69, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
       {
         label: 'Neutral',
@@ -312,8 +291,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         backgroundColor: 'rgba(108, 117, 125, 0.1)',
         tension: 0.3,
         pointBackgroundColor: 'rgba(108, 117, 125, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
       {
         label: 'Negative',
@@ -322,41 +301,19 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         backgroundColor: 'rgba(220, 53, 69, 0.1)',
         tension: 0.3,
         pointBackgroundColor: 'rgba(220, 53, 69, 1)',
-        pointRadius: 3,
-        pointHoverRadius: 5
+        pointRadius: isMobile ? 2 : 3,
+        pointHoverRadius: isMobile ? 4 : 5
       },
     ],
   };
 
-  // Empty state component
+  // Update the EmptyState component to be more compact
   const EmptyState = ({ icon, message }) => (
     <div className="empty-state">
-      <i className={`bi ${icon}`} aria-hidden="true"></i>
-      <p className="text-muted mb-0 text-center">{message}</p>
+      <i className={`bi ${icon} mb-2 d-block`} style={{ fontSize: '1.5rem', opacity: 0.6 }} aria-hidden="true"></i>
+      <p className="text-muted mb-0">{message}</p>
     </div>
   );
-  
-  // Function to render badge items
-  const renderBadges = (items, colorClass) => {
-    if (!items || items.length === 0) {
-      return <EmptyState icon="bi-tag" message="No data available" />;
-    }
-    
-    return (
-      <div className="d-flex flex-wrap">
-        {items.map((item, index) => (
-          <Badge 
-            key={index} 
-            bg={colorClass} 
-            text={colorClass === 'light' ? 'dark' : 'white'} 
-            className="me-2 mb-2 border-0 rounded-pill py-1 px-2"
-          >
-            {item.name} <span className="opacity-75">({item.count})</span>
-          </Badge>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <>
@@ -387,7 +344,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         aria-label="Analytics Sidebar"
         tabIndex={isOpen ? 0 : -1}
       >
-        <div className="side-menu-resize-handle" title="Drag to resize"></div>
         <div className="side-menu-header">
           <h4 className="mb-0 d-flex align-items-center">
             <i className="bi bi-graph-up-arrow me-2 text-primary" aria-hidden="true"></i>
@@ -405,20 +361,31 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           </div>
         </div>
 
+        <div className="side-menu-content">
         {results && results.length > 0 ? (
           <>
             {/* Sentiment Distribution */}
-            <Card className="analytics-card primary shadow-sm mb-3">
-              <Card.Header className="bg-white">
+              <Card className="analytics-card">
+                <Card.Header>
                 <h5 className="mb-0">
                   <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
-                  <span>Sentiment Distribution</span>
+                    Sentiment Distribution
                 </h5>
               </Card.Header>
               <Card.Body>
                 {totalSentiments > 0 ? (
                   <div className="chart-container">
-                    <Pie data={sentimentChartData} options={chartOptions} />
+                      <Pie 
+                        data={sentimentChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true,
+                          layout: {
+                            padding: 0
+                          }
+                        }} 
+                      />
                   </div>
                 ) : (
                   <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
@@ -427,8 +394,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
             </Card>
 
             {/* Source Distribution */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
+              <Card className="analytics-card">
+                <Card.Header>
                 <h5 className="mb-0">
                   <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
                   <span>Top Sources</span>
@@ -437,7 +404,14 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               <Card.Body>
                 {Object.keys(sourceCounts).length > 0 ? (
                   <div className="chart-container">
-                    <Bar data={sourceChartData} options={chartOptions} />
+                      <Bar 
+                        data={sourceChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
                   </div>
                 ) : (
                   <EmptyState icon="bi-newspaper" message="No source data available" />
@@ -445,35 +419,9 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               </Card.Body>
             </Card>
 
-            {/* Top Companies */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Companies</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {renderBadges(topCompanies, 'light')}
-              </Card.Body>
-            </Card>
-
-            {/* Top Categories */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Categories</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {renderBadges(topCategories, 'info')}
-              </Card.Body>
-            </Card>
-
             {/* Publication Timeline */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
+              <Card className="analytics-card">
+                <Card.Header>
                 <h5 className="mb-0">
                   <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
                   <span>Publication Timeline</span>
@@ -482,7 +430,14 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               <Card.Body>
                 {Object.keys(timeDistribution).length > 0 ? (
                   <div className="chart-container">
-                    <Line data={timelineChartData} options={chartOptions} />
+                      <Line 
+                        data={timelineChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
                   </div>
                 ) : (
                   <EmptyState icon="bi-calendar" message="No timeline data available" />
@@ -491,8 +446,8 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
             </Card>
             
             {/* Sentiment Trends */}
-            <Card className="analytics-card shadow-sm">
-              <Card.Header className="bg-white">
+              <Card className="analytics-card">
+                <Card.Header>
                 <h5 className="mb-0">
                   <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
                   <span>Sentiment Trends</span>
@@ -501,7 +456,14 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
               <Card.Body>
                 {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
                   <div className="chart-container">
-                    <Line data={sentimentTrendChartData} options={chartOptions} />
+                      <Line 
+                        data={sentimentTrendChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
                   </div>
                 ) : (
                   <EmptyState icon="bi-graph-up" message="No trend data available" />
@@ -511,11 +473,12 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           </>
         ) : (
           <div className="text-center py-4">
-            <i className="bi bi-bar-chart text-muted" style={{fontSize: "2.5rem", opacity: 0.4}} aria-hidden="true"></i>
+              <i className="bi bi-bar-chart text-muted" style={{fontSize: "2rem", opacity: 0.4}} aria-hidden="true"></i>
             <p className="mt-2 text-muted">No data available for analytics</p>
             <small className="text-muted d-block">Search for results to see analysis</small>
           </div>
         )}
+        </div>
       </div>
     </>
   );

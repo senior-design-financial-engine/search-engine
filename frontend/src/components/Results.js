@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { searchArticles } from '../services/api';
-import { Container, Row, Col, Card, Button, Badge, Spinner, Form, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Spinner, Form, Alert, Collapse } from 'react-bootstrap';
 import AnalyticsSideMenu from './AnalyticsSideMenu';
 import { availableSources } from '../constants';
 import '../styles/Results.css';
@@ -26,6 +26,7 @@ function Results() {
   const [sortBy, setSortBy] = useState('relevance');
   // Add side menu state
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [isFiltersVisible, setIsFiltersVisible] = useState(true);
   const navigate = useNavigate();
 
   // Toggle side menu function
@@ -47,11 +48,9 @@ function Results() {
             activeFilters.sentiment || undefined
           );
           
-          // Transform results to ensure consistent structure
-          const normalizedResults = Array.isArray(searchResults) ? searchResults : 
-            (searchResults.articles || []);
-          
-          setResults(normalizedResults);
+          // Ensure we're getting the articles array from the response
+          const articles = searchResults?.articles || [];
+          setResults(articles);
         }
       } catch (error) {
         console.error('Error fetching search results:', error);
@@ -357,77 +356,92 @@ function Results() {
           </Button>
           
           {/* Results title */}
-          <h2 className="results-title fw-bold">
-            <i className="bi bi-search text-primary me-2"></i>
-            Results for "<span className="text-primary">{query}</span>"
-          </h2>
+          <div className="d-flex justify-content-between align-items-center">
+            <h2 className="results-title fw-bold">
+              <i className="bi bi-search text-primary me-2"></i>
+              Results for "<span className="text-primary">{query}</span>"
+            </h2>
+            <Button
+              variant="outline-primary"
+              onClick={() => setIsFiltersVisible(!isFiltersVisible)}
+              className="rounded-pill"
+              aria-expanded={isFiltersVisible}
+            >
+              <i className={`bi bi-funnel me-2 ${isFiltersVisible ? 'text-primary' : ''}`}></i>
+              {isFiltersVisible ? 'Hide Filters' : 'Show Filters'}
+            </Button>
+          </div>
           
           {/* Filters row */}
-          <div className="filter-row">
-            <div className="filter-col">
-              <Form.Group>
-                <Form.Label className="fw-bold">Source</Form.Label>
-                <Form.Select 
-                  value={activeFilters.source || ''}
-                  onChange={(e) => handleFilterChange('source', e.target.value)}
-                  className="rounded-3"
-                >
-                  <option value="">All Sources</option>
-                  {availableSources.map(src => (
-                    <option key={src} value={src}>{src}</option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
+          <Collapse in={isFiltersVisible}>
+            <div>
+              <div className="filter-row mt-3">
+                <div className="filter-col">
+                  <Form.Group>
+                    <Form.Label className="fw-bold">Source</Form.Label>
+                    <Form.Select 
+                      value={activeFilters.source || ''}
+                      onChange={(e) => handleFilterChange('source', e.target.value)}
+                      className="rounded-3"
+                    >
+                      <option value="">All Sources</option>
+                      {availableSources.map(src => (
+                        <option key={src} value={src}>{src}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </div>
+                
+                <div className="filter-col">
+                  <Form.Group>
+                    <Form.Label className="fw-bold">Time Range</Form.Label>
+                    <Form.Select 
+                      value={activeFilters.timeRange || ''}
+                      onChange={(e) => handleFilterChange('time_range', e.target.value)}
+                      className="rounded-3"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="1d">Last 24 Hours</option>
+                      <option value="7d">Last Week</option>
+                      <option value="30d">Last Month</option>
+                      <option value="90d">Last 3 Months</option>
+                    </Form.Select>
+                  </Form.Group>
+                </div>
+                
+                <div className="filter-col">
+                  <Form.Group>
+                    <Form.Label className="fw-bold">Sentiment</Form.Label>
+                    <Form.Select 
+                      value={activeFilters.sentiment || ''}
+                      onChange={(e) => handleFilterChange('sentiment', e.target.value)}
+                      className="rounded-3"
+                    >
+                      <option value="all">All Sentiments</option>
+                      <option value="positive">Positive</option>
+                      <option value="neutral">Neutral</option>
+                      <option value="negative">Negative</option>
+                    </Form.Select>
+                  </Form.Group>
+                </div>
+                
+                <div className="filter-col">
+                  <Form.Group>
+                    <Form.Label className="fw-bold">Sort By</Form.Label>
+                    <Form.Select 
+                      value={sortBy}
+                      onChange={(e) => handleSort(e.target.value)}
+                      className="rounded-3"
+                    >
+                      <option value="relevance">Relevance</option>
+                      <option value="date">Date (Newest)</option>
+                      <option value="sentiment">Sentiment</option>
+                    </Form.Select>
+                  </Form.Group>
+                </div>
+              </div>
             </div>
-            
-            <div className="filter-col">
-              <Form.Group>
-                <Form.Label className="fw-bold">Time Range</Form.Label>
-                <Form.Select 
-                  value={activeFilters.timeRange || ''}
-                  onChange={(e) => handleFilterChange('time_range', e.target.value)}
-                  className="rounded-3"
-                >
-                  <option value="all">All Time</option>
-                  <option value="1d">Last 24 Hours</option>
-                  <option value="7d">Last Week</option>
-                  <option value="30d">Last Month</option>
-                  <option value="90d">Last 3 Months</option>
-                </Form.Select>
-              </Form.Group>
-            </div>
-            
-            <div className="filter-col">
-              <Form.Group>
-                <Form.Label className="fw-bold">Sentiment</Form.Label>
-                <Form.Select 
-                  value={activeFilters.sentiment || ''}
-                  onChange={(e) => handleFilterChange('sentiment', e.target.value)}
-                  className="rounded-3"
-                >
-                  <option value="all">All Sentiments</option>
-                  <option value="positive">Positive</option>
-                  <option value="neutral">Neutral</option>
-                  <option value="negative">Negative</option>
-                </Form.Select>
-              </Form.Group>
-            </div>
-            
-            <div className="filter-col">
-              <Form.Group>
-                <Form.Label className="fw-bold">Sort By</Form.Label>
-                <Form.Select 
-                  value={sortBy}
-                  onChange={(e) => handleSort(e.target.value)}
-                  className="rounded-3"
-                >
-                  <option value="relevance">Relevance</option>
-                  <option value="date">Date (Newest)</option>
-                  <option value="sentiment">Sentiment</option>
-                </Form.Select>
-              </Form.Group>
-            </div>
-          </div>
+          </Collapse>
         </Container>
       </div>
 
