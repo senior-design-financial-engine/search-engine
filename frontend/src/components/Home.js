@@ -374,10 +374,7 @@ function Home() {
 										</Button>
 									</Col>
 								</Row>
-								
-								{/* Recent Queries Component */}
-								<RecentQueries onSelectQuery={handleRecentQuerySelect} />
-								
+
 								<div className="d-flex justify-content-end mb-3">
 									<Button 
 										variant="link" 
@@ -440,6 +437,9 @@ function Home() {
 										</Card.Body>
 									</Card>
 								)}
+								
+								{/* Recent Queries Component */}
+								<RecentQueries onSelectQuery={handleRecentQuerySelect} />
 							</Form>
 						</Card.Body>
 					</Card>
