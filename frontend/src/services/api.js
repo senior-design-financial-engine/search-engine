@@ -32,10 +32,10 @@ const formatDateForES = (date) => {
 	return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-// Function to get current date (using frontend date instead of server date)
+// Function to get current date
 const getCurrentDate = () => {
-	// For test data: Use 2025 as the base year
-	return new Date('2025-05-02T00:00:00Z');
+	const now = new Date();
+	return now;
 };
 
 // Runtime configuration resolver
@@ -503,12 +503,16 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					
 					startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
 					
-					// Add the date range filter to the must array using the text format
+					// Format dates for Elasticsearch query
+					const startDateFormatted = formatDateForES(startDate);
+					const endDateFormatted = formatDateForES(baseDate);
+					
+					// Add the date range filter using the formatted dates
 					must.push({
 						range: {
 							"published_at.enum": {
-								gte: formatDateForES(startDate),
-								lte: formatDateForES(baseDate)
+								gte: startDateFormatted,
+								lte: endDateFormatted
 							}
 						}
 					});
@@ -517,8 +521,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						originalTimeRange: time_range,
 						normalizedTimeRange: effectiveTimeRange,
 						daysToSubtract,
-						startDateFormatted: formatDateForES(startDate),
-						endDateFormatted: formatDateForES(baseDate)
+						startDateFormatted,
+						endDateFormatted
 					});
 				}
 				
@@ -627,7 +631,7 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					// Add time range filtering if needed (as a backup)
 					if (time_range && (time_range !== 'All Time')) {
 						// For test data: Use 2025 as the base year
-						const baseDate = new Date('2025-05-01T00:00:00Z');
+						const baseDate = getCurrentDate();
 						let startDate;
 						const MS_PER_DAY = 24 * 60 * 60 * 1000;
 						
@@ -651,19 +655,23 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						}
 						
 						startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
+						
+						// Format dates for comparison
+						const startDateFormatted = formatDateForES(startDate);
+						const endDateFormatted = formatDateForES(baseDate);
 
 						console.log('JavaScript date filtering:', {
 							timeRange: time_range,
-							startDateUTC: startDate.toISOString(),
-							endDateUTC: baseDate.toISOString()
+							startDateFormatted,
+							endDateFormatted
 						});
 
 						formattedResults.articles = formattedResults.articles.filter(article => {
 							if (!article.published_at) return false;
 							
-							// Convert article date to UTC for comparison
-							const articleDate = new Date(article.published_at);
-							return articleDate >= startDate && articleDate <= baseDate;
+							// Compare using the same format as Elasticsearch
+							const articleDate = article.published_at;
+							return articleDate >= startDateFormatted && articleDate <= endDateFormatted;
 						});
 					}
 
