@@ -209,7 +209,7 @@
 
 /* Card styles with reduced spacing */
 .analytics-card {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   border-radius: var(--radius-md, 8px);
   overflow: hidden;
   transition: all 0.2s ease;
@@ -227,13 +227,13 @@
 }
 
 .analytics-card .card-header {
-  padding: 8px 12px;
+  padding: 12px;
   background-color: var(--white, #fff);
   border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
 .analytics-card .card-body {
-  padding: 8px 12px;
+  padding: 12px;
 }
 
 .analytics-card .card-header h5 {
@@ -242,16 +242,29 @@
 }
 
 .chart-container {
-  height: 140px;
+  height: 200px;
   margin-bottom: 0;
+  position: relative;
 }
 
+/* Add spacing between chart and legend */
+.chart-container canvas {
+  margin-bottom: 8px;
+}
+
+/* Ensure proper spacing for badge containers */
+.d-flex.flex-wrap {
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* Adjust empty state padding */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 24px 16px;
   color: #6c757d;
 }
 
@@ -303,7 +316,7 @@
   }
   
   .chart-container {
-    height: 160px;
+    height: 180px;
   }
 }
 
@@ -330,7 +343,7 @@
   }
   
   .chart-container {
-    height: 140px;
+    height: 160px;
   }
   
   .analytics-card .card-header h5 {

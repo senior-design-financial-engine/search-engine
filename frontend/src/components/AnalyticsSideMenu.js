@@ -187,13 +187,15 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       legend: {
         position: 'bottom',
         labels: {
-          boxWidth: 10,
-          padding: 6,
+          boxWidth: 12,
+          padding: 10,
           font: {
-            size: 10
+            size: 11
           },
-          color: '#495057'
-        }
+          color: '#495057',
+          usePointStyle: true
+        },
+        margin: 8
       },
       tooltip: {
         enabled: true,
@@ -205,43 +207,51 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         borderColor: '#dee2e6',
         borderWidth: 1,
         titleFont: {
-          size: 11
+          size: 12
         },
         bodyFont: {
           size: 11
-        }
+        },
+        padding: 8
       }
     },
     layout: {
       padding: {
-        left: 5,
-        right: 5,
-        top: 5,
-        bottom: 5
+        left: 8,
+        right: 8,
+        top: 8,
+        bottom: 16
       }
     },
     scales: {
       y: {
         beginAtZero: true,
         grid: {
-          color: '#f0f0f0'
+          color: '#f0f0f0',
+          drawBorder: false
         },
         ticks: {
           color: '#495057',
           font: {
-            size: 10
-          }
+            size: 11
+          },
+          padding: 4,
+          maxTicksLimit: 5
         }
       },
       x: {
         grid: {
-          display: false
+          display: false,
+          drawBorder: false
         },
         ticks: {
           color: '#495057',
           font: {
-            size: 10
-          }
+            size: 11
+          },
+          padding: 4,
+          maxRotation: 45,
+          minRotation: 45
         }
       }
     }
