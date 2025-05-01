@@ -21,6 +21,17 @@ const fetchServerDate = async () => {
 	}
 };
 
+// Function to format date for Elasticsearch query
+const formatDateForES = (date) => {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	const seconds = String(date.getSeconds()).padStart(2, '0');
+	return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
 // Function to get current date (using frontend date instead of server date)
 const getCurrentDate = () => {
 	// For test data: Use 2025 as the base year
@@ -492,12 +503,12 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 					
 					startDate = new Date(baseDate.getTime() - (daysToSubtract * MS_PER_DAY));
 					
-					// Add the date range filter to the must array
+					// Add the date range filter to the must array using the text format
 					must.push({
 						range: {
-							"published_at": {
-								gte: startDate.toISOString(),
-								lte: baseDate.toISOString()
+							"published_at.enum": {
+								gte: formatDateForES(startDate),
+								lte: formatDateForES(baseDate)
 							}
 						}
 					});
@@ -506,8 +517,8 @@ export const searchArticles = async (query, source, time_range, sentiment) => {
 						originalTimeRange: time_range,
 						normalizedTimeRange: effectiveTimeRange,
 						daysToSubtract,
-						startDateUTC: startDate.toISOString(),
-						endDateUTC: baseDate.toISOString()
+						startDateFormatted: formatDateForES(startDate),
+						endDateFormatted: formatDateForES(baseDate)
 					});
 				}
 				
