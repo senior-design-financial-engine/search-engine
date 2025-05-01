@@ -430,7 +430,6 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         aria-label="Analytics Sidebar"
         tabIndex={isOpen ? 0 : -1}
       >
-        <div className="side-menu-resize-handle" title="Drag to resize"></div>
         <div className="side-menu-header">
           <h4 className="mb-0 d-flex align-items-center">
             <i className="bi bi-graph-up-arrow me-2 text-primary" aria-hidden="true"></i>
@@ -448,117 +447,147 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           </div>
         </div>
 
-        {results && results.length > 0 ? (
-          <>
-            {/* Sentiment Distribution */}
-            <Card className="analytics-card primary shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
-                  <span>Sentiment Distribution</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {totalSentiments > 0 ? (
-                  <div className="chart-container">
-                    <Pie data={sentimentChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
-                )}
-              </Card.Body>
-            </Card>
+        <div className="side-menu-content">
+          {results && results.length > 0 ? (
+            <>
+              {/* Sentiment Distribution */}
+              <Card className="analytics-card primary">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
+                    <span>Sentiment Distribution</span>
+                  </h5>
+                </Card.Header>
+                <Card.Body>
+                  {totalSentiments > 0 ? (
+                    <div className="chart-container">
+                      <Pie 
+                        data={sentimentChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
+                    </div>
+                  ) : (
+                    <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
+                  )}
+                </Card.Body>
+              </Card>
 
-            {/* Source Distribution */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Sources</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {Object.keys(sourceCounts).length > 0 ? (
-                  <div className="chart-container">
-                    <Bar data={sourceChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-newspaper" message="No source data available" />
-                )}
-              </Card.Body>
-            </Card>
+              {/* Source Distribution */}
+              <Card className="analytics-card">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
+                    <span>Top Sources</span>
+                  </h5>
+                </Card.Header>
+                <Card.Body>
+                  {Object.keys(sourceCounts).length > 0 ? (
+                    <div className="chart-container">
+                      <Bar 
+                        data={sourceChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
+                    </div>
+                  ) : (
+                    <EmptyState icon="bi-newspaper" message="No source data available" />
+                  )}
+                </Card.Body>
+              </Card>
 
-            {/* Top Companies */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Companies</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {renderBadges(topCompanies, 'light')}
-              </Card.Body>
-            </Card>
+              {/* Top Companies */}
+              <Card className="analytics-card">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
+                    <span>Top Companies</span>
+                  </h5>
+                </Card.Header>
+                <Card.Body className="d-flex align-items-center">
+                  {renderBadges(topCompanies, 'light')}
+                </Card.Body>
+              </Card>
 
-            {/* Top Categories */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
-                  <span>Top Categories</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {renderBadges(topCategories, 'info')}
-              </Card.Body>
-            </Card>
+              {/* Top Categories */}
+              <Card className="analytics-card">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
+                    <span>Top Categories</span>
+                  </h5>
+                </Card.Header>
+                <Card.Body className="d-flex align-items-center">
+                  {renderBadges(topCategories, 'info')}
+                </Card.Body>
+              </Card>
 
-            {/* Publication Timeline */}
-            <Card className="analytics-card shadow-sm mb-3">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
-                  <span>Publication Timeline</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {Object.keys(timeDistribution).length > 0 ? (
-                  <div className="chart-container">
-                    <Line data={timelineChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-calendar" message="No timeline data available" />
-                )}
-              </Card.Body>
-            </Card>
-            
-            {/* Sentiment Trends */}
-            <Card className="analytics-card shadow-sm">
-              <Card.Header className="bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
-                  <span>Sentiment Trends</span>
-                </h5>
-              </Card.Header>
-              <Card.Body>
-                {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
-                  <div className="chart-container">
-                    <Line data={sentimentTrendChartData} options={chartOptions} />
-                  </div>
-                ) : (
-                  <EmptyState icon="bi-graph-up" message="No trend data available" />
-                )}
-              </Card.Body>
-            </Card>
-          </>
-        ) : (
-          <div className="text-center py-4">
-            <i className="bi bi-bar-chart text-muted" style={{fontSize: "2.5rem", opacity: 0.4}} aria-hidden="true"></i>
-            <p className="mt-2 text-muted">No data available for analytics</p>
-            <small className="text-muted d-block">Search for results to see analysis</small>
-          </div>
-        )}
+              {/* Publication Timeline */}
+              <Card className="analytics-card">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
+                    <span>Publication Timeline</span>
+                  </h5>
+                </Card.Header>
+                <Card.Body>
+                  {Object.keys(timeDistribution).length > 0 ? (
+                    <div className="chart-container">
+                      <Line 
+                        data={timelineChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
+                    </div>
+                  ) : (
+                    <EmptyState icon="bi-calendar" message="No timeline data available" />
+                  )}
+                </Card.Body>
+              </Card>
+              
+              {/* Sentiment Trends */}
+              <Card className="analytics-card">
+                <Card.Header>
+                  <h5 className="mb-0">
+                    <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
+                    <span>Sentiment Trends</span>
+                  </h5>
+                </Card.Header>
+                <Card.Body>
+                  {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
+                    <div className="chart-container">
+                      <Line 
+                        data={sentimentTrendChartData} 
+                        options={{
+                          ...chartOptions,
+                          maintainAspectRatio: false,
+                          responsive: true
+                        }} 
+                      />
+                    </div>
+                  ) : (
+                    <EmptyState icon="bi-graph-up" message="No trend data available" />
+                  )}
+                </Card.Body>
+              </Card>
+            </>
+          ) : (
+            <div className="text-center py-4">
+              <i className="bi bi-bar-chart text-muted" style={{fontSize: "2.5rem", opacity: 0.4}} aria-hidden="true"></i>
+              <p className="mt-2 text-muted">No data available for analytics</p>
+              <small className="text-muted d-block">Search for results to see analysis</small>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
