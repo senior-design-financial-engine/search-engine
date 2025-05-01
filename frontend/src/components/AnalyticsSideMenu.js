@@ -30,7 +30,7 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
   
   // Add mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
+  
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -447,19 +447,19 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         </div>
 
         <div className="side-menu-content">
-          {results && results.length > 0 ? (
-            <>
-              {/* Sentiment Distribution */}
+        {results && results.length > 0 ? (
+          <>
+            {/* Sentiment Distribution */}
               <Card className="analytics-card">
                 <Card.Header>
-                  <h5 className="mb-0">
-                    <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
+                <h5 className="mb-0">
+                  <i className="bi bi-emoji-smile me-2 text-primary" aria-hidden="true"></i>
                     Sentiment Distribution
-                  </h5>
-                </Card.Header>
-                <Card.Body>
-                  {totalSentiments > 0 ? (
-                    <div className="chart-container">
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {totalSentiments > 0 ? (
+                  <div className="chart-container">
                       <Pie 
                         data={sentimentChartData} 
                         options={{
@@ -471,24 +471,24 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                           }
                         }} 
                       />
-                    </div>
-                  ) : (
-                    <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
-                  )}
-                </Card.Body>
-              </Card>
+                  </div>
+                ) : (
+                  <EmptyState icon="bi-emoji-neutral" message="No sentiment data available" />
+                )}
+              </Card.Body>
+            </Card>
 
-              {/* Source Distribution */}
+            {/* Source Distribution */}
               <Card className="analytics-card">
                 <Card.Header>
-                  <h5 className="mb-0">
-                    <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
-                    <span>Top Sources</span>
-                  </h5>
-                </Card.Header>
-                <Card.Body>
-                  {Object.keys(sourceCounts).length > 0 ? (
-                    <div className="chart-container">
+                <h5 className="mb-0">
+                  <i className="bi bi-newspaper me-2 text-primary" aria-hidden="true"></i>
+                  <span>Top Sources</span>
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {Object.keys(sourceCounts).length > 0 ? (
+                  <div className="chart-container">
                       <Bar 
                         data={sourceChartData} 
                         options={{
@@ -497,50 +497,50 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                           responsive: true
                         }} 
                       />
-                    </div>
-                  ) : (
-                    <EmptyState icon="bi-newspaper" message="No source data available" />
-                  )}
-                </Card.Body>
-              </Card>
+                  </div>
+                ) : (
+                  <EmptyState icon="bi-newspaper" message="No source data available" />
+                )}
+              </Card.Body>
+            </Card>
 
-              {/* Top Companies */}
+            {/* Top Companies */}
               <Card className="analytics-card">
                 <Card.Header>
-                  <h5 className="mb-0">
-                    <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
-                    <span>Top Companies</span>
-                  </h5>
-                </Card.Header>
+                <h5 className="mb-0">
+                  <i className="bi bi-building me-2 text-primary" aria-hidden="true"></i>
+                  <span>Top Companies</span>
+                </h5>
+              </Card.Header>
                 <Card.Body className="d-flex align-items-center">
-                  {renderBadges(topCompanies, 'light')}
-                </Card.Body>
-              </Card>
+                {renderBadges(topCompanies, 'light')}
+              </Card.Body>
+            </Card>
 
-              {/* Top Categories */}
+            {/* Top Categories */}
               <Card className="analytics-card">
                 <Card.Header>
-                  <h5 className="mb-0">
-                    <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
-                    <span>Top Categories</span>
-                  </h5>
-                </Card.Header>
+                <h5 className="mb-0">
+                  <i className="bi bi-tags me-2 text-primary" aria-hidden="true"></i>
+                  <span>Top Categories</span>
+                </h5>
+              </Card.Header>
                 <Card.Body className="d-flex align-items-center">
-                  {renderBadges(topCategories, 'info')}
-                </Card.Body>
-              </Card>
+                {renderBadges(topCategories, 'info')}
+              </Card.Body>
+            </Card>
 
-              {/* Publication Timeline */}
+            {/* Publication Timeline */}
               <Card className="analytics-card">
                 <Card.Header>
-                  <h5 className="mb-0">
-                    <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
-                    <span>Publication Timeline</span>
-                  </h5>
-                </Card.Header>
-                <Card.Body>
-                  {Object.keys(timeDistribution).length > 0 ? (
-                    <div className="chart-container">
+                <h5 className="mb-0">
+                  <i className="bi bi-calendar-date me-2 text-primary" aria-hidden="true"></i>
+                  <span>Publication Timeline</span>
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {Object.keys(timeDistribution).length > 0 ? (
+                  <div className="chart-container">
                       <Line 
                         data={timelineChartData} 
                         options={{
@@ -549,24 +549,24 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                           responsive: true
                         }} 
                       />
-                    </div>
-                  ) : (
-                    <EmptyState icon="bi-calendar" message="No timeline data available" />
-                  )}
-                </Card.Body>
-              </Card>
-              
-              {/* Sentiment Trends */}
+                  </div>
+                ) : (
+                  <EmptyState icon="bi-calendar" message="No timeline data available" />
+                )}
+              </Card.Body>
+            </Card>
+            
+            {/* Sentiment Trends */}
               <Card className="analytics-card">
                 <Card.Header>
-                  <h5 className="mb-0">
-                    <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
-                    <span>Sentiment Trends</span>
-                  </h5>
-                </Card.Header>
-                <Card.Body>
-                  {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
-                    <div className="chart-container">
+                <h5 className="mb-0">
+                  <i className="bi bi-graph-up me-2 text-primary" aria-hidden="true"></i>
+                  <span>Sentiment Trends</span>
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {Object.values(monthlyTrends).some(month => month.articles > 0) ? (
+                  <div className="chart-container">
                       <Line 
                         data={sentimentTrendChartData} 
                         options={{
@@ -575,20 +575,20 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
                           responsive: true
                         }} 
                       />
-                    </div>
-                  ) : (
-                    <EmptyState icon="bi-graph-up" message="No trend data available" />
-                  )}
-                </Card.Body>
-              </Card>
-            </>
-          ) : (
-            <div className="text-center py-4">
+                  </div>
+                ) : (
+                  <EmptyState icon="bi-graph-up" message="No trend data available" />
+                )}
+              </Card.Body>
+            </Card>
+          </>
+        ) : (
+          <div className="text-center py-4">
               <i className="bi bi-bar-chart text-muted" style={{fontSize: "2rem", opacity: 0.4}} aria-hidden="true"></i>
-              <p className="mt-2 text-muted">No data available for analytics</p>
-              <small className="text-muted d-block">Search for results to see analysis</small>
-            </div>
-          )}
+            <p className="mt-2 text-muted">No data available for analytics</p>
+            <small className="text-muted d-block">Search for results to see analysis</small>
+          </div>
+        )}
         </div>
       </div>
     </>
