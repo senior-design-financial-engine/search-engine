@@ -161,61 +161,9 @@ function Home() {
 		setRecentQueries(savedQueries);
 	}, []);
 
-	const saveRecentQuery = (searchQuery) => {
-		// Create query object with filters
-		const queryData = {
-			query: searchQuery,
-			filters: {},
-			timestamp: new Date().toISOString()
-		};
-		
-		// Add filters that have non-default values
-		if (advancedQueries.source) {
-			queryData.filters.source = advancedQueries.source;
-		}
-		
-		if (advancedQueries.time_range !== 'all') {
-			queryData.filters.time_range = advancedQueries.time_range;
-		}
-		
-		if (advancedQueries.sentiment !== 'all') {
-			queryData.filters.sentiment = advancedQueries.sentiment;
-		}
-		
-		// Get existing recent queries
-		const existingQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
-		
-		// Check if query exists (compare both query text and filters)
-		const queryExists = existingQueries.some(existingQuery => {
-			if (typeof existingQuery === 'string') {
-				return existingQuery === searchQuery && Object.keys(queryData.filters).length === 0;
-			}
-			
-			return existingQuery.query === searchQuery && 
-				JSON.stringify(existingQuery.filters) === JSON.stringify(queryData.filters);
-		});
-		
-		if (!queryExists) {
-			// Add new query at the beginning
-			const updatedQueries = [queryData, ...existingQueries.slice(0, 9)];
-			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
-			setRecentQueries(updatedQueries);
-		} else {
-			// If query exists, move it to the top and update timestamp
-			const updatedQueries = [
-				queryData,
-				...existingQueries.filter(existingQuery => {
-					if (typeof existingQuery === 'string') {
-						return !(existingQuery === searchQuery && Object.keys(queryData.filters).length === 0);
-					}
-					
-					return !(existingQuery.query === searchQuery && 
-						JSON.stringify(existingQuery.filters) === JSON.stringify(queryData.filters));
-				})
-			].slice(0, 10);
-			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
-			setRecentQueries(updatedQueries);
-		}
+	const clearRecentQueries = () => {
+		localStorage.removeItem('recentQueries');
+		setRecentQueries([]);
 	};
 
 	const handleQueryClick = (queryData) => {
@@ -258,6 +206,70 @@ function Home() {
 				navigate(`/results?${searchParams.toString()}`);
 			}, 300);
 		}
+	};
+
+	// Function to render filter badges
+	const renderFilterBadges = (filters) => {
+		if (!filters) return null;
+		
+		const badges = [];
+		
+		if (filters.source) {
+			badges.push(
+				<Badge key="source" bg="info" className="me-1" pill>
+					<i className="bi bi-newspaper me-1"></i>
+					{filters.source}
+				</Badge>
+			);
+		}
+		
+		if (filters.time_range && filters.time_range !== 'all') {
+			const timeLabel = timeRanges.find(t => t.value === filters.time_range)?.label || filters.time_range;
+			badges.push(
+				<Badge key="time" bg="secondary" className="me-1" pill>
+					<i className="bi bi-calendar me-1"></i>
+					{timeLabel}
+				</Badge>
+			);
+		}
+		
+		if (filters.sentiment && filters.sentiment !== 'all') {
+			const sentimentInfo = sentiments.find(s => s.value === filters.sentiment);
+			const label = sentimentInfo?.label || filters.sentiment;
+			const color = sentimentInfo?.color || 'secondary';
+			badges.push(
+				<Badge key="sentiment" bg={color} className="me-1" pill>
+					<i className="bi bi-emoji-smile me-1"></i>
+					{label}
+				</Badge>
+			);
+		}
+		
+		return badges.length ? <div className="mt-1">{badges}</div> : null;
+	};
+
+	// Function to get a summary of filters for screen readers and tooltips
+	const getFilterSummary = (filters) => {
+		if (!filters || Object.keys(filters).length === 0) return "No filters applied";
+		
+		const filterDescriptions = [];
+		
+		if (filters.source) {
+			filterDescriptions.push(`Source: ${filters.source}`);
+		}
+		
+		if (filters.time_range && filters.time_range !== 'all') {
+			const timeLabel = timeRanges.find(t => t.value === filters.time_range)?.label || filters.time_range;
+			filterDescriptions.push(`Time: ${timeLabel}`);
+		}
+		
+		if (filters.sentiment && filters.sentiment !== 'all') {
+			const sentimentInfo = sentiments.find(s => s.value === filters.sentiment);
+			const label = sentimentInfo?.label || filters.sentiment;
+			filterDescriptions.push(`Sentiment: ${label}`);
+		}
+		
+		return filterDescriptions.join(', ');
 	};
 
 	const handleSearch = (e) => {
@@ -340,6 +352,63 @@ function Home() {
 			
 			navigate(`/results?${searchParams.toString()}`);
 		}, 300);
+	};
+
+	const saveRecentQuery = (searchQuery) => {
+		// Create query object with filters
+		const queryData = {
+			query: searchQuery,
+			filters: {},
+			timestamp: new Date().toISOString()
+		};
+		
+		// Add filters that have non-default values
+		if (advancedQueries.source) {
+			queryData.filters.source = advancedQueries.source;
+		}
+		
+		if (advancedQueries.time_range !== 'all') {
+			queryData.filters.time_range = advancedQueries.time_range;
+		}
+		
+		if (advancedQueries.sentiment !== 'all') {
+			queryData.filters.sentiment = advancedQueries.sentiment;
+		}
+		
+		// Get existing recent queries
+		const existingQueries = JSON.parse(localStorage.getItem('recentQueries')) || [];
+		
+		// Check if query exists (compare both query text and filters)
+		const queryExists = existingQueries.some(existingQuery => {
+			if (typeof existingQuery === 'string') {
+				return existingQuery === searchQuery && Object.keys(queryData.filters).length === 0;
+			}
+			
+			return existingQuery.query === searchQuery && 
+				JSON.stringify(existingQuery.filters) === JSON.stringify(queryData.filters);
+		});
+		
+		if (!queryExists) {
+			// Add new query at the beginning
+			const updatedQueries = [queryData, ...existingQueries.slice(0, 9)];
+			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
+			setRecentQueries(updatedQueries);
+		} else {
+			// If query exists, move it to the top and update timestamp
+			const updatedQueries = [
+				queryData,
+				...existingQueries.filter(existingQuery => {
+					if (typeof existingQuery === 'string') {
+						return !(existingQuery === searchQuery && Object.keys(queryData.filters).length === 0);
+					}
+					
+					return !(existingQuery.query === searchQuery && 
+						JSON.stringify(existingQuery.filters) === JSON.stringify(queryData.filters));
+				})
+			].slice(0, 10);
+			localStorage.setItem('recentQueries', JSON.stringify(updatedQueries));
+			setRecentQueries(updatedQueries);
+		}
 	};
 
 	return (
