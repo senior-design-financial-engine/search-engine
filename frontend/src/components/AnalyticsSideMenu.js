@@ -187,10 +187,10 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
       legend: {
         position: 'bottom',
         labels: {
-          boxWidth: 12,
-          padding: 8,
+          boxWidth: 10,
+          padding: 6,
           font: {
-            size: 11
+            size: 10
           },
           color: '#495057'
         }
@@ -203,15 +203,21 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
         titleColor: '#495057',
         bodyColor: '#495057',
         borderColor: '#dee2e6',
-        borderWidth: 1
+        borderWidth: 1,
+        titleFont: {
+          size: 11
+        },
+        bodyFont: {
+          size: 11
+        }
       }
     },
     layout: {
       padding: {
-        left: 10,
-        right: 10,
-        top: 10,
-        bottom: 10
+        left: 5,
+        right: 5,
+        top: 5,
+        bottom: 5
       }
     },
     scales: {
@@ -221,7 +227,10 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           color: '#f0f0f0'
         },
         ticks: {
-          color: '#495057'
+          color: '#495057',
+          font: {
+            size: 10
+          }
         }
       },
       x: {
@@ -229,7 +238,10 @@ const AnalyticsSideMenu = ({ isOpen, toggleMenu, results }) => {
           display: false
         },
         ticks: {
-          color: '#495057'
+          color: '#495057',
+          font: {
+            size: 10
+          }
         }
       }
     }

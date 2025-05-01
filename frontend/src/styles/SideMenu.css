@@ -209,7 +209,7 @@
 
 /* Card styles with reduced spacing */
 .analytics-card {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-radius: var(--radius-md, 8px);
   overflow: hidden;
   transition: all 0.2s ease;
@@ -227,13 +227,13 @@
 }
 
 .analytics-card .card-header {
-  padding: 10px 12px;
+  padding: 8px 12px;
   background-color: var(--white, #fff);
   border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
 .analytics-card .card-body {
-  padding: 10px 12px;
+  padding: 8px 12px;
 }
 
 .analytics-card .card-header h5 {
@@ -242,8 +242,8 @@
 }
 
 .chart-container {
-  height: 180px;
-  margin-bottom: 8px;
+  height: 140px;
+  margin-bottom: 0;
 }
 
 .empty-state {
