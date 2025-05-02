@@ -23,20 +23,115 @@ openai.api_key = ''
 
 # Define topics and their related keywords
 TOPICS = {
-    # Individual company tags
-    "nvidia": ["nvidia", "nvda", "jensen huang", "rtx", "ai chips", "gpu"],
-    "microsoft": ["microsoft", "msft", "satya nadella", "azure", "windows", "xbox"],
-    "apple": ["apple", "aapl", "tim cook", "iphone", "mac", "ipad"],
-    "alphabet": ["alphabet", "googl", "goog", "google", "sundar pichai", "youtube", "android"],
-    "amazon": ["amazon", "amzn", "andy jassy", "aws", "prime", "alexa"],
-    "meta": ["meta", "meta platforms", "facebook", "mark zuckerberg", "instagram", "whatsapp"],
-    "tesla": ["tesla", "tsla", "elon musk", "cybertruck"],
+    # Tech Giants (FAANG+)
+    "nvidia": ["nvidia", "nvda", "jensen huang", "rtx", "ai chips", "gpu", "h100", "a100", "cuda"],
+    "microsoft": ["microsoft", "msft", "satya nadella", "azure", "windows", "xbox", "office", "linkedin", "github"],
+    "apple": ["apple", "aapl", "tim cook", "iphone", "mac", "ipad", "vision pro", "app store", "services"],
+    "alphabet": ["alphabet", "googl", "goog", "google", "sundar pichai", "youtube", "android", "waymo", "deepmind"],
+    "amazon": ["amazon", "amzn", "andy jassy", "aws", "prime", "alexa", "amazon web services", "amazon prime"],
+    "meta": ["meta", "meta platforms", "facebook", "mark zuckerberg", "instagram", "whatsapp", "threads", "metaverse"],
+    "tesla": ["tesla", "tsla", "elon musk", "cybertruck", "model y", "model 3", "gigafactory", "fsd"],
     
-    # Other specific company tags
-    "netflix": ["netflix", "nflx", "netflix original", "reed hastings", "ted sarandos"],
-    "jp_morgan": ["jp morgan", "jpm", "jpmorgan", "jamie dimon", "jp morgan chase"],
-    "tempus_ai": ["tempus ai", "tempus labs", "eric lefkofsky"],
-    "openai": ["openai", "sam altman", "chatgpt", "gpt-4", "anthropic", "claude", "microsoft ai"]
+    # Streaming & Entertainment
+    "netflix": ["netflix", "nflx", "netflix original", "reed hastings", "ted sarandos", "streaming wars"],
+    "disney": ["disney", "dis", "bob iger", "disney+", "espn", "hulu", "marvel", "star wars", "pixar"],
+    "warner_bros": ["warner bros", "wbd", "david zaslav", "hbo", "max", "dc", "warner discovery"],
+    
+    # Financial Services
+    "jp_morgan": ["jp morgan", "jpm", "jpmorgan", "jamie dimon", "jp morgan chase", "chase bank"],
+    "goldman_sachs": ["goldman sachs", "gs", "david solomon", "investment banking", "goldman"],
+    "morgan_stanley": ["morgan stanley", "ms", "james gorman", "wealth management", "investment bank"],
+    "visa": ["visa", "v", "ryan mcinerney", "credit cards", "payment processing"],
+    "mastercard": ["mastercard", "ma", "michael miebach", "payment processing", "credit cards"],
+    
+    # Healthcare & Biotech
+    "pfizer": ["pfizer", "pfe", "albert bourla", "vaccines", "pharmaceuticals", "covid vaccine"],
+    "moderna": ["moderna", "mrna", "stephane bancel", "mrna vaccines", "covid vaccine"],
+    "eli_lilly": ["eli lilly", "lly", "david ricks", "diabetes", "trulicity", "mounjaro"],
+    "novo_nordisk": ["novo nordisk", "nvo", "lars fruergaard jorgensen", "ozempic", "wegovy", "diabetes"],
+    
+    # AI & Tech Innovation
+    "openai": ["openai", "sam altman", "chatgpt", "gpt-4", "anthropic", "claude", "microsoft ai"],
+    "tempus_ai": ["tempus ai", "tempus labs", "eric lefkofsky", "healthcare ai", "precision medicine"],
+    "palantir": ["palantir", "pltr", "alex karp", "data analytics", "government contracts", "ai platform"],
+    "amd": ["amd", "lisa su", "ryzen", "epyc", "radeon", "ai chips", "semiconductors"],
+    "intel": ["intel", "intc", "pat gelsinger", "processors", "foundry", "semiconductors"],
+    
+    # Retail & E-commerce
+    "walmart": ["walmart", "wmt", "doug mcmillon", "retail", "e-commerce", "walmart+"],
+    "target": ["target", "tgt", "brian cornell", "retail", "target circle"],
+    "costco": ["costco", "cost", "craig jelinek", "wholesale", "membership", "warehouse"],
+    
+    # Automotive & Transportation
+    "ford": ["ford", "f", "jim farley", "electric vehicles", "f-150", "mustang mach-e", "ford pro"],
+    "general_motors": ["general motors", "gm", "mary barra", "electric vehicles", "chevrolet", "cadillac", "ultium"],
+    "rivian": ["rivian", "rivn", "rj scaringe", "electric vehicles", "r1t", "r1s", "amazon vans"],
+    "toyota": ["toyota", "tm", "koji sato", "prius", "camry", "rav4", "battery ev", "hydrogen"],
+    "honda": ["honda", "hmc", "toshihiro mibe", "accord", "civic", "cr-v", "prologue"],
+    "volkswagen": ["volkswagen", "vw", "oliver blume", "id.4", "id.buzz", "porsche", "audi", "bentley"],
+    "stellantis": ["stellantis", "stla", "carlos tavares", "jeep", "ram", "chrysler", "dodge", "peugeot"],
+    "hyundai": ["hyundai", "hyu", "euisun chung", "ioniq", "kona", "korea motors", "genesis"],
+    "lucid": ["lucid", "lcid", "peter rawlinson", "lucid air", "gravity", "luxury ev"],
+    "fisker": ["fisker", "fsr", "henrik fisker", "ocean", "pearl", "ronin"],
+    
+    # Energy & Utilities
+    "exxon": ["exxon", "xom", "darren woods", "oil", "energy", "exxon mobil", "lng", "chemicals"],
+    "chevron": ["chevron", "cvx", "mike wirth", "oil", "energy", "renewables", "lng", "carbon capture"],
+    "nextera": ["nextera", "nee", "john ketchum", "renewable energy", "wind", "solar", "clean energy"],
+    "shell": ["shell", "shel", "wael sawan", "oil", "lng", "renewables", "carbon capture"],
+    "bp": ["bp", "bernard looney", "oil", "renewables", "wind", "solar", "carbon capture"],
+    "conocophillips": ["conocophillips", "cop", "ryan lance", "oil", "natural gas", "lng"],
+    "pioneer": ["pioneer", "pxd", "scott sheffield", "oil", "shale", "permian basin"],
+    "schlumberger": ["schlumberger", "slb", "olivier le peuch", "oil services", "drilling", "digital solutions"],
+    "halliburton": ["halliburton", "hal", "jeff miller", "oil services", "fracking", "drilling"],
+    "baker_hughes": ["baker hughes", "bkr", "lorenzo simonelli", "oil services", "turbomachinery", "digital solutions"],
+    
+    # Industrial & Manufacturing
+    "boeing": ["boeing", "ba", "dave calhoun", "aircraft", "737 max", "defense", "space", "starliner"],
+    "lockheed": ["lockheed", "lmt", "james taiclet", "defense", "f-35", "aerospace", "space", "skunk works"],
+    "caterpillar": ["caterpillar", "cat", "jim umpleby", "construction", "mining", "heavy equipment"],
+    "northrop": ["northrop grumman", "noc", "kathy warden", "b-21", "b-2", "space", "defense systems"],
+    "raytheon": ["raytheon", "rtx", "greg hayes", "missiles", "defense", "pratt & whitney", "collins aerospace"],
+    "general_dynamics": ["general dynamics", "gd", "phebe novakovic", "submarines", "gulfstream", "combat systems"],
+    "l3harris": ["l3harris", "lhx", "chris kubasik", "space", "defense", "communications", "electronic warfare"],
+    "huntington_ingalls": ["huntington ingalls", "hi", "chris kastner", "shipbuilding", "nuclear carriers", "submarines"],
+    "bae_systems": ["bae systems", "baesf", "charles woodburn", "defense", "electronic systems", "combat vehicles"],
+    "leidos": ["leidos", "ldos", "tom bell", "defense", "cybersecurity", "intelligence", "healthcare it"],
+    
+    # Telecommunications
+    "verizon": ["verizon", "vz", "hans vestberg", "5g", "wireless", "fios"],
+    "t-mobile": ["t-mobile", "tmus", "mike sievert", "5g", "wireless", "sprint merger"],
+    "comcast": ["comcast", "cmcsa", "brian roberts", "xfinity", "nbcuniversal", "peacock"],
+    
+    # Major Industrials & Conglomerates
+    "ge": ["ge", "general electric", "larry culp", "aerospace", "power", "renewable energy", "healthcare", "ge vernova", "ge aerospace"],
+    "siemens": ["siemens", "sie", "roland busch", "industrial automation", "smart infrastructure", "mobility", "healthcare"],
+    "honeywell": ["honeywell", "hon", "vimal kapur", "aerospace", "building technologies", "performance materials", "safety solutions"],
+    "3m": ["3m", "mmm", "mike roman", "post-it", "industrial adhesives", "healthcare", "safety", "consumer goods"],
+    "dow": ["dow", "dow chemical", "jim fitterling", "chemicals", "materials science", "packaging", "industrial solutions"],
+    "dupont": ["dupont", "dd", "ed breen", "electronics", "water solutions", "protection", "industrial biosciences"],
+    
+    # Precious Metals & Mining
+    "newmont": ["newmont", "nem", "tom palmer", "gold", "mining", "nevada gold mines", "peñasquito"],
+    "barrick": ["barrick", "gold", "mark bristow", "gold", "copper", "nevada gold mines", "carlin"],
+    "wheaton": ["wheaton precious metals", "wpm", "randy smallwood", "silver", "gold", "streaming", "royalties"],
+    "pan_american": ["pan american silver", "paas", "michael steinmann", "silver", "gold", "mining", "latam"],
+    "agnico_eagle": ["agnico eagle", "aem", "ammar al-joundi", "gold", "mining", "canadian malartic", "kittila"],
+    "franco_nevada": ["franco nevada", "fnv", "paul brink", "gold", "silver", "royalties", "streaming"],
+    
+    # Semiconductor & Tech Hardware
+    "tsmc": ["tsmc", "taiwan semiconductor", "cc wei", "semiconductors", "chips", "foundry", "3nm", "5nm"],
+    "samsung": ["samsung", "ssnlf", "kyung kye-hyun", "semiconductors", "memory chips", "galaxy", "foundry"],
+    "micron": ["micron", "mu", "sanjay mehrotra", "memory chips", "dram", "nand", "semiconductors"],
+    "qualcomm": ["qualcomm", "qcom", "cristiano amon", "snapdragon", "5g", "semiconductors", "mobile chips"],
+    "broadcom": ["broadcom", "avgo", "hock tan", "semiconductors", "networking", "software", "vmware"],
+    
+    # Industrial Materials & Chemicals
+    "albemarle": ["albemarle", "alb", "kent masters", "lithium", "battery materials", "bromine", "catalysts"],
+    "linde": ["linde", "lin", "sanjiv lamba", "industrial gases", "hydrogen", "oxygen", "nitrogen"],
+    "air_products": ["air products", "apd", "seifi ghasemi", "industrial gases", "hydrogen", "helium", "nitrogen"],
+    "lyondellbasell": ["lyondellbasell", "lyb", "peter vanacker", "chemicals", "plastics", "refining", "olefins"],
+    "eastman": ["eastman chemical", "emn", "mark costa", "chemicals", "materials", "plastics", "fibers"],
 }
 
 # Load sources configuration

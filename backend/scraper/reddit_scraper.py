@@ -53,7 +53,7 @@ class RedditScraper:
         self.api_key = apify_api_key or os.environ.get('APIFY_API_KEY')
         if not self.api_key:
             logger.warning("No Apify API key provided. Using demonstration API key.")
-            self.api_key = "apify_api_2K848Em7cJOhFutBhW2acAIQh0XRa63EjftD"  # Demo key, should be replaced
+            self.api_key = "apify_api_WFeRN7S2NUJoSCmg5YuYILRxyep9du4G50ab"  # Demo key, should be replaced
         
         self.client = ApifyClient(self.api_key)
         self.threads = {}

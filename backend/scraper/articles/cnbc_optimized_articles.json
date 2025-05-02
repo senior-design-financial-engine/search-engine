@@ -184,5 +184,676 @@
         "headline_tags": [
             "tesla"
         ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/04/microsoft-turns-50-future-success-built-on-ability-to-win-the-new-.html",
+        "source": "cnbc",
+        "headline": "As Microsoft turns 50, Nadella sees future success built on ability to 'win the new'",
+        "content": "A half-century ago, childhood friendsBill Gatesand Paul Allen startedfrom a strip mall in Albuquerque, New Mexico. Five decades and almost $3 trillion later, the company celebrates its 50th birthday on Friday from its sprawling campus in Redmond, Washington. Now the second most valuable publicly traded company in the world, Microsoft has only had three CEOs in its history, and all of them are in attendance for the monumental event. One is current CEOSatya Nadella. The other two are Gates andSteve Ballmer, both among the 11 richest people in the world due to their Microsoft fortunes. While Microsoft has mostly been on the ascent of late, with Nadella turning the company into a major power player in cloud computing and artificial intelligence, the birthday party lands at an awkward moment. The company's stock price has dropped for four consecutive months for the first time since 2009 and just suffered its steepest quarterly drop in three years. That was all beforePresident Donald Trump'sannouncement this week of sweeping tariffs, which sent the Nasdaqtumblingon Thursday and Microsoft down another 2.4%. Cloud computing has been Microsoft's main source of new revenue since Nadella took over from Ballmer as CEO in 2014. But the Azure cloud reporteddisappointing revenuein the latest quarter, a miss that finance chief Amy Hood attributed in January to power and space shortages and a sales posture that focused too much on AI. Hood said revenue growth in the current quarter will fall to 10% from 17% a year earlier Nadella said management is refining sales incentives to maximize revenue from traditional workloads, while positioning the company to benefit from the ongoing AI boom. \"You would rather win the new than just protect the past,\" Nadella told analysts on a conference call. The past remains healthy. Microsoft still generates around one-fifth of its roughly $262 billion in annual revenue from productivity software, mostly from commercial clients. Windows makes up around 10% of sales. Meanwhile, the company has used its massive cash pile to orchestrate its three largest acquisitions on record in a little over eight years, snapping up LinkedIn in late 2016, Nuance Communications in 2022 and Activision Blizzard in 2023, for a combined $121 billion.",
+        "summary": "Microsoft celebrates its 50th birthday with current CEO Satya Nadella, along with founders Bill Gates and Steve Ballmer, marking the occasion. Despite recent setbacks like a drop in stock price and disappointing Azure cloud revenue, Nadella remains focused on winning in the new technology landscape, emphasizing the importance of cloud computing and artificial intelligence for future success.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": 0.6
+        },
+        "tags": [
+            "microsoft"
+        ],
+        "timestamp": "2025-04-04 12:00:01",
+        "headline_tags": [
+            "microsoft"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/03/nvidia-positioned-to-weather-trump-tariffs-says-altimeters-gerstner.html",
+        "source": "cnbc",
+        "headline": "Nvidia positioned to weather Trump tariffs, chip demand 'off the charts,' says Altimeter's Gerstner",
+        "content": "Altimeter Capital CEOBrad Gerstnersaid Thursday that he is moving out of the \"bomb shelter\" withand into a position of safety, expecting that the chipmaker is positioned to withstandPresident Donald Trump'swidespread tariffs. \"The growth and the demand for GPUs is off the charts,\" he told CNBC's \"Fast Money Halftime Report,\" referring to Nvidia's graphics processing units that are powering the artificial intelligence boom. He said investors just need to listen to commentary from OpenAI,andElon Musk. President Trump announced an expansive and aggressive\"reciprocal tariff\" policyin a ceremony at the White House on Wednesday. The plan established a 10% baseline tariff, though many countries such as China, Vietnam and Taiwan are subject to steeper rates. The announcement sent stocks tumbling on Thursday, with the tech-heavy Nasdaq closing down nearly 6%, and registering its biggest decline since March 2020. The big reason Nvidia may be better positioned to withstand Trump's tariff hikes is because semiconductors are on the list of exceptions, which Gerstner called a \"wise exception\" due to the importance of AI. Nvidia'sbusiness has explodedsince the release of OpenAI's ChatGPT in 2022, and annual revenue has more than doubled in each of the past two fiscal years. After a massive rally, Nvidia's stock price has dropped more than 20% this year and closed down almost 8% on Thursday. Gerstner is concerned about the potential of a recession due to the tariffs, but is relatively bullish on Nvidia, and said the \"negative impact from tariffs will be much less than in other areas.\" He said it is key for the U.S. to stay competitive in AI. While the company's chips are designed domestically, they are manufactured in Taiwan \"because they can't be fabricated in the U.S.\" Higher tariffs would punish companies such asand, he said. \"We're in a global race in AI,\" Gerstner said. \"We can't hamper our ability to win that race.\"",
+        "summary": "Altimeter Capital CEO Brad Gerstner believes Nvidia is well-positioned to withstand President Trump's tariffs, citing strong demand for GPUs powering AI. Despite concerns about potential recession impacts, Gerstner remains bullish on Nvidia due to its exception from semiconductor tariffs and significant revenue growth driven by AI applications.",
+        "sentiment": {
+            "company": "nvidia",
+            "score": 0.8
+        },
+        "tags": [
+            "nvidia",
+            "openai"
+        ],
+        "timestamp": "2025-04-03 20:16:31",
+        "headline_tags": [
+            "nvidia"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/03/youtube-announces-shorts-editing-features-amid-potential-tiktok-ban.html",
+        "source": "cnbc",
+        "headline": "YouTube announces Shorts editing features amid potential TikTok ban",
+        "content": "YouTube on Thursday announced new video creation tools for Shorts, its short-form video feed that competes against TikTok. The features come at a time when TikTok, which is owned by Chinese company ByteDance, is at risk of an effectiveban in the U.S.if it's not sold to an American owner by April 5. Among the new tools is an updated video editor that allows creators to make precise adjustments and edits, a feature that automatically syncs video cuts to the beat of a song and AI stickers. The creator tools will become available later this spring, said YouTube, which is owned by. Along with the new features, YouTube last week said it was changing the way view counts are tabulated on Shorts. Under the new guidelines, Shorts views will count the number of times the video is played or replayed with no minimum watch time requirement. Previously, views were only counted if a video was played for a certain number of seconds. This new tabulation method is similar to how views are counted on TikTok and Meta's Reels, and will likely inflate view counts. \"We got this feedback from creators that this is what they wanted. It's a way for them to better understand when their Shorts have been seen,\" YouTube Chief Product Officer Johanna Voolich said in aYouTube video. \"It's useful for creators who post across multiple platforms.\" WATCH:TikTok is a digital Trojan horse, says Hayman Capital's Kyle Bass",
+        "summary": "YouTube announced new video creation tools for Shorts, its short-form video feed, in response to the potential TikTok ban in the U.S. The features include an updated video editor, automatic syncing to music beats, and AI stickers. YouTube is also changing its view count tabulation method for Shorts to align with TikTok and Meta's Reels.",
+        "sentiment": {
+            "company": "alphabet",
+            "score": 0.8
+        },
+        "tags": [
+            "alphabet"
+        ],
+        "timestamp": "2025-04-03 16:00:01",
+        "headline_tags": [
+            "alphabet"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/03/tech-stocks-sink-after-trump-tariff-rollout-apple-leads-drop.html",
+        "source": "cnbc",
+        "headline": "Tech stocks have worst day since Covid pandemic, led by plunge in Apple",
+        "content": "Technology stocks plummeted Thursday for their worst session since the Covid pandemic after President Donald Trump's newtariffpolicies sparked widespreadmarket panic. led the declines among the so-called \"Magnificent Seven\" group, dropping more than 9% for its worst drop since 2020. The iPhone maker makes its devices in China and other Asian countries. Suppliers such asandplunged about 16% and 12%, respectively. The tech-heavyshed about 6% for its worst session in more than five years. The index is down more than 14% year to date. Other megacaps also felt the pressure.andfell about 9% each, whiledropped nearly 8%. Nvidia builds its new chips in Taiwan and relies on Mexico for assembling its artificial intelligence systems.slumped more than 5%, whileandboth fell about 2% and 4%, respectively. Semiconductor stocks also felt the pain, with,andfalling at least 10% each.sank more than 16%, whiledeclined more about 9%. Personal computer makersandtanked 19% and about 15%, respectively. Dell registered its worst session in since 2018.",
+        "summary": "Technology stocks, including Apple, experienced a significant decline due to President Trump's new tariff policies, marking the worst day since the Covid pandemic. Apple led the losses, dropping over 9%, impacting its suppliers as well. The tech-heavy Nasdaq also fell about 6%, with other major tech companies like Amazon and Microsoft also facing declines.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.8
+        },
+        "tags": [
+            "nvidia",
+            "apple"
+        ],
+        "timestamp": "2025-04-03 20:11:08",
+        "headline_tags": [
+            "apple"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/03/apple-iphone-production-in-china-india-in-focus-after-trump-tariffs.html",
+        "source": "cnbc",
+        "headline": "Here's where Apple makes its products — and how Trump's tariffs could have an impact",
+        "content": "has made moves to diversify its supply chain beyond China to places like India and Vietnam, but tariffs announced by the White House are set to hit those countries too. U.S. President Donald Trumplaid out \"reciprocal tariff\" rateson more than 180 countries on Wednesday. China will face a 34% tariff, but with the existing 20% rate, that brings the true tariff rate on Beijing under this Trump term to 54%,CNBC reported. India faces a 26% tariff, while Vietnam's rate is 46%. Apple was not immediately available for comment when contacted by CNBC. Here's a breakdown on Apple's supply chain footprint that could be affected by tariffs.",
+        "summary": "Apple has been diversifying its supply chain beyond China to countries like India and Vietnam, but Trump's tariffs are set to impact these countries as well. The White House announced reciprocal tariff rates for over 180 countries, with China facing a 34% tariff and India and Vietnam facing 26% and 46% tariffs respectively. Apple has not commented on the situation.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.5
+        },
+        "tags": [
+            "apple"
+        ],
+        "timestamp": "2025-04-03 08:37:54",
+        "headline_tags": [
+            "apple"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/02/-apple-leads-drop-in-tech-stocks-after-trump-tariff-announcement.html",
+        "source": "cnbc",
+        "headline": "Apple leads a drop in tech stocks after Trump tariff announcement",
+        "content": "slid more than 6% in late trading Wednesday and led a broader decline in tech stocks afterPresident Donald Trumpannounced new tariffs of between 10% and 49% on imported goods. The majority of Apple's revenue comes from devices manufactured primarily in China and a handful of other Asian countries., which manufactures new chips in Taiwan and assembles its artificial intelligence systems in Mexico and elsewhere, fell about 4%, while electric vehicle companydropped 4.5%. Across the rest of the megacap universe,,andall dropped between 2.5% and 5%, andwas down by almost 2%. If Apple's postmarket loss is matched in regular trading Thursday, it would be the steepest decline for the stock since September 2020. Trump on Wednesday afternoon said the new taxes on imported goods would be a \"declaration of economic independence\" for the country. He announced a 10% blanket tariff on all imports, and higher duties for specific countries, including 34% for China, 20% for European nations, and 24% for Japanese imports, based on what tariffs they charge on U.S. exports, Trump said. \"We will supercharge our domestic industrial base, we will pry open foreign markets and break down foreign trade barriers,\" Trump said during his speech. \"Ultimately, more production at home will mean stronger competition and lower prices for consumers.\" Stocks broadly got hit by Trump's announcements. Anexchange-traded fundtracking the S&P 500 slid 2.8%, while an ETFfollowing the Nasdaq 100lost more than 3%. During his speech, Trump praised Apple, Meta, and Nvidia for spending money andinvestingin the United States. \"Apple is going to spend $500 billion, they never spent money like that here,\" Trump said. \"They're going to build their plants here.\" The Nasdaq just wrapped up its worst quarter since 2022, dropping 10% in the first three months of the year, though the tech-heavy index rose in each of the first two days of the second quarter. WATCH:President Trump signs executive orders for reciprocal tariffs",
+        "summary": "Apple's stock slid over 6% in late trading following President Trump's announcement of new tariffs on imported goods, impacting tech stocks overall. The majority of Apple's revenue comes from devices manufactured in China and other Asian countries. Trump's tariffs aim to boost domestic production and lower prices for consumers, leading to a broader decline in the stock market.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.8
+        },
+        "tags": [
+            "nvidia",
+            "apple"
+        ],
+        "timestamp": "2025-04-02 22:13:44",
+        "headline_tags": [
+            "apple"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/02/amazon-submits-bid-for-tiktok-as-ban-deadline-nears.html",
+        "source": "cnbc",
+        "headline": "Amazon submits bid for TikTok as ban deadline nears",
+        "content": "submitted a bid to the White House to purchase the social media app TikTok from its Chinese owners, CNBC has confirmed. The company sent its proposal in a letter this week to Vice President JD Vance and Commerce Secretary Howard Lutnick, according to a source familiar with the matter who asked not to be named because the discussions are confidential. The parties are not treating the bid seriously, however, given that it was submitted just days before a deadline staving off a U.S. ban is set to expire, the person said. Amazon declined to comment. The e-commerce company's offer, which was first reported byThe New York Times, comes as TikTok's fate in the U.S. is up in the air. The short-form video app faces another potential shutdown in the U.S. on April 5 if ByteDance, its parent company, cannot reach a deal to divest TikTok's American operations. Lawmakers passed a bill last year setting a Jan. 19 deadline for the sale, but Trump signed an executive order granting a 75-day extension for a potential deal. Trump could announce a decision on TikTok's fate in the U.S. as soon as Wednesday, sources familiar with the situation told CNBC's David Faber. Mobile technology companyhasalso made a bidfor TikTok, Faber reported separately, citing sources familiar with the matter. TikTok has emerged asa major hub for e-commerceas it has poured money into growing its online marketplace, called TikTok Shop. TikTok's lucrative marketplace, coupled with the app's more than 170 million users, could be an attractive asset for Amazon. Following TikTok's success, Amazon launched and then shuttered a short-form video service of its own. Last August, the two companies formed a partnership that allowed TikTok users to link their account with Amazon and make purchases from the site without leaving the app. The dealattracted scrutiny from lawmakerswho were concerned about its potential national security risks.",
+        "summary": "Amazon has submitted a bid to purchase TikTok from its Chinese owners just days before the U.S. ban deadline. The bid, though late in the process, could be attractive to Amazon due to TikTok's e-commerce potential and large user base. Lawmakers have expressed concerns about the potential national security risks associated with the deal.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.2
+        },
+        "tags": [
+            "amazon"
+        ],
+        "timestamp": "2025-04-02 21:22:55",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/02/amazon-to-launch-first-batch-of-kuiper-satellites-on-april-9-.html",
+        "source": "cnbc",
+        "headline": "Amazon to launch first batch of Kuiper satellites on April 9",
+        "content": "has set a date for the long-awaited maiden voyage of its Kuiper internet satellites. The satellites are slated to take off on United Launch Alliance's Atlas V rocket from Cape Canaveral, Florida, on April 9 at 12 p.m. ET, Amazonsaid in a blog post. The launch will be livestreamed onULA's website. The mission is a pivotal step toward beginning commercial service for Amazon's Project Kuiper, an initiativelaunched in 2019that aims to provide broadband internet from a constellation of more than 3,000 satellites. Amazon has earmarked $10 billion for the project, thoughthird-party analysts have saidKuiper could cost the company as much as $20 billion to get started. Amazon completed its first test of the servicein October 2023, when it sent up two prototype satellites. The company was expected to set its first operational satellites aloft last year, but the launch was delayed as ULA prioritized two U.S. Space Force missions. \"We've done extensive testing on the ground to prepare for this first mission, but there are some things you can only learn in flight, and this will be the first time we've flown our final satellite design and the first time we've deployed so many satellites at once,\" Rajeev Badyal, vice president of Kuiper, said in a statement. Kuiper will compete with other low earth orbit satellite internet providers including Elon Musk's Starlink — which has a 7,000-plus satellite constellation, making it well ahead of Amazon — along with SoftBank-backed OneWeb and newer entrants like China's SpaceSail. Like its rivals, Amazon is marketing Kuiper to consumers who lack adequate access to broadband internet, along with governments and companies. Users connect to the service bypurchasing terminals, which can send and receive signals from Kuiper satellites. The clock is ticking for Amazon to meet a deadline set by the Federal Communications Commission, which requires the company to have half of its total constellation, or 1,618 satellites, up in the air by July 2026. Amazon has bought more than 80 launches from rocket providers including ULA, Musk's SpaceX and Blue Origin, the rocket company owned by Amazon founder Jeff Bezos. WATCH:Inside Amazon's satellite factory",
+        "summary": "Amazon has announced the launch date for its Kuiper internet satellites, scheduled to take off on April 9 from Cape Canaveral, Florida. This launch marks a significant milestone for Amazon's Project Kuiper, aiming to provide broadband internet through a constellation of over 3,000 satellites. The company has invested $10 billion in the project, with potential costs reaching $20 billion. Amazon faces competition from other satellite internet providers like Starlink, OneWeb, and SpaceSail, targeting consumers without adequate broadband access.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.6
+        },
+        "tags": [
+            "amazon"
+        ],
+        "timestamp": "2025-04-02 18:28:14",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/02/tesla-shares-rise-on-unconfirmed-report-elon-musk-could-be-leaving-doge-post-soon.html",
+        "source": "cnbc",
+        "headline": "Tesla shares rise on report Elon Musk could be leaving DOGE post soon",
+        "content": "shares rose Wednesday afterPoliticoreported thatElon Muskcould leave his post at the so-called Department of Government Efficiency, paving the way for the CEO to return his focus on the struggling electric vehicle maker. The White House later called the report \"garbage.\" Musk also posted on X, \"Yeah, fake news,\" in response to the news. The stock closed more than 5% higher. At its session lows, it had dropped as much as 6.4% on the back ofweaker-than-expected vehicle deliveriesfor the first quarter. The report — which cites Trump insiders — noted that, while PresidentDonald Trumpis pleased with Musk and the DOGE spending cuts that have been pushed through, the two decided in recent days that the billionaire would soon return to his businesses. NBC Newsreported that Trump told the Cabinet that Musk could leave in the coming months. A senior government official told NBC News that Musk would leave at the end of a 130-day stint as a special government employee.",
+        "summary": "Tesla shares rose after reports suggested Elon Musk may be leaving his post at the Department of Government Efficiency to focus more on the struggling electric vehicle maker. Despite initial stock fluctuations due to weaker-than-expected vehicle deliveries, Tesla closed more than 5% higher. The White House dismissed the report as \"garbage,\" with Musk himself calling it \"fake news.\"",
+        "sentiment": {
+            "company": "tesla",
+            "score": 0.7
+        },
+        "tags": [
+            "tesla"
+        ],
+        "timestamp": "2025-04-02 20:04:29",
+        "headline_tags": [
+            "tesla"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/02/tesla-tsla-q1-2025-vehicle-delivery-and-production-numbers.html",
+        "source": "cnbc",
+        "headline": "Tesla reports 13% drop in first-quarter vehicle deliveries from a year ago",
+        "content": "Teslareported 336,681 vehicle deliveries in the first quarter of 2025, a 13% decline from a year ago, two days after the electric vehicle company's stock wrapped up itsworst quarter since 2022. The company's shares closed up more than 5%, rebounding from a dip after Politico reported that CEOElon Muskcouldleave his Department of Government Efficiency position. Here are the key numbers: Investors were expecting Tesla to report deliveries of between 360,000 and 370,000 vehicles, according to StreetAccount. Tesla's investor relations team sends a company-compiled consensus to select analysts, and said the average estimate was for around 377,590 deliveries. Prediction market company Kalshi on Tuesday released a forecast for Tesla deliveries of 352,000. In the first quarter of 2024, Tesla reported 386,810 deliveries, and production of 433,371 vehicles. Wedbush Securities analyst Dan Ives, typically among Tesla and CEO Musk's biggest believers, called the report a \"fork in the road moment\" for the electric vehicle company in aposton social media platform X. \"We knew 1Q Tesla deliveries would be soft but these numbers were bad,\" he wrote. \"We are not going to look at these numbers with rose colored glasses...they were a disaster on every metric. Refresh issues but brand crisis key.\" Deliveries are the closest approximation of vehicle sales reported by Tesla but are not precisely defined in the company's shareholder communications. Tesla doesn't break out sales and production by model or region. However, the company said that it produced 345,454of its most popularModel 3 and Model Y carsand delivered 323,800 of them in the three months ended March 31. The company reported 12,881 deliveries of its other models, including its angular steel Cybertruck.",
+        "summary": "Tesla reported a 13% drop in vehicle deliveries in the first quarter of 2025 compared to the previous year, falling short of investor expectations. The stock initially dipped after rumors of Elon Musk potentially leaving his government position but rebounded by more than 5%. Analysts like Dan Ives expressed concerns about the delivery numbers, calling it a critical moment for the company.",
+        "sentiment": {
+            "company": "tesla",
+            "score": -0.6
+        },
+        "tags": [
+            "tesla"
+        ],
+        "timestamp": "2025-04-02 20:05:46",
+        "headline_tags": [
+            "tesla"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/02/tesla-china-made-ev-sales-fall-11point5percent-in-march-as-competition-rises.html",
+        "source": "cnbc",
+        "headline": "Tesla China-made EV sales fall 11.5% in March as competition rises",
+        "content": "sales of its China-made cars fell in March as competition from local players like BYD intensified. Tesla sold 78,828 electric vehicles in China in March, down 11.5% year-on-year, according to data from the China Passenger Car Association (CPCA) released on Wednesday. However, sales rose 157% compared with the 30,688 cars bought in February. The U.S. carmaker is facing a number of headwinds in China, in particular mounting challenges from local rivals — which, unlike Tesla, logged growth. BYD, for example, sold 371,419 so-called new energy vehicles in March, which includes battery hybrid cars, the CPCA said. That was a 23% year-on-year rise. Sales from Geely, which owns brands such as Volvo Cars, rose 167% year-on-year to 119,696 vehicles last month. In a bid to push back against competition, Tesla launched arevamped Model Y in January.The automaker's stock suffered itsworst quarterin the first three months of the year in terms of performance since 2022, amid mounting pressures. The company's shares fell 3.04% by 08:04 a.m. EST in premarket trade on Wednesday. Concerns have meanwhile mounted that President Donald Trump's automotive tariffs could impact Tesla's suppliers in Mexico and China, with the White House involvement of the company's CEO Elon Musk also receiving backlash. Musk is part of the so-called Department of Government Efficiency, which is pushing for widespread government job cuts.The tech billionaire said last monththat his involvement with DOGE could be hurting Tesla's stock, amid protests, boycotts and attacks on Tesla dealerships around the world.",
+        "summary": "Tesla's China-made EV sales dropped by 11.5% in March due to increasing competition from local players like BYD. Despite the decline, Tesla saw a 157% increase in sales compared to February. The company faces challenges in China, with local rivals like BYD and Geely showing growth in their electric vehicle sales.",
+        "sentiment": {
+            "company": "tesla",
+            "score": -0.6
+        },
+        "tags": [
+            "tesla"
+        ],
+        "timestamp": "2025-04-02 12:26:01",
+        "headline_tags": [
+            "tesla"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/03/31/amazon-resumes-drone-deliveries-after-two-month-pause.html",
+        "source": "cnbc",
+        "headline": "Amazon resumes drone deliveries after two-month pause",
+        "content": "has restarted drone deliveries in two states after a months-long pause, the company confirmed. In January, Amazon halted Prime Air deliveries in College Station, Texas, and Tolleson, Arizona, the two U.S. markets where it's testing the service, as the company rolled out a software update to its drone fleet. Amazon discovered an abnormality with the drone's altitude sensor, caused by dust in the air, that could have caused its system to produce an inaccurate reading of its position relative to the ground, the company said. Amazon \"never experienced an actual safety issue,\" but said it opted to suspend deliveries while it corrected the issue. The company brought drone deliveries back online last week after it completed the software update and received approval from the Federal Aviation Administration, Amazon spokesperson Av Zammit said in a statement. \"Safety underscores everything we do at Prime Air, which is why we paused our operations to conduct a software update on the MK30 drone,\" Zammit said. \"The updates are now complete and were approved by the FAA, allowing us to resume deliveries.\" An FAA spokesperson didn't immediately provide a comment. Zammit said Prime Air has seen \"unprecedented levels of demand\" since it resumed service. David Carbon, an executive who oversees Amazon's drone program, wrotein a LinkedIn postlast week that the company dropped a bottle of ZzzQuil sleep medicine at an Arizona customer's home in \"31 minutes and 30 seconds.\" Carbon didn't say how far the drone had to fly and Zammit declined to provide details. For over a decade, Amazon has been working to bring to lifefounder Jeff Bezos' visionof drones whizzing toothpaste, books and batteries to customers' doorsteps in 30 minutes or less. But progress has been slow, as Prime Air has only been made available in the U.S. in College Station and Tolleson. A test site in Lockeford, California,was shuttered last April. The program was also hit with layoffsin 2023as Amazon CEO Andy Jassy cut costs across the company. Amazon has set a goal to deliver 500 million packages by drone per year by the end of the decade. The companylast year notched a critical regulatory milestonethat could enable it to accelerate deliveries. It'seyed international expansionto the U.K., andrecently welcomed Transportation Secretary Sean Duffyin a visit to a Prime Air facility. The company also introduced a new version of its delivery drone, called the MK30, which is designed to be quieter than previous models and can fly in light rain. Customers in College Station, a quiet suburban town that's about 100 miles northwest of Houston,had previously complained aboutthe drones' noise levels. After rolling out the MK30, the company is also taking steps to relocate its drone hub farther away from residents' homes later this year. Before Amazon suspended drone deliveries, the MK30 crashed in two separate incidents during test flights at the company's facility in Pendleton, Oregon. Last December, a software issue caused two drones to crash, according toBloomberg. And in September, a pilot mistakenly caused a \"mid-air collision\" between two drones after he tested how the MK30 would perform when faced with a failed propeller, according to a federal crash report. Another crash occurred on Feb. 21 during tests at the Pendleton site, which resulted in a drone sustaining substantial damage, according to a report compiled by the National Transportation Safety Board. Amazon said the crashes were unrelated to its decision to halt drone operations. The company has said these kinds of incidents, which havealso occurred with other modelsin previous years, are part of the testing process, as it pushes drone systems \"up to the limits and beyond.\" WATCH:Amazon, Alphabet's Wing and Zipline race to roll out drone delivery",
+        "summary": "Amazon has resumed drone deliveries in College Station, Texas, and Tolleson, Arizona, after a two-month pause due to an altitude sensor issue caused by dust. The company completed a software update and received approval from the FAA to resume operations. Amazon reported \"unprecedented levels of demand\" for its Prime Air service.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.8
+        },
+        "tags": [
+            "amazon"
+        ],
+        "timestamp": "2025-04-01 00:17:35",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/apple-has-managed-tariffs-so-far-says-tough-to-predict-beyond-june.html",
+        "source": "cnbc",
+        "headline": "Apple has managed tariffs so far, but Cook lacks long-term answers",
+        "content": "CEO Tim Cook, after nearly a month of anticipation from investors, on Thursday finally revealed how Apple was navigating the Trump administration's tariffs. The company only saw a \"limited impact\" on tariffs between January and the end of March, Cook told investors on an earnings call for the company'ssecond quarter results. For the current quarter which ends in June, Apple is predicting about $900 million in additional costs for those tariffs — assuming nothing changes, Cook said. That surprised analysts who said on the call that they expected the costs to be higher. The vast majority of Apple's products are \"currently not subject\" to Trump's reciprocal tariffs, Cook said. But beyond June, he didn't say much. \"I don't want to predict the future because I'm not sure what will happen with tariffs,\" said Cook, adding that \"it's very difficult to predict beyond beyond June.\" Apple doesn't usually give a lot of details or guidance beyond the current quarter, but investors didn't like Thursday's lack of clarity. Apple shares fell as much as 4% in extended trading on Thursday despite the company reporting results that beat Wall Street expectations for revenue and showed strong sales growth for iPads and Mac computers. \"As we look ahead, we remain confident,\" Cook said. Apple's uncertainty highlights how even a company with a reputation for world-class operations can get whacked by the unpredictability of the Trump administration's shifting tariff rates and dates. Cook, who built his reputation in Silicon Valley as Apple's operations guru, discussed how the company has dealt with the tariffs to minimize their impact so far on Thursday. He praised his old division on a call with analysts. \"'l'll just say that the operational team has done an incredible job around optimizing the the supply chain and the inventory,\" he said. Apple is currently sourcing American-bound products from India and Vietnam, Cook said. Those countries currently have 10% tariffs on them, and the company is sourcing Apple computers for rest of the world from China, which the Trump administration has hit with a 145% tariff rate. Cook also said that Apple had built up inventory ahead of the tariffs, which would be reported as manufacturing purchase obligations in the company's filings with the Securities and Exchange Commission. Cook said there was no \"obvious evidence\" that consumers were buying more Apple products ahead of tariffs. \"We do expect the majority of iPhones sold in the U.S. will have India as their country of origin,\" Cook said. \"Vietnam will be the country of origin for almost all iPad, Mac, Apple Watch and AirPods products sold in the U.S.\" Apple will still pay higher 145% tariffs on some Chinese imports for AppleCare, its extended warranty program, and accessories, Cook said. One issue for forecasting tariffs going forward is that both Vietnam and India are in line to get hit with hefty tariffs on imported goods as soon as July. Trump previously targeted both countries under his \"reciprocal tariffs\" on April 2, but a week later, he paused the tariffs for 90 days. Apple expanded its supply chain to those countries in recent years as ahedgefor its business, but the Vietnam and India strategy won't work if Trump's tariffs ultimately take effect. Cook also mentioned the possibility that technology products such as semiconductors might receive additional tariffs under a process called a Section 232 Investigation. Apple is not the only big tech company to get rattled by the Trump administration's tariffs. Amazon finance chief Brian OlsavskysaidThursday that Amazon would offer a wider range of guidance because of tariff uncertainty, and he also alluded to the possibility of weakening consumer demand. Microsoft raisedXbox prices on Thursday, despite tariffs coming upjust onceon the company's Wednesday earnings call. Apple didn't offer guidance for its profitable Services division on Thursday, but offered the same kind of top-line forecast that it has in previous quarters. Apple expects overall revenue to grow \"low to mid-single digits\" on an annual basis during the current quarter. Apple reported $85.78 billion in sales during the June quarter last year. And at least during that quarter, Apple investors will know what to expect. WATCH:Deepwater's Gene Munster digs into Apple post-earnings",
+        "summary": "Apple CEO Tim Cook addressed the impact of Trump administration tariffs on the company during an earnings call, stating a \"limited impact\" in the previous quarter but predicting $900 million in additional costs for the current quarter. Cook expressed uncertainty about the future impact of tariffs beyond June, leading to investor concerns and a 4% drop in Apple's shares. Despite strong revenue and sales growth for iPads and Mac computers, the lack of clarity on long-term tariff strategies raised apprehension among investors.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.6
+        },
+        "tags": [
+            "microsoft",
+            "apple",
+            "amazon",
+            "amd",
+            "intel",
+            "tsmc",
+            "samsung",
+            "micron",
+            "qualcomm",
+            "broadcom"
+        ],
+        "timestamp": "2025-05-02 01:01:42",
+        "headline_tags": [
+            "apple"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/nvidia-ceo-jensen-huang-gets-first-salary-raise-in-a-decade.html",
+        "source": "cnbc",
+        "headline": "Nvidia CEO Jensen Huang gets first salary raise in a decade",
+        "content": "CEO Jensen Huang has made tens of billions of dollars in recent years from his stake in the chipmaker, but he's getting his first salary increase in a decade. Huang's base salary rose to $1.5 million, a 49% increase from 2024, according to aproxy filingwith the SEC on Thursday. His variable cash also went up by $1 million, or 50%, from the 2024 fiscal year. Stock awards grew to $38.8 million, bringing total pay to $49.9 million. The compensation committee \"believed this was appropriate in consideration of internal pay equity with the base salaries\" of other top executives, the filing said, and \"it represented Mr. Huang's first base salary increase in 10 years.\" Nvidia is in the midst of a boom that's turned it into one of the most valuable companies in the world, thanks to its graphics processing units (GPUs) that power the most powerful artificial intelligence models and workloads. Revenue in the 2025 fiscal year jumped 114% to $130.5 billion, the companyreportedin February. The company's stock price increased more than ninefold between the end of 2022 and the end of last year. Huang's roughly 3.5% stake is currently worth about $94 billion. Huang's 2025 pay also included $3.5 million in residential security and consultation fees and driver services, the company said in the filing. In the previous year, residential security and consultation fees for Huang totaled $2.2 million. Googlein a recent filing said it paid $8.27 million for CEO Sundar Pichai's personalsecurityand travel, representing a 22% increase from the year prior. WATCH:Nvidia-Anthropic feud",
+        "summary": "Nvidia CEO Jensen Huang received his first salary raise in a decade, with his base salary increasing to $1.5 million and total pay reaching $49.9 million, including stock awards. Nvidia's revenue surged by 114% to $130.5 billion in the 2025 fiscal year, driven by the success of its GPUs powering AI models.",
+        "sentiment": {
+            "company": "nvidia",
+            "score": 0.8
+        },
+        "tags": [
+            "nvidia",
+            "leidos",
+            "ge"
+        ],
+        "timestamp": "2025-05-01 22:49:10",
+        "headline_tags": [
+            "nvidia"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/amazon-jassy-tariffs.html",
+        "source": "cnbc",
+        "headline": "Amazon CEO Jassy says he's 'optimistic' company could emerge from tariff uncertainty stronger",
+        "content": "CEO Andy Jassy looked to reassure investors on the company's first-quarter earnings call on Thursday, saying he's \"optimistic\" the retail giant could emerge from the current tariff environment stronger than before. \"Given our really broad selection, low pricing and speedy delivery, we have emerged from these uncertain eras with more relative market segment share than we started and better set up for the future,\" Jassy said. \"I'm optimistic this could happen again.\" Jassy pointed to the Covid pandemic as an example of how the company's broad selection and low prices helped \"customers find what they want,\" despite persistent economic uncertainty. Amazonwas a big beneficiaryof the coronavirus crisis, as many shoppers shunned physical stores and turned to the online retailer for both essential and non-essential goods. The company's profit soared, along with its stock price. The comments followed Amazon'sfirst-quarter earnings report, where the company beat expectations, but its operating income forecast for the current period came in light. The company projected operating profit of $13 billion to $17.5 billion, compared with consensus estimates of $17.8 billion, according to LSEG. Amazon called out \"tariff and trade policies\" as one of several factors that could impact its guidance. Amazon CFO Brian Olsavsky said there continues to be uncertainty around President Donald Trump's sweeping tariffs, which caused the company to issue a wider guidance range.",
+        "summary": "Amazon CEO Andy Jassy expressed optimism during the first-quarter earnings call, stating that the company could emerge stronger from the current tariff uncertainty due to its broad selection, low pricing, and fast delivery. Despite potential challenges from tariff and trade policies, Jassy remains positive about Amazon's future growth potential, especially considering its performance during the Covid pandemic.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.8
+        },
+        "tags": [
+            "amazon",
+            "walmart",
+            "target"
+        ],
+        "timestamp": "2025-05-01 22:07:05",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/aws-q1-earnings-report-2025.html",
+        "source": "cnbc",
+        "headline": "Amazon falls short on cloud revenue for third straight quarter",
+        "content": "cloud business grew at a slower pace than expected in the first quarter, a third straight revenue miss. Revenue at Amazon Web Services increased 17% to $29.27 billion, while analysts polled by StreetAccount had expected $29.42 billion. The growth slowed from 18.9% inthe fourth quarter. AWS, which accounted for about 19% of its parent company's total revenue, is the world's top provider of cloud infrastructure., its top competitor, announced first-quarter Azure cloud growth and guidance for the business thatexceeded consensuson Wednesday., the No. 3 supplier, came in atouch below consensuson cloud revenue last week. Cloud computing is still showing healthy growth despite signals elsewhere of a more challenging economy. Automakers and retailers have begun preparing for higher costs or lower demand because of sweeping tariffs on goods imported to the U.S. that President Donald Trump announced in early April. Amazon said first-quarter AWS operating income totaled $11.55 billion, higher than the $10.52 billion StreetAccount consensus. The segment's operating margin of 39.5% was the widest it has been at least since 2014. During the quarter, AWS said it was launching a service forstreaming video games, and forming anagentic artificial intelligencegroup. Capital infrastructures for the quarter came out to $24.3 billion, up around 74% year over year. In February, management called for roughly $105 billion in 2025 capital spending, some of which will go toward data centers containing chips that can train and run artificial intelligence models from Anthropic and other cloud clients. Amazon CEO and former AWS chief Andy Jassy said in an Aprilletter to shareholdersthat the cost of AI for customers will come down over time, due in part to Amazon's custom chips that represent an alternative tographics processing units. The AWS AI business has billions in annualized revenue, Jassy said on a conference call with analysts. \" I think we could be helping more customers and driving more revenue for the business if we had more capacity,\" he said. \"We have a lot more Trainium2 instances and the next generation of Nvidia instances landing in the coming months.\" Trainium2,announced in 2023, is Amazon's next-generation chip for training AI models. AWS has diversified away from China for components in the past six years, Jassy said.",
+        "summary": "Amazon's cloud business, Amazon Web Services (AWS), experienced slower growth than expected in the first quarter, marking the third consecutive revenue miss. Despite the revenue shortfall, AWS still reported a revenue increase of 17% to $29.27 billion. The segment's operating income exceeded analyst expectations, with an operating margin of 39.5%, the widest since at least 2014. Amazon CEO Andy Jassy highlighted the company's efforts to reduce the cost of AI for customers through custom chips.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.2
+        },
+        "tags": [
+            "nvidia",
+            "microsoft",
+            "apple",
+            "amazon",
+            "openai",
+            "costco",
+            "leidos",
+            "tsmc"
+        ],
+        "timestamp": "2025-05-01 22:43:47",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/microsoft-raises-prices-of-xbox-video-game-consoles-and-controllers.html",
+        "source": "cnbc",
+        "headline": "Microsoft raises prices of Xbox video game consoles due to 'market conditions'",
+        "content": "said Thursday that it has increased the recommended retail prices of its Xbox video game consoles and some controllers globally due to \"market conditions.\" The announcement, which also affects some new first-party games, means consumers will be paying more for consoles this holiday season as they reckon with higher costs from President Donald Trump's sweeping tariffs on imports. \"We understand that these changes are challenging, and they were made with careful consideration given market conditions and the rising cost of development,\" Microsoft said on asupport page. \"Looking ahead, we continue to focus on offering more ways to play more games across any screen and ensuring value for Xbox players.\" Microsoft said the increase will not hit existing video game titles. Nintendo and Sony have also announced plans to charge more in recent weeks. In April, Nintendo announced the$449.99 Switch 2console, a step up from the original $300 Switch, and also lifted the price of games. Sony, citing inflation and currency changes, said its disc drive-free PlayStation 5 willbecome more expensivein Europe and three other countries, effective April 14. Prices for the PlayStation Plus subscription service, which allows people to download games and play against others online,also rosein some countries. For Microsoft, the entry-level Xbox Series S with 512 GB of storage costs $379.99 in the U.S. as of Thursday, up from $299.99. The flagship Xbox Series X will go for $599.99, up from $499.99. Both consolesdebuted in 2020. The price of the special edition of the Xbox Wireless Controller will increase to $79.99 from $69.99. The recommended pricing for some new games will be $79.99 in the holiday timeframe, Microsoft said. In 2023, prices for major Microsoft titlesrose to $70from $60. Popular video games have become more expensive to produce, an issue that is now of particular concern to Microsoft following the company's $75.4 billion acquisition of Activision Blizzard in 2023. Activision Blizzard's Call of Duty: Black Ops Cold War from 2020 cost upward of $700 million to make,Game Filereported, citing an executive's comments in a legal filing. On Wednesday, Microsoft said sales of Call of Duty and Minecraft increased during thefiscal third quarter.",
+        "summary": "Microsoft has raised the prices of its Xbox video game consoles and some controllers globally due to market conditions. This increase is attributed to factors such as President Trump's tariffs on imports and rising development costs. The price hikes do not affect existing video game titles, but new first-party games and consoles will see an increase in pricing.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": -0.5
+        },
+        "tags": [
+            "microsoft",
+            "walmart",
+            "target",
+            "costco",
+            "verizon",
+            "t-mobile"
+        ],
+        "timestamp": "2025-05-01 16:49:12",
+        "headline_tags": [
+            "microsoft"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/amazon-amzn-q1-earnings-report-2025.html",
+        "source": "cnbc",
+        "headline": "Amazon issues light guidance, noting 'tariffs and trade policies' as factors",
+        "content": "reportedbetter-than-expected results for the first quarter, but it gave soft guidance for the current period as the company navigates uncertainty around President Donald Trump's sweeping tariffs. The stock fell more than 2% in extended trading. Here's how the company did, compared with estimates from analysts polled by LSEG: Wall Street is also looking at other key revenue numbers: Amazon said it expects second-quarter operating income to be between $13 billion and $17.5 billion, below the $17.64 billion consensus forecast, according to StreetAccount. The company expects sales this quarter to be between $159 billion and $164 billion, representing growth of 7% to 11%. Analysts were expecting $160.9 billion, according to LSEG. Amazon noted\"tariffs and trade policies\"and \"recessionary fears\" are among a range of factors that could make its guidance subject to change. The company did not refer to tariffs in its forward-looking guidance last quarter. The topic of tariffs is a major focus among investors this quarter. Amazon faces significant exposure to Trump's tariffs, primarily through its retail unit. Amazon sources some products from China, which was hit with an aggressive 145% levy. Many sellers on Amazon's third-party marketplace, which accounts for more than half the company's total sales, rely on the world's second-largest economy to make or assemble their products. Some sellershave already raised pricesand cut back on advertising spend as they confront higher import costs. The companylanded in the crosshairsof the White House earlier this week over a report that Amazon planned to show shoppers the cost of the tariffs. Amazon said no such change was coming, and that itonly considered adding a line itemto products sold via its discount storefront, called Haul. On a call with investors, Jassy said the \"diversity\" of Amazon's third-party seller base means that some merchants aren't \"going to pass all or any of those tariffs on to customers.\" Hewent on to saythat Amazon could emerge from the uncertain tariff environment stronger than before, given its ability offer low prices. Jassy pointed to the Covid pandemic as a period when shoppers flocked to the site and the company grew its market share. Jassy acknowledged that Trump's on-again-off-again tariffs have made it hard to predict what impact they'll have on Amazon's businesses. \"It's hard to tell what's going to happen with tariffs right now,\" he told investors. \"It's hard to tell where they're going to settle and when they're going to settle.\" Net income came in at $17.13 billion, or $1.59 per share, compared with $10.43 billion, or 98 cents per share, a year ago. Jassy has worked to bolster Amazon's profits in recent years by cutting expenses and making its logistics network operate more efficiently. Sales in Amazon's cloud divisioncame in just below consensus estimates, marking the third consecutive quarter of revenue misses. AWS revenue grew 17% during the quarter, which was a slower rate than analysts expected. Last quarter, sales in the unit expanded 18.9%. Advertising was a bright spot in the report.Sales in the unitrose 19% year over year to $13.92 billion during the quarter, outpacing growth in Amazon's core retail business. Other online ad companies includingandhave warned of the potential for businesses to tighten their marketing budgets as a result of the tariffs.",
+        "summary": "Amazon reported better-than-expected results for the first quarter but issued soft guidance for the current period due to uncertainties surrounding tariffs and trade policies under President Trump. The company's stock fell over 2% in extended trading. Amazon expects second-quarter operating income to be below consensus forecasts, citing factors like tariffs and recessionary fears. The company faces significant exposure to tariffs, particularly through its retail unit, as it sources products from China.",
+        "sentiment": {
+            "company": "amazon",
+            "score": -0.6
+        },
+        "tags": [
+            "amazon",
+            "walmart",
+            "target",
+            "costco"
+        ],
+        "timestamp": "2025-05-01 22:33:22",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/apple-aapl-earnings-report-q2-2025-.html",
+        "source": "cnbc",
+        "headline": "Apple shares fall as Cook says 'very difficult' to predict tariff costs beyond June",
+        "content": "reportedsecond fiscal-quarter earningsThursday that beat Wall Street expectations, but the company's closely-watched Services division came up light versus estimates. Shares of the iPhone maker fell as much as 4% in extended trading. Here's how Apple did versus consensus estimates for the quarter ending in March: Cook provided Apple's first comments on the impact of tariffs on its business on an earnings call with analysts, saying the company saw \"limited impact\" in the March quarter because it was able to optimize its supply chain. Apple expects overall revenue to grow \"low to mid-single digits\" on an annual basis during the current quarter, ending in June, finance chief Kevan Parekh said on the call. Apple reported $85.78 billion in sales during the June quarter last year. The company also expects gross margin to come in at 46% at the midpoint, taking into account tariff costs. Analysts were looking for third-quarter guidance of $1.48 in earnings per share on $89.45 billion of sales. Apple expects tariffs to add $900 million to its costs for the current quarter, assuming no new tariffs or other major changes occur, Cook said on the call. However, he added that it is \"very difficult\" to predict beyond June \"because I'm not sure what will happen with tariffs.\" \"We will manage the company the way we always have with thoughtful and deliberate decisions, with a focus on investing for the long term and with dedication to innovation and the possibilities it creates,\" Cook said on the call. \"As we look ahead, we remain confident.\" Cook told CNBC that Apple is already sourcing about half of the iPhones for the U.S. from India, and most of its other products for the U.S. from Vietnam, where tariffs are lower than they are from China. Apple still makes the \"vast majority\" of its products for other countries in China, Cook said. The iPhone uses a lot of chips made domestically, said Cook, adding that Apple is buying 19 billion chips this year from the U.S. \"With an iPhone, you really have to go a step lower and look at the individual parts and where they come from,\" he said. Apple said its board authorized up to $100 billion in share repurchases this quarter, down from $110 billion in authorization last year. Apple also said it would pay a dividend of 26 cents per share, a 4% increase. \"We continue to plan for annual dividend increases,\" Cook said. The company reported $1.65 per share on $24.78 billion of net income during the quarter, versus $23.64 billion, or $1.53 per share, in the year-ago period. The company's most important product line, iPhones, topped estimates at $46.8 billion in sales during the quarter. The overall product line's sales were up just under 2% on an annual basis. Apple's profitable Services division includes iCloud subscriptions, services like Apple Music and Apple TV+, warranties and revenue from search licensing deals like its agreement with Google. Cook hailed Services growth to $26.65 billion in revenue during the quarter, an annual increase of 11.65%. However, Services revenue came in slightly under StreetAccount expectations, and last year, Apple's services division grew 14.2% during the March quarter. Apple hardware generally did well during the quarter. Mac sales rose nearly 7% to just under $8 billion, and iPad sales were up 15% on an annual basis to $6.4 billion. Apple introduced new mid-priced iPad Air and MacBook Air models in March. However, Apple's wearables division, which includes Apple Watch, AirPods and accessories sales, declined 5% versus the same period last year to $7.52 billion in revenue. Cook attributed the decline, in part, to the launch of the Vision Pro headset in the year ago quarter. Sales in Greater China, which includes Taiwan and Hong Kong, were down slightly year-over-year at $16 billion. Cook said that China sales were accelerating on a quarterly basis, and that Apple sales in the region would have been flat if not for foreign exchange rates. On the other hand, sales in the Americas, Apple's largest market that has seen some increased consumer demand ahead of tariffs, rose nearly 8%. Cook told CNBC's Steve Kovach that Apple had not seen evidence of order \"pull forward\" because of tariffs. \"We don't believe that there was a significant pull forward due to tariffs into the March quarter,\" Cook said. \"There's no obvious evidence of it.\" During the quarter, Apple delayed some of its AI features announced last summerto the \"coming year,\"which some analysts said might reduce the appeal of Apple's latest iPhones. This included features for Apple's Siri AI voice assistant that were the focus of commercials the company has since taken down.\"We need more time to complete our work on these features so they meet our high quality bar,\" Cook said on an earnings call with analysts. WATCH:Street's biggest Apple bear says a production move to India is unrealistic",
+        "summary": "Apple reported second fiscal-quarter earnings that beat expectations, but its Services division fell short. CEO Tim Cook mentioned the impact of tariffs on the business, with expectations of revenue growth in the low to mid-single digits for the current quarter. Cook highlighted the company's efforts to mitigate tariff costs by optimizing the supply chain and diversifying sourcing locations. Apple is facing uncertainty beyond June due to tariff unpredictability.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.5
+        },
+        "tags": [
+            "apple",
+            "tsmc"
+        ],
+        "timestamp": "2025-05-01 22:08:46",
+        "headline_tags": [
+            "apple"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/microsoft-pops-9percent-after-earnings-beat-on-pace-for-best-day-in-5-years.html",
+        "source": "cnbc",
+        "headline": "Microsoft pops more than 7% after earnings beat, posts best day since 2022",
+        "content": "shares popped 7.6% Thursday after the software giantissued strong guidanceand robust cloud growth drove a top- and bottom-line beat in the third quarter. Shares notched their best day since November 2022. Azure revenuestopped estimates, growing 33% year over year. Microsoft attributed 16 points of that growth to artificial intelligence. Analysts polled by StreetAccount and CNBC had anticipated 30.3%. \"Clearly, the macro environment remains a wild card, but with Azure back in 'beat/raise' mode, we believe that overhang now turns into a tailwind and highlights not only the significant demand for AI services on Azure, but also MSFT's broad base of infrastructure offerings to support the ongoing migration of enterprise workloads to the cloud,\" wrote Evercore ISI's Kirk Materne. During itsfiscal second-quarter results, Microsoft's Azure segment showed lighter-than-expected growth and a deceleration from the previous quarter. Microsoft said it anticipates 34% to 35% Azure growth at constant currency in the current period, versus a 31.5% estimate from StreetAccount.",
+        "summary": "Microsoft's shares surged over 7% following a strong earnings report in the third quarter, marking its best day since November 2022. The growth was primarily driven by robust cloud growth, with Azure revenue surpassing estimates by growing 33% year over year, attributed in part to artificial intelligence. Analysts are optimistic about Microsoft's performance, especially with Azure showing strong growth and potential for the future.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": 0.8
+        },
+        "tags": [
+            "microsoft",
+            "apple",
+            "broadcom"
+        ],
+        "timestamp": "2025-05-01 20:04:46",
+        "headline_tags": [
+            "microsoft"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/nvidia-and-anthropic-clash-over-us-ai-chip-restrictions-on-china.html",
+        "source": "cnbc",
+        "headline": "Nvidia says Anthropic is telling 'tall tales' in its defense of U.S. AI chip restrictions on China",
+        "content": "blastedAnthropicThursday in a rare public clash overartificial intelligencepolicy with U.S.chip export restrictionsset to take effect. \"American firms should focus on innovation and rise to the challenge, rather than tell tall tales that large, heavy, and sensitive electronics are somehowsmuggledin 'baby bumps' or 'alongside live lobsters,' \" a spokesperson for Nvidia said. Anthropic, the AI startup backed by billions from, argued for tighter controls and enforcement, saying in a blog post Wednesday thatChinese smugglingtactics involved chips hidden in \"prosthetic baby bumps\" and \"packed alongside live lobsters.\" Chip restrictionsfrom former PresidentJoe Biden's term, called the \"AI Diffusion Rule,\" are set to take effect May 15. The rule puts global export controls on advanced AI chips and model weights to prevent rival nations like China from gaining ground in an escalating AI arms race. PresidentDonald Trumpis reportedly working on updating theserestrictions, adding another layer of uncertainty to the already contentious policy.",
+        "summary": "Nvidia publicly clashed with Anthropic over U.S. AI chip export restrictions, criticizing Anthropic's claims of Chinese smuggling tactics involving hidden chips. The \"AI Diffusion Rule\" under Biden's administration aims to control advanced AI chips to prevent China's advancement in AI technology.",
+        "sentiment": {
+            "company": "nvidia",
+            "score": 0.2
+        },
+        "tags": [
+            "nvidia",
+            "openai",
+            "amd",
+            "boeing",
+            "lockheed",
+            "raytheon",
+            "l3harris",
+            "bae_systems",
+            "leidos",
+            "dupont",
+            "tsmc"
+        ],
+        "timestamp": "2025-05-01 19:43:57",
+        "headline_tags": [
+            "nvidia",
+            "openai",
+            "boeing",
+            "lockheed",
+            "raytheon",
+            "l3harris",
+            "bae_systems",
+            "leidos"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/meta-platforms-jumps-6percent-on-earnings-beat-advertising-resilience-.html",
+        "source": "cnbc",
+        "headline": "Meta Platforms jumps 4% on earnings beat, advertising resilience",
+        "content": "shares jumped more than 4% Thursday after the companytopped earnings expectationsand showedadvertising resiliencein a murky macroeconomic environment. \"Key here is that Meta's adv. demand trends appear to be relatively healthy and while we're watching for any impacts from macro and lower spend from China-based advertisers given the de minimis change, Meta's scale of users and advertisers + focus on newer products are offsetting some macro challenges,\" wrote Citi's Ronald Josey. First-quarter revenues grew 16% from a year ago to $42.31 billion and topped a $41.10 billion estimate from LSEG. Earnings came in at $6.43 per share, versus the expectation of $5.28 per share. Net income reached $16.64 billion, jumping 35% from $12.37 billion in the year-ago quarter. The company also issued in-line guidance for the current period. Meta's finance chief Susan Li said the company expects sales to range between $42.5 billion and $45.5 billion. Analysts polled by LSEG had forecast $44.03 billion in revenues. \"Our business is also performing very well, and I think we're well positioned to navigate the macroeconomic uncertainty,\" Meta CEO Mark Zuckerberg reassured analysts on an earnings call Wednesday.",
+        "summary": "Meta Platforms saw its shares rise over 4% after beating earnings expectations and demonstrating advertising resilience amidst a challenging macroeconomic environment. The company reported a 16% revenue growth in the first quarter, surpassing estimates, with earnings per share and net income also exceeding expectations. Meta's CEO, Mark Zuckerberg, expressed confidence in the company's performance and ability to navigate macroeconomic uncertainties.",
+        "sentiment": {
+            "company": "meta",
+            "score": 0.8
+        },
+        "tags": [
+            "meta"
+        ],
+        "timestamp": "2025-05-01 20:00:44",
+        "headline_tags": [
+            "meta"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/05/01/tesla-shares-fall-on-report-that-companys-board-seeks-new-ceo-to-replace-elon-musk.html",
+        "source": "cnbc",
+        "headline": "Tesla denies report that the EV maker is looking to replace Elon Musk",
+        "content": "Shares ofTeslawere flat in premarket trading Thursday after the EV maker denied a Wall Street Journal report that its board was searching for a replacement for chief executive Elon Musk. The report,citing comments from sources familiar with the discussions, said that Tesla's board members reached out to several executive search firms to work on a formal process for finding the company's next CEO. Shares of Tesla fell as much as 3% in overnight trading on trading platform Robinhood following the news, before paring losses. Tesla chair Robyn Denholm wrote on the social media platform X that the report was \"absolutely false.\" \"Earlier today, there was a media report erroneously claiming that the Tesla Board had contacted recruitment firms to initiate a CEO search at the company,\" she wrote. \"This is absolutely false (and this was communicated to the media before the report was published). The CEO of Tesla is Elon Musk and the Board is highly confident in his ability to continue executing on the exciting growth plan ahead.\"",
+        "summary": "Tesla denied a Wall Street Journal report claiming its board was seeking a replacement for CEO Elon Musk, leading to a flat premarket trading for Tesla shares. The report, based on comments from sources familiar with the discussions, suggested that Tesla's board had contacted executive search firms to find a new CEO. However, Tesla chair Robyn Denholm refuted the report on social media, asserting the confidence in Elon Musk's leadership.",
+        "sentiment": {
+            "company": "tesla",
+            "score": 0.8
+        },
+        "tags": [
+            "tesla"
+        ],
+        "timestamp": "2025-05-01 12:54:03",
+        "headline_tags": [
+            "tesla"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/meta-says-china-retailers-are-reducing-digital-ad-spend.html",
+        "source": "cnbc",
+        "headline": "Meta says China retailers are reducing digital ad spend",
+        "content": "Chinese online retailers have cut back their spending on Facebook and Instagram ads in reaction to President Donald Trump's tough trade policy with the country. finance chief Susan Li said Wednesday that \"Asia-based e-commerce exporters\" have reduced their spending with the social media company. It's likely those firms did so as they prepare for the de minimis trade loopholeending this Friday, Li said during afirst-quarter earningscall. \"A portion of that spend has been redirected to other markets, but overall spend for those advertisers is below the levels prior to April,\" Li said. Trump in early April signed anexecutive orderto end the de minimis trade exemptions for Chinese imports, which benefited online retailers likeTemuand Shein. Analysts have said they believe thatTemu and Shein make up the bulk ofMeta's 2024 China-related sales of $18.35 billion. Meta's advertising sales in the Asia-Pacific region reached $8.22 billion for the first quarter, the company said. That was below Wall Street projections of $8.42 billion. Li said that Meta's second-quarter revenue would be in the range of $42.5 billion to $45.5 billion, which was in line with analysts expectations of $44.03 billion. \"It's very early, hard to know how things will play out over the quarter, and certainly, harder to know that for the rest of the year,\" Li said. The comments echo whatsaid last week during its earnings call, warning that itexpects headwindsto its advertising business, particularly from the Asia-Pacific region. Similarly,on Tuesday said it had \"experienced headwindsto start the current quarter.\"",
+        "summary": "Meta's finance chief, Susan Li, mentioned that Chinese online retailers are reducing their spending on Facebook and Instagram ads due to President Trump's trade policy. This reduction in ad spend is likely in preparation for the end of the de minimis trade exemptions for Chinese imports. Meta's advertising sales in the Asia-Pacific region for the first quarter were below Wall Street projections.",
+        "sentiment": {
+            "company": "meta",
+            "score": -0.6
+        },
+        "tags": [
+            "meta",
+            "walmart"
+        ],
+        "timestamp": "2025-05-01 03:30:53",
+        "headline_tags": [
+            "meta"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/microsoft-passed-its-first-test-on-us-tariffs-with-limited-exposure.html",
+        "source": "cnbc",
+        "headline": "Microsoft passes its first test on U.S. tariffs with limited product exposure",
+        "content": "President Trump's tariffs have dominated global news headlines for weeks. During's earnings call with investors on Wednesday, though, tariffs came up only once in prepared remarks. The reference from Amy Hood, Microsoft's finance chief, had to do with sales of personal computers and Windows operating system licenses to other PC makers. \"Windows OEM and devices revenue increased 3% year over year, ahead of expectations, as tariff uncertainty through the quarter resulted in inventory levels that remained elevated,\" Hood said. While Microsoft sells Surface PCs and Xbox video game consoles, impact will likely be less direct than for companies that rely more on physical products. Still, Microsoft does stand to see the effects of software spending from struggling clients, and Microsoft also faces higher costs as it purchases equipment from other countries. The company is investing heavily to buy and install the necessarygraphics processing units across the world to power OpenAI's ChatGPT and other artificial intelligence products. Software might help companies respond in the event that their costs go up because of tariffs, CEO Satya Nadella said on the conference call \"I think if you sort of buy into the argument that software is the most malleable resource we have to fight any type of inflationary pressure or any type of growth pressure where you need to do more with less, I think we can be super helpful in that,\" he said. \"And so if anything, we would probably have more of that mindset is, how do we make sure we are helping our customers, and then, of course, we'll look toshare gains.\" The company sells a slew of AI products, including the GitHub Copilot that spits out source code suggestions for developers and the Microsoft 365 Copilot assistant that answers questions in Excel, Teams and other productivity apps. Microsoftshares rose about 8%in extended trading after the call. The company reported higher revenue and earnings than analysts had predicted and issued an upbeat forecast. WATCH:Corporate margins will be pressured as a results of tariffs, says Morgan Stanley's Guerra",
+        "summary": "Microsoft's exposure to U.S. tariffs is limited, with the impact primarily related to sales of personal computers and Windows operating system licenses. The company's finance chief, Amy Hood, mentioned that Windows OEM and devices revenue exceeded expectations despite tariff uncertainty. CEO Satya Nadella highlighted the importance of software in mitigating inflationary pressures. Microsoft's AI products, including GitHub Copilot and Microsoft 365 Copilot, are performing well, leading to an 8% rise in shares after reporting higher revenue and earnings than expected.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": 0.8
+        },
+        "tags": [
+            "microsoft",
+            "openai",
+            "leidos",
+            "ge",
+            "broadcom"
+        ],
+        "timestamp": "2025-05-01 03:35:25",
+        "headline_tags": [
+            "microsoft"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/court-finds-apple-executive-lied-under-oath.html",
+        "source": "cnbc",
+        "headline": "Apple says it will appeal after court finds company, executive lied under oath in Epic Games trial",
+        "content": "willfully violated a 2021 injunction that came out of the Epic Games case, Judge Yvonne Gonzalez Rogerssaid in a court filingon Wednesday. She wrote that Apple Vice President of Finance Alex Roman \"outright lied\" to the court about when Apple had decided to levy a 27% fee on some purchases linked to its App Store. \"Neither Apple, nor its counsel, corrected the, now obvious, lies,\" Rogers wrote, saying that she considers Apple to \"to have adopted the lies and misrepresentations to this Court.\" Rogers added that she referred the matter to U.S. attorneys to investigate whether to pursue criminal contempt proceedings on both Roman and Apple. \"We strongly disagree with the decision. We will comply with the court's order and we will appeal,\" an Apple spokesperson said in a statement. The decision is a striking repudiation of Apple's conduct in the Epic Games trial, which was decided in 2021 and appealed in 2023. While Apple won the vast majority of counts in the original trial, Epic Games did winsome concessions tucked inside a 180-page order. Rogers originally ordered the company to make changes to its app store, allowing software developers to link to theirwebsites inside of iPhone apps for customers to make purchasesoutside of Apple's ecosystem. On Wednesday, Rogers accused Apple of willfully trying to violate her ruling, and she held the company in contempt.",
+        "summary": "Apple is facing backlash after a court found the company and one of its executives, Alex Roman, lied under oath in the Epic Games trial. The court accused Apple of willfully violating a 2021 injunction related to App Store fees, leading to a referral for potential criminal contempt proceedings. Apple has stated it will appeal the court's decision.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.8
+        },
+        "tags": [
+            "apple",
+            "broadcom"
+        ],
+        "timestamp": "2025-05-01 14:27:10",
+        "headline_tags": [
+            "apple"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/amazon-to-spend-4-billion-on-small-town-delivery-expansion.html",
+        "source": "cnbc",
+        "headline": "Amazon to spend $4 billion on small town delivery expansion",
+        "content": "saidWednesday it plans to spend roughly $4 billion by the end of 2026 on expanding deliveries in rural towns as part of a push to bring faster shipping times to more parts of the U.S. Once the expansion is complete, more than 200 delivery stations will be added, tripling the size of Amazon's rural delivery network, the company said. The move will bring products closer to customers, and cut average delivery times \"in half,\" Amazon added. \"At a time where many logistics providers are backing away from serving rural customers because of cost to serve, we are stepping up our investment to make their lives easier and better,\" Udit Madan, Amazon's senior vice president of worldwide operations, said in a statement.",
+        "summary": "Amazon announced a plan to invest $4 billion by 2026 to expand deliveries in rural towns, aiming to improve shipping times across the U.S. The expansion will include adding over 200 delivery stations, tripling Amazon's rural delivery network, and cutting average delivery times in half.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.8
+        },
+        "tags": [
+            "amazon",
+            "costco"
+        ],
+        "timestamp": "2025-04-30 21:17:57",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/qualcomm-qcom-earnings-report-q2-2025.html",
+        "source": "cnbc",
+        "headline": "Qualcomm tops estimates but gives light revenue forecast",
+        "content": "reportedfiscal second-quarter earningson Wednesday that topped Wall Street expectations as the company's chip sales showed strong year-over-year growth. The company's share price fell in extended trading as Qualcomm's revenue forecast for the current quarter was slightly lighter than expectations. Here's how the chipmaker did compared to Wall Street expectations, based on a survey of analysts by LSEG: In the current quarter, Qualcomm said it expected $2.70 at the midpoint in adjusted earnings per share on $10.3 billion in revenue at the midpoint. Analysts polled by LSEG were looking for $2.67 in adjusted earnings on $10.35 billion in sales. Net income during the quarter ending in March was $2.81 billion, or $2.52 per share, compared to $2.33 billion, or $2.06 per share, in the year-ago period. Qualcomm's adjusted results include exclusions for acquisition-related charges, interest expenses and share compensation. Qualcomm said that it doesn't currently expect any material impact from tariffs, and that it had not seen elevated buying of its products ahead of tariffs during the quarter. \"One thing to remember is when you look at our supply chain, we have a very diversified global supply chain,\" Qualcomm finance chief Akash Palkhiwala said on the earnings call. \"As we navigate those times, this is a company that is not inexperienced dealing with uncertainty,\" Qualcomm CEO Cristiano Amon said on the call. Qualcomm's most important business is selling chips such as modems and processors for smartphones, including high-end devices made by Samsung and. Its overall handset chip sales increased 12% on an annual basis to $6.93 billion. Qualcomm's overall adjusted revenue in the quarter rose 15%. Amon said the company has been working to sell more chips for cars through its automotive business, more chips for other gadgets like Meta's Quest virtual-reality headsets and more Windows PCs under Qualcomm's Internet of Things business. Growth in those categories signals how well the company is diversifying away from its core handset business, which expects to lose Apple as a customer in the coming years. \"Our top priorities remain executing our diversification strategy and continuing to invest in areas that drive long-term value,\" Amon said in a statement. Qualcomm said that its automotive business grew a 59% on an annual basis, to $959 million in sales. Its Internet of Things business rose 27% to $1.58 billion in revenue. All together, Qualcomm's QCT chips business rose 18% on an annual basis to $9.47 billion in revenue during the quarter. Qualcomm's other major division is QTL, which is a profitable division that collects licensing fees from technology that Qualcomm developed and patented. QTL revenue was flat year-over-year at $1.32 billion. The company said it spent $2.7 billion on capital return during the quarter, including $1.7 billion in share repurchases and $938 million in dividends. WATCH:Microsoft beats on revenue expectations, Qualcomm tops estimates but gives light guidance",
+        "summary": "Qualcomm reported fiscal second-quarter earnings that exceeded Wall Street expectations, with strong year-over-year growth in chip sales. However, the company's share price dropped in extended trading due to a slightly lighter revenue forecast for the current quarter. Qualcomm's adjusted revenue rose by 15% in the quarter, driven by increased sales of handset chips and expansion into new markets such as automotive and Internet of Things.",
+        "sentiment": {
+            "company": "qualcomm",
+            "score": 0.6
+        },
+        "tags": [
+            "microsoft",
+            "apple",
+            "intel",
+            "tsmc",
+            "samsung",
+            "qualcomm"
+        ],
+        "timestamp": "2025-04-30 22:47:24",
+        "headline_tags": [
+            "qualcomm"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/trump-bezos-call-sets-stage-for-tense-earnings-report-from-amazon.html",
+        "source": "cnbc",
+        "headline": "Trump-Bezos call sets stage for tense earnings report from Amazon",
+        "content": "President Donald Trumpused to refer toJeff Bezosas\"Jeff Bozo.\"Now, after more drama between the two men, Trump is calling the Amazon founder a \"good guy.\" Amazon's earnings report, scheduled for Thursday, already had investors on edge due to the president's sweeping tariffs and the potential impact they'll have across the tech giant's numerous businesses. With its stock price down 17% this year, Amazon is expected to report its slowest rate of revenue growth for any period since 2022, and that doesn't reflect the levies announced in early April. The tension got amped up early this week. The White House on TuesdaycriticizedAmazon for reportedly planning to display on its site how much the new tariffs on top U.S. trading partners are driving up prices for consumers. After the story was published by Punchbowl News, Trump called Bezos to complain. Amazon swiftly responded and said no such change was coming. \"This was never approved and is not going to happen,\" Amazon wrote in ablog postthat totaled 31 words. President Trump frequently hurled insults at Bezos during his firm term in the White House, largely because of the Amazon founder's ownership of the Washington Post. Bezos has recently gone out of his way to try and mend the relationship, traveling to Washington, D.C., for the inauguration in January. The president said he was pleased with their latest phone call. \"Jeff Bezos was very nice,\" Trump told reporters later on Tuesday. \"He was terrific. He solved the problem very quickly and he did the right thing. He's a good guy.\" Amazon clarified that it was only considering displaying the import fees on products sold on its discount storefront,Amazon Haul, which competes with ultra-cheap Chinese retailer Temu. Products on Haul cost $20 or less and many of them are sold direct from China using the de minimis trade exemption. That loophole is set to go away next month after Trump signed an executive order, making it more expensive to ship those products to the U.S.",
+        "summary": "President Trump and Jeff Bezos recently had a positive phone call, marking a shift from previous tensions. Amazon's upcoming earnings report is anticipated to show slow revenue growth, impacted by tariffs and other challenges. The company faced criticism from the White House over plans to display tariff impacts on its site, leading to a swift response from Amazon.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.3
+        },
+        "tags": [
+            "amazon",
+            "costco"
+        ],
+        "timestamp": "2025-04-30 17:00:05",
+        "headline_tags": [
+            "amazon"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/nvidia-ceo-jensen-huang-says-china-not-behind-in-ai.html",
+        "source": "cnbc",
+        "headline": "Nvidia CEO Jensen Huang warns China is 'not behind' in AI",
+        "content": "CEO Jensen Huang said Wednesday that China is \"not behind\" in artificial intelligence, and that Huawei is \"one of the most formidable technology companies in the world.\" Speaking to reporters at a tech conference in Washington, D.C., Huang said China may be \"right behind\" the U.S. for now, but it's a narrow gap. \"We are very close,\" he said. \"Remember this is a long-term, infinite race.\" Nvidia has become key to the world economy over the past few years as it makes the chips powering the majority of recent advanced AI applications. The company faces growing hurdles in the U.S., including tariffs and a pending Biden-era regulation that would restrict the shipment of its most advanced AI chips to many countries around the world. The Trump administration this month restricted the shipment of Nvidia's H20 chips to China without a license. That technology, which is related to the Hopper chips used in the rest of the world, was developed to comply with previous U.S. export restrictions. Nvidia said it would take a $5.5 billion hit on the restriction. Huawei, which is on a U.S. trade blacklist, is reportedly working onan AI chip of its ownfor Chinese customers. \"They're incredible in computing and network technology, all these essential capabilities to advance AI,\" Huang said. \"They have made enormous progress in the last several years.\" Nvidia has made the case that U.S. policy should focus on making its companies competitive, and that restricting chip sales to China and other countries threatens U.S. technology leadership. Huang called again for the U.S. government to focus on AI policies that accelerate the technology's development. \"This is an industry that we will have to compete for,\" Huang said. President Trump on Wednesday called Huang \"my friend Jensen,\" cheering the company's recent announcement that it planned to build $500 billion in AI infrastructure in the U.S. over the next five years. Huang said he believes Nvidia will be able to manufacture its artificial intelligence devices in the U.S. The company said earlier this month that it will assemble AI servers with its manufacturing partner Foxconn near Houston. \"With willpower and the resources of our country, I'm certain we can manufacture onshore,\" Huang said. Nvidia shares are down more than 20% this year, sliding along with the broader market, after almost tripling in value last year. The stock fell almost 3% on Wednesday.",
+        "summary": "Nvidia CEO Jensen Huang emphasized that China is not lagging behind in AI and praised Huawei's technological prowess. Huang highlighted the competitiveness between China and the U.S. in AI development, stressing the importance of long-term strategies. Nvidia faces challenges in the U.S., including tariffs and regulations restricting the shipment of advanced AI chips. Despite hurdles, Huang advocates for policies that promote competitiveness and technological advancement.",
+        "sentiment": {
+            "company": "nvidia",
+            "score": 0.6
+        },
+        "tags": [
+            "nvidia",
+            "amd",
+            "leidos",
+            "tsmc"
+        ],
+        "timestamp": "2025-04-30 18:36:06",
+        "headline_tags": [
+            "nvidia"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/meta-q1-earnings-report-2025.html",
+        "source": "cnbc",
+        "headline": "Meta shares rise on stronger-than-expected revenue for first quarter",
+        "content": "shares rose as much as 5% Wednesday after the company reported stronger-than-expected revenue in the first quarter and provided second-quarter guidance that was in line with Wall Street's expectations. Here's how the company did, compared with estimates from analysts polled by LSEG: Meta's first-quarter sales rose 16% year over year while net income jumped 35% to $16.64 billion, up from $12.37 billion a year earlier.Second-quarter sales will be in the range of $42.5 billion to $45.5 billion, said Meta finance chief Susan Li. That was in line with analysts expectations of $44.03 billion. However, Li also added that the company has begun to see some reduced ad spend from Asia e-commerce exporters. \"Our business is also performing very well, and I think we're well positioned to navigate the macroeconomic uncertainty,\" Meta CEO Mark Zuckerberg told analysts on an earnings call on Wednesday.Meta said that it lowered the range of its 2025 total expenses, which will now come in between $113 billion to $118 billion. That figure was previously $114 billion to $119 billion.However, Meta increased its 2025 capital expenditures to come in the range of $64 billion to $72 billion, up from its prior outlook of $60 billion to $65 billion. \"This updated outlook reflects additional data center investments to support our artificial intelligence efforts as well as an increase in the expected cost of infrastructure hardware,\" the company said in theearnings release. The increase in expected infrastructure hardware is the result of \"suppliers who source from countries around the world,\" Li said.\"There's just a lot of uncertainty around this, given the ongoing trade discussions,\" said Li, adding that Meta is \"working on our end on mitigations by optimizing our supply chain.\"The company also warned that a recent decision by the European Commission could result in a materially worse user experience for European users and cause \"a significant impact\" to Meta's European business and revenue as soon as the third quarter. The company said this is the result of the EC deciding thatMeta's no-ads subscription servicefor European users is not in compliance with one of itsregulations. \"We are continuing to engage actively with the European Commission further on this, so we hope to have more clarity by next quarter's call,\" Li said. The company's advertising revenue for the first quarter came in at $41.39 billion, ahead of Wall Street projections of $40.44 billion. Meta's Reality Labs hardware divisionposted an operating loss of $4.2 billionin the first quarter, which was less than the $4.6 billion figure that Wall Street was expecting. However, Reality Labs' sales came in at $412 million, which was down 6% from a year ago and came in below analysts' expectations of $492.7 million. Daily active users rose to 3.43 billion in the first quarter, topping analyst estimates of 3.39 billion. That's up from 3.35 billion in the previous quarter. The company's Threads microblogging service now has 350 million monthly users, Zuckerberg said. That's up from 320 million in January. Meta last weeksaidthat all \"eligible advertisers globally\" will be able to run ads on Threads. Meta does not expect Threads ads to meaningfully drive revenue growth in 2025, Li said Wednesday. The Meta AI digital assistant now has nearly 1 billion monthly users, Zuckerberg said. In January, the company said the AI service had 700 million monthly users. WhatsApp is the primary way people access Meta AI, Li said. The company on Tuesdayreleaseda standalone Meta AI app, confirming a Februaryreportfrom CNBC.Zuckerberg said that he envisions Meta AI as a place to show ads and that the company could charge for a premium version of the assistant, but Meta will focus on building the product for at least the next year before beginning to monetize it. Meta said its employee headcount was 76,834 as of March 31, representing an 11% year-over-year increase. The company in Februarylaid off 5% of its workforcethat it deemed as its lowest performers. The company recorded $8.22 billion in first-quarter advertising sales stemming from the Asia-Pacific region. Analysts expected Meta to post $8.42 billion in Asia-Pacific ad sales for the quarter. Li told analysts that the company has \"seen some reduced spend in the U.S. from Asia based e-commerce exporters.\" The company believes that is in anticipation of the de minimis loopholeending on Friday, Li said. \"A portion of that spend has been redirected to other markets, but overall spend for those advertisers is below the levels prior to April,\" Li said. on Tuesday andlast week warned of potential headwinds affecting their respective advertising businesses due to macroeconomic uncertainty. When Google reportedfirst-quarter earningslast Thursday, company executives told analysts that it is likely the search giant willexperience headwindsto its online ad business stemming from Asia. Regarding the broader economy, Google Chief Business Officer Philipp Schindler said \"it's still too early in the second quarter to have a more specific view of things.\" Snap, which also relies on online advertising, reported itsfirst-quarter earningson Tuesday. Its stock price plunged after the company said it couldn't provide forward guidance due to macroeconomic uncertainties. andwill report earnings on Thursday.",
+        "summary": "Meta's shares rose by 5% after reporting stronger-than-expected revenue for the first quarter and providing second-quarter guidance in line with Wall Street's expectations. The company's first-quarter sales increased by 16% year over year, with net income jumping by 35% to $16.64 billion. Meta's CEO, Mark Zuckerberg, expressed confidence in the company's performance and ability to navigate macroeconomic uncertainty. However, Meta adjusted its 2025 total expenses range lower but increased its capital expenditures range due to additional data center investments and increased infrastructure hardware costs.",
+        "sentiment": {
+            "company": "meta",
+            "score": 0.8
+        },
+        "tags": [
+            "alphabet",
+            "meta",
+            "walmart",
+            "costco",
+            "leidos"
+        ],
+        "timestamp": "2025-04-30 22:16:13",
+        "headline_tags": [
+            "meta"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/microsoft-msft-q3-earnings-report-2025.html",
+        "source": "cnbc",
+        "headline": "Microsoft shares jump 9% on earnings and revenue beat, uplifting forecast",
+        "content": "shares rose about 9% in extended trading on Wednesday after the company reported better-than-expected quarterly results, driven by its Azure cloud business, and issued surprisingly strong guidance Here's how the company performed in comparison with LSEG consensus: Microsoft called for revenue in the range of $73.15 billion to $74.25 billion. The middle of the range was higher than LSEG's $72.26 billion consensus. The company sees 34% to 35% in Azure growth at constant currency, compared with StreetAccount's 31.5% consensus. Management reiterated that capital expenditures will grow in the new fiscal year, though at a slower rate than the current 2025 fiscal year. The company's implied operating margin of 43.35% was just shy of StreetAccount's 43.5% consensus. Revenue increased 13% year over year in the fiscal third quarter, which ended on March 31, according to astatement. Net income climbed 18% to $25.8 billion from $21.9 billion, or $2.94 per share, a year earlier. While earnings and revenue topped estimates, those results are backward looking.President Donald Trump'ssweeping tariffs were announced in early April, so the company's optimistic forecast provided some relief to investors who have been concerned about how tech businesses will fare the remainder of the year. CEOSatya Nadellasaid earlier this year that Microsoft plans to spend $80 billion in fiscal 2025 on construction of data centers that can handle artificial intelligence workloads. That requires hefty imports from overseas, meaning costs could rise depending on where tariffs land. Microsoft continued to invest heavily in AI infrastructure during the quarter. Capital expenditures, excluding finance leases, reached $16.75 billion, up nearly 53%. Analysts surveyed by Visible Alpha had expected $16.37 billion.",
+        "summary": "Microsoft shares surged 9% in after-hours trading following the company's strong quarterly results driven by its Azure cloud business. The company exceeded revenue expectations and provided a robust forecast, with revenue projected to be higher than analyst consensus. Microsoft also emphasized continued investment in AI infrastructure and data centers, despite potential challenges from tariffs.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": 0.8
+        },
+        "tags": [
+            "microsoft",
+            "caterpillar",
+            "leidos"
+        ],
+        "timestamp": "2025-05-01 12:56:23",
+        "headline_tags": [
+            "microsoft"
+        ]
+    },
+    {
+        "url": "https://www.cnbc.com/2025/04/30/ge-healthcare-earnings-tariffs.html",
+        "source": "cnbc",
+        "headline": "GE HealthCare beats on earnings, slashes full year outlook due to tariffs",
+        "content": "reported better-than-expectedfirst-quarter resultson Wednesday, but the company slashed its annual forecast to account for the impact of PresidentDonald Trump's far-reaching \"reciprocal\"tariffpolicy. Shares of GE HealthCare closed up 3% on Wednesday. Here's how the company did: Revenue increased 3% year over year from $4.65 billion. GE HealthCare reported net income of $564 million, or $1.23 per share, up from $374 million, or 81 cents per share, during the same period last year. GE HealthCare's adjusted EPS figure is a result of adds like nonoperating benefit costs, restructuring costs and investment valuations, among other things. For its full year, GE HealthCare said it expects to report adjusted earnings in the range of $3.90 to $4.10 per share, which is a decline of 13% to 9% from its guide last quarter. The company said the range includes roughly 85 cents per share of tariff impact. \"Regarding the current global trade environment, we are actively driving mitigation actions,\" GE HealthCare CEO Peter Arduini said in a statement. \"We continue to see strong customer demand in many of the markets we serve and are well-positioned to drive long-term value as we invest in future innovation.\"",
+        "summary": "GE HealthCare reported better-than-expected first-quarter results, with revenue increasing by 3% year over year to $4.65 billion. Despite the positive earnings, the company slashed its full-year outlook due to the impact of President Trump's tariff policies, expecting adjusted earnings to decline by 9% to 13%.",
+        "sentiment": {
+            "company": "ge",
+            "score": -0.2
+        },
+        "tags": [
+            "ge",
+            "siemens",
+            "3m"
+        ],
+        "timestamp": "2025-04-30 20:02:52",
+        "headline_tags": [
+            "ge",
+            "siemens",
+            "3m"
+        ]
     }
 ]

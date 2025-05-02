@@ -837,5 +837,1018 @@
             "company": "meta",
             "score": 0.5
         }
+    },
+    "t3_1kc5lax": {
+        "post": {
+            "id": "t3_1kc5lax",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "stocks",
+            "title": "Tesla denies contacting headhunters to replace Musk",
+            "body": "\nTesla denied reports of seeking a replacement for Elon Musk, calling claims of a CEO search “absolutely false.” \n\nOk, in the meantime, High P/E for a damaged brand with customer base erosion with long-term harm and falling sales—doesn’t justify a 10x P/B ratio ($16–$23 book value per share per SEC filings), still waiting for a justification of the premium with clear sales, market share,and penetration index and growth projections.",
+            "url": "https://www.reddit.com/r/stocks/comments/1kc5lax/tesla_denies_contacting_headhunters_to_replace/",
+            "upVotes": 150,
+            "upVoteRatio": 0.87,
+            "createdAt": "2025-05-01T10:39:04.000Z",
+            "scrapedAt": "2025-05-02T01:11:06.796860Z",
+            "company_tags": [
+                "tesla"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mpzzjnc",
+                "username": "sick_ranchez7",
+                "body": "Stock +10% even tho it wasnt priced in",
+                "url": "https://www.reddit.com/r/stocks/comments/1kc5lax/tesla_denies_contacting_headhunters_to_replace/mpzzjnc/",
+                "upVotes": 82,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T11:11:19.000Z",
+                "scrapedAt": "2025-05-02T01:11:06.797860Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq03jp3",
+                "username": "That_Account6143",
+                "body": "Musk leaves? +10%\n\nMusk stays? +10%\n\nMusk takes a shit? Believe it or not, +5%, 10 if it's runny",
+                "url": "https://www.reddit.com/r/stocks/comments/1kc5lax/tesla_denies_contacting_headhunters_to_replace/mq03jp3/",
+                "upVotes": 69,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T11:41:45.000Z",
+                "scrapedAt": "2025-05-02T01:11:06.797860Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The main point of the Reddit thread is Tesla denying reports of seeking a replacement for Elon Musk. There is a discussion about Tesla's high P/E ratio, damaged brand, customer base erosion, falling sales, and the lack of justification for its premium valuation. Some users are speculating on the impact on Tesla's stock price if Musk were to leave or stay.",
+        "sentiment": {
+            "company": "tesla",
+            "score": 0.2
+        }
+    },
+    "t3_1kcidro": {
+        "post": {
+            "id": "t3_1kcidro",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "stocks",
+            "title": "Reddit shares rocket 16% on strong sales and guidance",
+            "body": "Reddit reported first-quarter earnings Thursday that beat Wall Street expectations on sales and guidance.\n\nShares of the social media company rose more than 16% in after-hours trading.\n\nHere’s how the company did compared with LSEG estimates:\n\n* **Earnings per share:** 13 cents vs. 2 cents expected\n* **Revenue:** $392 million vs. $370 million expected\n\nReddit said its second-quarter sales should come in the range of $410 million to $430 million, ahead of Wall Street expectations of $396 million. Reddit provided the guidance and touched on the on-going trade dispute between the U.S. and China in a letter to investors, saying it is “well-positioned to meet this moment.”\n\n“Ever-shifting macro environments like these create both challenges and opportunities,” Reddit CEO Steve Huffman wrote. “We’ve grown through challenging times before — people need connection and information just as much in uncertain times.”\n\nRevenue during Reddit’s first quarter rose 61% year over year. Net income, meanwhile, was $26.2 million compared to a year ago when Reddit recorded a net loss of $575.1 million due to costs associated with its March 2024 initial public offering.\n\nThe company’s global daily active uniques, or DAUq, jumped 31% year over year to 108.1 million in the first quarter. Analysts were expecting 107.3 million.\n\nReddit has been a big beneficiary from Google search changes and internal site improvements, which has led to an influx of new and returning users, which it refers to as logged-out users. The social media firm has focused on site updates and features intended to convince logged-out users to create accounts and become logged-in users, which are more valuable to advertisers.\n\nThe company’s first-quarter global logged-in DAUq rose 23% year over year to 48.7 million, while its global logged-out DAUq jumped 38% to 59.4 million.\n\nIn February, Reddit said that a Google search algorithm change temporarily impacted the company’s user growth during the fourth quarter. Search-driven traffic soon recovered in the first quarter, the company said at the time.\n\nReddit isn’t the only company to weigh in on macroeconomic challenges.\n\nMeta shares rose Thursday after the company reported first-quarter earnings that beat on the top and bottom. However, the company’s advertising sales in the Asia-Pacific region came in at $8.22 billion for the first quarter, which was lower than analysts estimates of $8.42 billion.\n\nSusan Li, Meta’s finance chief, said that “Asia-based e-commerce exporters” have reduced their digital ad spending likely due to the de minimis trade loophole ending Friday.\n\nSnap reported its latest earnings on Tuesday and said it “experienced headwinds to start the current quarter,” and declined to provide guidance because of macroeconomic uncertainties.\n\nAlphabet reported first-quarter earnings last week, and said that Google Advertising sales jumped 8.5% year over year to $66.89 billion while YouTube ad sales rose 10% to $8.93 billion.\n\nSource: [https://www.cnbc.com/2025/05/01/reddit-rddt-q1-2025.html](https://www.cnbc.com/2025/05/01/reddit-rddt-q1-2025.html)",
+            "url": "https://www.reddit.com/r/stocks/comments/1kcidro/reddit_shares_rocket_16_on_strong_sales_and/",
+            "upVotes": 97,
+            "upVoteRatio": 0.86,
+            "createdAt": "2025-05-01T20:12:13.000Z",
+            "scrapedAt": "2025-05-02T01:11:06.797860Z",
+            "company_tags": [
+                "apple",
+                "alphabet",
+                "meta"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq2uneh",
+                "username": "Ruby_Rhods_Hair",
+                "body": "Inverse reddit strikes again",
+                "url": "https://www.reddit.com/r/stocks/comments/1kcidro/reddit_shares_rocket_16_on_strong_sales_and/mq2uneh/",
+                "upVotes": 72,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:14:43.000Z",
+                "scrapedAt": "2025-05-02T01:11:06.797860Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2uxi5",
+                "username": "Ok_Criticism_558",
+                "body": "Proven strategy.",
+                "url": "https://www.reddit.com/r/stocks/comments/1kcidro/reddit_shares_rocket_16_on_strong_sales_and/mq2uxi5/",
+                "upVotes": 11,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:16:03.000Z",
+                "scrapedAt": "2025-05-02T01:11:06.797860Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "Reddit reported strong first-quarter earnings, beating Wall Street expectations on sales and guidance. The company's revenue and earnings per share exceeded estimates, leading to a significant increase in its stock price. Reddit provided optimistic guidance for the second quarter, expecting sales to be between $410 million to $430 million. The CEO highlighted the company's resilience in navigating challenging macro environments and emphasized the importance of connection and information. Reddit's revenue saw a substantial increase year over year, with a rise in global daily active uniques. The company attributed its growth to Google search changes and site improvements, which attracted new users. Overall, Reddit's performance and outlook were positive, reflecting its ability to adapt and grow in evolving market conditions.",
+        "sentiment": {
+            "company": "alphabet",
+            "score": 0.9
+        }
+    },
+    "t3_1kco8l9": {
+        "post": {
+            "id": "t3_1kco8l9",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "investing",
+            "title": "Reddit reports strong sales and issues optimistic guidance",
+            "body": "Reddit reported first-quarter revenue on Thursday that beat Wall Street expectations, and issued better-than-expected guidance.\n\nThe stock initially soared by as much as 19% in after-hours trading, but receded to around 5% when executives discussed the shaky economy and Google search-related challenges.",
+            "url": "https://www.reddit.com/r/investing/comments/1kco8l9/reddit_reports_strong_sales_and_issues_optimistic/",
+            "upVotes": 4,
+            "upVoteRatio": 0.83,
+            "createdAt": "2025-05-02T00:38:26.000Z",
+            "scrapedAt": "2025-05-02T01:12:12.544810Z",
+            "company_tags": [
+                "alphabet"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq48j26",
+                "username": "TLakes",
+                "body": "I wish I bought the Reddit IPO when it was offered to users...",
+                "url": "https://www.reddit.com/r/investing/comments/1kco8l9/reddit_reports_strong_sales_and_issues_optimistic/mq48j26/",
+                "upVotes": 2,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-02T00:45:27.000Z",
+                "scrapedAt": "2025-05-02T01:12:12.544810Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses Reddit's strong first-quarter revenue that exceeded Wall Street expectations and the optimistic guidance provided by the company. The stock initially surged by 19% in after-hours trading but settled around 5% as executives highlighted concerns about the economy and challenges related to Google search.",
+        "sentiment": {
+            "company": "alphabet",
+            "score": 0.6
+        }
+    },
+    "t3_1kbwtoq": {
+        "post": {
+            "id": "t3_1kbwtoq",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "investing",
+            "title": "Tesla Board Opened Search for a CEO to Succeed Elon Musk",
+            "body": "With profits and stock price sinking, board members told Musk he needed to spend more time at company.\n\nAbout a month ago, with Tesla’s TSLA -3.38%decrease; red down pointing triangle stock sinking and some investors irritated about Elon Musk’s White House focus, Tesla’s board got serious about looking for Musk’s successor.\n\nhttps://www.wsj.com/business/autos/tesla-musk-ceo-search-board-0ce61af9",
+            "url": "https://www.reddit.com/r/investing/comments/1kbwtoq/tesla_board_opened_search_for_a_ceo_to_succeed/",
+            "upVotes": 1177,
+            "upVoteRatio": 0.94,
+            "createdAt": "2025-05-01T01:19:09.000Z",
+            "scrapedAt": "2025-05-02T01:12:12.544810Z",
+            "company_tags": [
+                "tesla"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mpy0twn",
+                "username": "TheArchitect_7",
+                "body": "Mark Cuban has an opportunity to do the funniest thing ever.",
+                "url": "https://www.reddit.com/r/investing/comments/1kbwtoq/tesla_board_opened_search_for_a_ceo_to_succeed/mpy0twn/",
+                "upVotes": 915,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T01:23:32.000Z",
+                "scrapedAt": "2025-05-02T01:12:12.544810Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mpy6e02",
+                "username": "cats_catz_kats_katz",
+                "body": "Marc Cuban Cost Plus Electric Automobiles",
+                "url": "https://www.reddit.com/r/investing/comments/1kbwtoq/tesla_board_opened_search_for_a_ceo_to_succeed/mpy6e02/",
+                "upVotes": 252,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T01:55:55.000Z",
+                "scrapedAt": "2025-05-02T01:12:12.545809Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses Tesla's board opening a search for a CEO to succeed Elon Musk due to sinking profits and stock prices. The board members have expressed the need for Musk to spend more time at the company, especially with some investors being concerned about his focus on other endeavors such as his involvement with the White House. The thread also mentions Mark Cuban potentially doing something humorous related to Tesla and electric automobiles.",
+        "sentiment": {
+            "company": "tesla",
+            "score": -0.5
+        }
+    },
+    "t3_1kc7e78": {
+        "post": {
+            "id": "t3_1kc7e78",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "wallstreetbets",
+            "title": "A judge just blew up Apple’s control of the App Store",
+            "body": "Epic Games v. Apple judge Yvonne Gonzalez Rogers just ruled that, effective immediately, Apple is no longer allowed to collect fees on purchases made outside apps and blocks the company from restricting how developers can point users to where they can make purchases outside of apps. Apple says it will appeal the order.",
+            "url": "https://www.reddit.com/r/wallstreetbets/comments/1kc7e78/a_judge_just_blew_up_apples_control_of_the_app/",
+            "upVotes": 2475,
+            "upVoteRatio": 0.98,
+            "createdAt": "2025-05-01T12:22:48.000Z",
+            "scrapedAt": "2025-05-02T01:13:05.728843Z",
+            "company_tags": [
+                "apple"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq0a1jc",
+                "username": "VisualMod",
+                "body": "\n**User Report**| | | |\n:--|:--|:--|:--\n**Total Submissions** | 1 | **First Seen In WSB** | 3 years ago\n**Total Comments** | 10 | **Previous Best DD** | \n**Account Age** | 12 years | | \n\n[**Join WSB Discord**](http://discord.gg/wsbverse)",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kc7e78/a_judge_just_blew_up_apples_control_of_the_app/mq0a1jc/",
+                "upVotes": 1,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T12:26:28.000Z",
+                "scrapedAt": "2025-05-02T01:13:05.728843Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq0b895",
+                "username": "Relative_Drop3216",
+                "body": "At this point its pretty obvious apples is just keeping judges and lawyers in a job",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kc7e78/a_judge_just_blew_up_apples_control_of_the_app/mq0b895/",
+                "upVotes": 881,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T12:34:19.000Z",
+                "scrapedAt": "2025-05-02T01:13:05.728843Z",
+                "company_tags": [
+                    "apple"
+                ]
+            },
+            {
+                "id": "t1_mq0e7nu",
+                "username": "Angry_Robot",
+                "body": "Cheaper than not abusing their market position.",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kc7e78/a_judge_just_blew_up_apples_control_of_the_app/mq0e7nu/",
+                "upVotes": 254,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T12:53:14.000Z",
+                "scrapedAt": "2025-05-02T01:13:05.728843Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq0mpg1",
+                "username": "escobartholomew",
+                "body": "What market position though? Folks keep acting like apple has this monopoly on mobile phones. They don’t. The iPhone isn’t even 30% of the phone market.",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kc7e78/a_judge_just_blew_up_apples_control_of_the_app/mq0mpg1/",
+                "upVotes": -68,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T13:42:08.000Z",
+                "scrapedAt": "2025-05-02T01:13:05.728843Z",
+                "company_tags": [
+                    "apple"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses a recent ruling in the Epic Games v. Apple case, where the judge has decided that Apple can no longer collect fees on purchases made outside apps and must allow developers to direct users to make purchases outside of the app store. Apple has stated that it will appeal this decision. The comments in the thread express mixed opinions, with some criticizing Apple for its market practices and others questioning the perception of Apple having a monopoly in the mobile phone market.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.5
+        }
+    },
+    "t3_1kbwlig": {
+        "post": {
+            "id": "t3_1kbwlig",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "wallstreetbets",
+            "title": "US Ukraine mineral deal signed",
+            "body": "Now what? \n\nLink[https://apple.news/AmUgjPIm-SBSj5OU6AQ_NPg](https://apple.news/AmUgjPIm-SBSj5OU6AQ_NPg)",
+            "url": "https://www.reddit.com/r/wallstreetbets/comments/1kbwlig/us_ukraine_mineral_deal_signed/",
+            "upVotes": 1046,
+            "upVoteRatio": 0.94,
+            "createdAt": "2025-05-01T01:07:27.000Z",
+            "scrapedAt": "2025-05-02T01:13:05.728843Z",
+            "company_tags": [
+                "apple"
+            ]
+        },
+        "comments": [],
+        "summary": "The Reddit thread discusses a news article about a US-Ukraine mineral deal being signed, with the title questioning \"Now what?\" The thread does not directly mention Apple or any of its related topics such as iPhone, Mac, iPad, or iOS. The focus is on the mineral deal between the US and Ukraine.",
+        "sentiment": {
+            "company": "apple",
+            "score": 0.0
+        }
+    },
+    "t3_1kc0g9t": {
+        "post": {
+            "id": "t3_1kc0g9t",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "wallstreetbets",
+            "title": "Microsoft is preparing for the worst scenario?",
+            "body": "\nOn MS blog they are providing a roadmap for assuring European digital sovereignty and business continuity in case of escalation… \n\nTo me this looks like a giant put? Isn’t it?\n\nSome relevant extracted sentences :\n\n- In a time of geopolitical volatility, we are committed to providing digital stability.\n\n- To further cement the nexus between Microsoft and Europe, going forward our European datacenter operations and their boards will be overseen by a European board of directors that consists exclusively of European nationals and operates under European law.\n\n- In the unlikely event we are ever ordered by any government anywhere in the world to suspend or cease cloud operations in Europe, we are committing that Microsoft will promptly and vigorously contest such a measure using all legal avenues available, including by pursuing litigation in court. \n",
+            "url": "https://www.reddit.com/r/wallstreetbets/comments/1kc0g9t/microsoft_is_preparing_for_the_worst_scenario/",
+            "upVotes": 2413,
+            "upVoteRatio": 0.96,
+            "createdAt": "2025-05-01T04:39:39.000Z",
+            "scrapedAt": "2025-05-02T01:13:05.729843Z",
+            "company_tags": [
+                "microsoft"
+            ]
+        },
+        "comments": [],
+        "summary": "The Reddit thread discusses Microsoft's recent blog post outlining their efforts to ensure European digital sovereignty and business continuity in the face of potential geopolitical volatility. The post highlights Microsoft's commitment to providing digital stability and their plan to have European nationals oversee European datacenter operations under European law. Additionally, Microsoft pledges to contest any government orders to suspend cloud operations in Europe through legal means.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": 0.6
+        }
+    },
+    "t3_1kcahwe": {
+        "post": {
+            "id": "t3_1kcahwe",
+            "category": "tech1",
+            "query": "(Apple OR AAPL OR Microsoft OR MSFT OR Google OR GOOG OR Alphabet OR GOOGL OR Tesla OR TSLA)",
+            "subreddit": "technology",
+            "title": "‘Cook chose poorly’: how Apple blew up its control over the App Store",
+            "body": "Images:\n\thttps://external-preview.redd.it/5LRhGXkB6OCUurSgA5UHJ8dYMqpH3x9UGogrxUQBDuU.jpg?auto=webp&amp;s=72b9946775a74eddd3f9a28bee1ac67b88b36fbe\n",
+            "url": "https://www.reddit.com/r/technology/comments/1kcahwe/cook_chose_poorly_how_apple_blew_up_its_control/",
+            "upVotes": 629,
+            "upVoteRatio": 0.95,
+            "createdAt": "2025-05-01T14:45:43.000Z",
+            "scrapedAt": "2025-05-02T01:14:17.845370Z",
+            "company_tags": [
+                "apple"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq1wgid",
+                "username": "SplintPunchbeef",
+                "body": "&gt;...a user experience writing manager at Apple, instructed an employee to add the phrase “external website” to the screen because it “sounds scary, so execs will love it.” Another employee gave a suggestion on how to make the screen “even worse” by using the developer’s name, rather than the app name. “ooh - keep going,” another Apple employee responded in Slack.\n\n...\n\n&gt;In court, Apple tried to argue that the term “scary” didn’t actually mean it wanted the screen to scare people. “Scary,” it claimed, was actually a “term of art” — an industry term with a specialized meaning. In fact, the company claimed, “scary” meant “raising awareness and caution.” The court did not buy it, saying the argument strained “common sense.”\n\nlol @ an industry term with specialized meaning",
+                "url": "https://www.reddit.com/r/technology/comments/1kcahwe/cook_chose_poorly_how_apple_blew_up_its_control/mq1wgid/",
+                "upVotes": 321,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T17:28:54.000Z",
+                "scrapedAt": "2025-05-02T01:14:17.845370Z",
+                "company_tags": [
+                    "apple"
+                ]
+            },
+            {
+                "id": "t1_mq21a9p",
+                "username": "SamanthaPierxe",
+                "body": "Interesting insight into the culture inside Apple",
+                "url": "https://www.reddit.com/r/technology/comments/1kcahwe/cook_chose_poorly_how_apple_blew_up_its_control/mq21a9p/",
+                "upVotes": 88,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T17:51:46.000Z",
+                "scrapedAt": "2025-05-02T01:14:17.845370Z",
+                "company_tags": [
+                    "apple"
+                ]
+            },
+            {
+                "id": "t1_mq2lse3",
+                "username": "maybe-an-ai",
+                "body": "Not really, they have spent 40 years building a walled garden and defending it against any perceived threats.\n\nThis is how you do that.",
+                "url": "https://www.reddit.com/r/technology/comments/1kcahwe/cook_chose_poorly_how_apple_blew_up_its_control/mq2lse3/",
+                "upVotes": 68,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T19:32:21.000Z",
+                "scrapedAt": "2025-05-02T01:14:17.845370Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2y0xr",
+                "username": "da_17co",
+                "body": "100%. Which is why I refuse to buy into their jailed garden, and support their competitors every time I can (even if the alternatives are at times questionable themselves 😔).",
+                "url": "https://www.reddit.com/r/technology/comments/1kcahwe/cook_chose_poorly_how_apple_blew_up_its_control/mq2y0xr/",
+                "upVotes": 21,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:30:49.000Z",
+                "scrapedAt": "2025-05-02T01:14:17.845370Z",
+                "company_tags": [
+                    "meta"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses how Apple's control over the App Store has been criticized, with examples of manipulative practices such as adding phrases to screens to please executives. Users express insights into Apple's internal culture and debate the company's approach of maintaining a closed ecosystem. Some users express reluctance to support Apple's restrictive policies and prefer to explore alternatives.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.6
+        }
+    },
+    "t3_1kcb7tr": {
+        "post": {
+            "id": "t3_1kcb7tr",
+            "category": "tech2",
+            "query": "(Nvidia OR NVDA OR Amazon OR AMZN OR Meta OR META OR Facebook OR OpenAI OR Intel OR INTC)",
+            "subreddit": "stocks",
+            "title": "The stock market is fully gaslit for this reason",
+            "body": "Tesla stalls = up. Meta and Microsoft are faring well = up. McDonald's reports large same-store sales decline = neutral. \n\nQuarterly reports are just starting to sound the alarm about recession + anti-American sentiment abroad (and perhaps at home as well). \n\nIt seems like it's important to inflate the market in the lead up, no matter what, because everyone knows the music is about to stop.\n\n  \n[https://www.cnbc.com/2025/05/01/mcdonalds-mcd-q1-2025-earnings.html](https://www.cnbc.com/2025/05/01/mcdonalds-mcd-q1-2025-earnings.html)\n\n",
+            "url": "https://www.reddit.com/r/stocks/comments/1kcb7tr/the_stock_market_is_fully_gaslit_for_this_reason/",
+            "upVotes": 2167,
+            "upVoteRatio": 0.93,
+            "createdAt": "2025-05-01T15:15:12.000Z",
+            "scrapedAt": "2025-05-02T01:14:56.318773Z",
+            "company_tags": [
+                "microsoft",
+                "meta",
+                "tesla"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq17elo",
+                "username": "Lvl99_Index_Fund",
+                "body": "The craziest part of today is Industrials (DOW) insane performance (rise) given CAT weak earnings and lower forecast.",
+                "url": "https://www.reddit.com/r/stocks/comments/1kcb7tr/the_stock_market_is_fully_gaslit_for_this_reason/mq17elo/",
+                "upVotes": 655,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T15:26:45.000Z",
+                "scrapedAt": "2025-05-02T01:14:56.318773Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq1dzkm",
+                "username": "Bx3_27",
+                "body": "It's almost as if the whole stock market is a sham 🤔",
+                "url": "https://www.reddit.com/r/stocks/comments/1kcb7tr/the_stock_market_is_fully_gaslit_for_this_reason/mq1dzkm/",
+                "upVotes": 599,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T15:59:02.000Z",
+                "scrapedAt": "2025-05-02T01:14:56.318773Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq1znsz",
+                "username": "abrandis",
+                "body": "It's only a sham for retail and 401k investors , those in the know, institutional investors  are five steps ahead of what the market will do next, it works great for them..",
+                "url": "https://www.reddit.com/r/stocks/comments/1kcb7tr/the_stock_market_is_fully_gaslit_for_this_reason/mq1znsz/",
+                "upVotes": 181,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T17:44:05.000Z",
+                "scrapedAt": "2025-05-02T01:14:56.318773Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2bv3f",
+                "username": "Funnybear3",
+                "body": "So what should i have been doing five steps ago? Just asking for a friend.",
+                "url": "https://www.reddit.com/r/stocks/comments/1kcb7tr/the_stock_market_is_fully_gaslit_for_this_reason/mq2bv3f/",
+                "upVotes": 40,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T18:43:32.000Z",
+                "scrapedAt": "2025-05-02T01:14:56.318773Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses the current state of the stock market, highlighting the unusual behavior where positive news for certain companies like Tesla, Meta, and Microsoft leads to market gains, while negative news such as McDonald's reporting a decline in same-store sales is considered neutral. There is a sense of skepticism and concern regarding the market's performance, with mentions of potential recession warnings and anti-American sentiment impacting investments. Users express doubts about the transparency and fairness of the market, suggesting that institutional investors have an advantage over retail investors.",
+        "sentiment": {
+            "company": "microsoft",
+            "score": 0.2
+        }
+    },
+    "t3_1kcjzjt": {
+        "post": {
+            "id": "t3_1kcjzjt",
+            "category": "tech2",
+            "query": "(Nvidia OR NVDA OR Amazon OR AMZN OR Meta OR META OR Facebook OR OpenAI OR Intel OR INTC)",
+            "subreddit": "investing",
+            "title": "shorted the market today. being a contrarian feels right at this point",
+            "body": "shorted the market today. it feels like everyone is too busy being bullish and forget nothing has really changed. i might be wrong. however i feel that this contrarian trade is good. after hours the outlook by amzn confirms my bias. although timing is not something i can pinpoint. only time will determine if i was correct or wrong also was my timing correct. thoughts?",
+            "url": "https://www.reddit.com/r/investing/comments/1kcjzjt/shorted_the_market_today_being_a_contrarian_feels/",
+            "upVotes": 33,
+            "upVoteRatio": 0.6,
+            "createdAt": "2025-05-01T21:20:28.000Z",
+            "scrapedAt": "2025-05-02T01:15:37.278124Z",
+            "company_tags": [
+                "amazon"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq39qfq",
+                "username": "Aint_EZ_bein_AZ",
+                "body": "Lmao if you think being a bear is contrarian around these parts you arent seeing what I'm seein",
+                "url": "https://www.reddit.com/r/investing/comments/1kcjzjt/shorted_the_market_today_being_a_contrarian_feels/mq39qfq/",
+                "upVotes": 115,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T21:28:53.000Z",
+                "scrapedAt": "2025-05-02T01:15:37.278124Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq3bt4h",
+                "username": "Unpossib1e",
+                "body": "Lol the sentiment on Reddit is that the market is doomed, you'll see.",
+                "url": "https://www.reddit.com/r/investing/comments/1kcjzjt/shorted_the_market_today_being_a_contrarian_feels/mq3bt4h/",
+                "upVotes": 27,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T21:39:41.000Z",
+                "scrapedAt": "2025-05-02T01:15:37.278124Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq3w560",
+                "username": "friendly_gentleman",
+                "body": "USA bad, China good",
+                "url": "https://www.reddit.com/r/investing/comments/1kcjzjt/shorted_the_market_today_being_a_contrarian_feels/mq3w560/",
+                "upVotes": 1,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T23:33:06.000Z",
+                "scrapedAt": "2025-05-02T01:15:37.278124Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq41ijk",
+                "username": "Cdraw51",
+                "body": "Like a day ago there was a post in this sub that got just shy of 400 upvotes and it was literal Chinese propaganda, straight up, incredibly obvious. The post was very obviously written by someone for whom English was a second language. You don't write sentences like \"China sides with the Global South-developing nations of Asia and Africa-and insists their voices be heard\" if you're just trying to present the facts, rather than ideological spin. \n\nThe mods eventually took it down, but the damage had already been done.",
+                "url": "https://www.reddit.com/r/investing/comments/1kcjzjt/shorted_the_market_today_being_a_contrarian_feels/mq41ijk/",
+                "upVotes": 1,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-02T00:03:46.000Z",
+                "scrapedAt": "2025-05-02T01:15:37.278124Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses the sentiment of shorting the market as a contrarian move, with the poster feeling that many are overly bullish and not considering potential risks. The mention of Amazon (AMZN) confirms the bias of the poster, although the timing of the trade is uncertain. Comments reflect differing views on the market sentiment, with some suggesting a bearish outlook while others point out propaganda and geopolitical aspects.",
+        "sentiment": {
+            "company": "amazon",
+            "score": 0.2
+        }
+    },
+    "t3_1kcia97": {
+        "post": {
+            "id": "t3_1kcia97",
+            "category": "tech2",
+            "query": "(Nvidia OR NVDA OR Amazon OR AMZN OR Meta OR META OR Facebook OR OpenAI OR Intel OR INTC)",
+            "subreddit": "wallstreetbets",
+            "title": "Amazon beats on Q1 earnings, but light Q2 guidance sends shares sliding",
+            "body": "Images:\n\thttps://external-preview.redd.it/703R8nXNwUvClim6w6sfYVB4PNHonaAi2V_xVN0Xz6A.jpg?auto=webp&amp;s=cf6fcde9e37c63fb54eb6a4b77f6e0b1f8c31b1c\n",
+            "url": "https://www.reddit.com/r/wallstreetbets/comments/1kcia97/amazon_beats_on_q1_earnings_but_light_q2_guidance/",
+            "upVotes": 138,
+            "upVoteRatio": 0.97,
+            "createdAt": "2025-05-01T20:08:10.000Z",
+            "scrapedAt": "2025-05-02T01:16:26.298962Z",
+            "company_tags": [
+                "amazon"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq2tawf",
+                "username": "VisualMod",
+                "body": "\n**User Report**| | | |\n:--|:--|:--|:--\n**Total Submissions** | 10 | **First Seen In WSB** | 9 months ago\n**Total Comments** | 307 | **Previous Best DD** | \n**Account Age** | 8 years | | \n\n[**Join WSB Discord**](http://discord.gg/wsbverse)",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kcia97/amazon_beats_on_q1_earnings_but_light_q2_guidance/mq2tawf/",
+                "upVotes": 1,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:08:15.000Z",
+                "scrapedAt": "2025-05-02T01:16:26.298962Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2uxq6",
+                "username": "hv876",
+                "body": "https://preview.redd.it/8givudpna8ye1.jpeg?width=680&amp;format=pjpg&amp;auto=webp&amp;s=96500fc3a4818479691afaa37582e870956feb9b",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kcia97/amazon_beats_on_q1_earnings_but_light_q2_guidance/mq2uxq6/",
+                "upVotes": 62,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:16:05.000Z",
+                "scrapedAt": "2025-05-02T01:16:26.298962Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2tl09",
+                "username": "dodohead_",
+                "body": "Role reversal of yesterdays close…",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kcia97/amazon_beats_on_q1_earnings_but_light_q2_guidance/mq2tl09/",
+                "upVotes": 45,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:09:37.000Z",
+                "scrapedAt": "2025-05-02T01:16:26.298962Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2upv5",
+                "username": "Latter-Trip7630",
+                "body": "apple still left",
+                "url": "https://www.reddit.com/r/wallstreetbets/comments/1kcia97/amazon_beats_on_q1_earnings_but_light_q2_guidance/mq2upv5/",
+                "upVotes": 6,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T20:15:02.000Z",
+                "scrapedAt": "2025-05-02T01:16:26.298962Z",
+                "company_tags": [
+                    "apple"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses Amazon's Q1 earnings report, which beat expectations, but the stock slid due to light Q2 guidance. There are images attached to the post, but the main focus is on the financial performance of Amazon. Users are commenting on the role reversal from the previous day's close and mentioning Apple as well.",
+        "sentiment": {
+            "company": "amazon",
+            "score": -0.5
+        }
+    },
+    "t3_1kc97zg": {
+        "post": {
+            "id": "t3_1kc97zg",
+            "category": "tech2",
+            "query": "(Nvidia OR NVDA OR Amazon OR AMZN OR Meta OR META OR Facebook OR OpenAI OR Intel OR INTC)",
+            "subreddit": "technology",
+            "title": "Meta and Spotify are teaming up to lobby against Apple and Google",
+            "body": "Images:\n\thttps://external-preview.redd.it/3H3OaYqcTiJtu3K8lJaV2HdSQIFlXh9hMJHgY5P1ZLU.jpeg?auto=webp&amp;s=35917b8fded938ab970d3d7dada35b3bbfce24eb\n",
+            "url": "https://www.reddit.com/r/technology/comments/1kc97zg/meta_and_spotify_are_teaming_up_to_lobby_against/",
+            "upVotes": 224,
+            "upVoteRatio": 0.89,
+            "createdAt": "2025-05-01T13:50:30.000Z",
+            "scrapedAt": "2025-05-02T01:17:10.587191Z",
+            "company_tags": [
+                "apple",
+                "alphabet",
+                "meta"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq0q2mj",
+                "username": "aIIisonmay",
+                "body": "Hooray, two evil corporations are teaming up against two evil corporations",
+                "url": "https://www.reddit.com/r/technology/comments/1kc97zg/meta_and_spotify_are_teaming_up_to_lobby_against/mq0q2mj/",
+                "upVotes": 225,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T14:00:13.000Z",
+                "scrapedAt": "2025-05-02T01:17:10.587191Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq1ezrt",
+                "username": "enonmouse",
+                "body": "I can’t wait for the Brand Wars. Go Taco Bell!",
+                "url": "https://www.reddit.com/r/technology/comments/1kc97zg/meta_and_spotify_are_teaming_up_to_lobby_against/mq1ezrt/",
+                "upVotes": 34,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T16:04:06.000Z",
+                "scrapedAt": "2025-05-02T01:17:10.587191Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq1t5ff",
+                "username": "silverport",
+                "body": "Cool Demolition Man reference! 😆",
+                "url": "https://www.reddit.com/r/technology/comments/1kc97zg/meta_and_spotify_are_teaming_up_to_lobby_against/mq1t5ff/",
+                "upVotes": 11,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T17:13:19.000Z",
+                "scrapedAt": "2025-05-02T01:17:10.587191Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq2a6l3",
+                "username": "CorrodedLollypop",
+                "body": "Sponsored by Carls JR",
+                "url": "https://www.reddit.com/r/technology/comments/1kc97zg/meta_and_spotify_are_teaming_up_to_lobby_against/mq2a6l3/",
+                "upVotes": 3,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T18:35:19.000Z",
+                "scrapedAt": "2025-05-02T01:17:10.587191Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses the partnership between Meta (formerly Facebook) and Spotify to lobby against Apple and Google. The thread includes humorous comments about the situation, with users joking about the \"Brand Wars\" and making references to popular culture. Some users express skepticism and cynicism towards the collaboration between these tech giants.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.2
+        }
+    },
+    "t3_1kc837j": {
+        "post": {
+            "id": "t3_1kc837j",
+            "category": "finance1",
+            "query": "(JPMorgan OR JPM OR Goldman Sachs OR GS OR Morgan Stanley OR MS OR Bank of America OR BAC OR Citigroup OR C OR Wells Fargo OR WFC)",
+            "subreddit": "stocks",
+            "title": "McDonald's reports largest revenue drop in US since pandemic as consumers pull back on spending",
+            "body": "Sales shrank almost 4%, at 3.6%.\n\nIt's concerning when fast food and retail businesses start seeing contracting sales from the US consumer. Especially staples that are concerned with affordability like Walmart and McDonalds. If Consumers are pulling back spending on \"cheap\", low cart value items like a McDonalds meal then it signals to me a budget constrained, worried consumer who won't spend on higher price discretionary categories like electronics, home reno, travel, etc.\n\nThe flip side of this - other fast food companies like Domino's have been doing fine. So maybe this is also a combination of McDonald's price hikes, lack of promotions, declining affordability, and increased competition. It could be both the macro and the company specific issues that created this result.\n\nhttps://www.reuters.com/business/mcdonalds-global-sales-post-surprise-drop-tariff-chaos-hits-consumer-confidence-2025-05-01/\n\nhttps://www.independent.co.uk/news/world/americas/mcdonalds-sales-drop-economy-recession-covid-pandemic-b2743029.html",
+            "url": "https://www.reddit.com/r/stocks/comments/1kc837j/mcdonalds_reports_largest_revenue_drop_in_us/",
+            "upVotes": 7780,
+            "upVoteRatio": 0.97,
+            "createdAt": "2025-05-01T12:58:38.000Z",
+            "scrapedAt": "2025-05-02T01:17:51.535567Z",
+            "company_tags": [
+                "apple"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq0fr7v",
+                "username": "quietlydesperate90",
+                "body": "McDonald's isn't \"cheap\" anymore.",
+                "url": "https://www.reddit.com/r/stocks/comments/1kc837j/mcdonalds_reports_largest_revenue_drop_in_us/mq0fr7v/",
+                "upVotes": 2547,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T13:02:32.000Z",
+                "scrapedAt": "2025-05-02T01:17:51.535567Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq0hzzp",
+                "username": "FalseProphet86",
+                "body": "I've eaten mcdonalds twice in slightly under two years. Their food has tasted extremely cheaper, and it is overpriced for fast food. I would have to assume their bootstraps are nicer than mine, so let's see how this plays out.",
+                "url": "https://www.reddit.com/r/stocks/comments/1kc837j/mcdonalds_reports_largest_revenue_drop_in_us/mq0hzzp/",
+                "upVotes": 655,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T13:15:44.000Z",
+                "scrapedAt": "2025-05-02T01:17:51.535567Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq0kedx",
+                "username": "gq533",
+                "body": "I haven't eaten McDonald's for a couple of years.   Went to get a cheeseburger and really noticed the difference.   It was so tiny compared to what I remembered.  This constant shrinking hoping the customer doesn't notice can only fly for so long.",
+                "url": "https://www.reddit.com/r/stocks/comments/1kc837j/mcdonalds_reports_largest_revenue_drop_in_us/mq0kedx/",
+                "upVotes": 246,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T13:29:19.000Z",
+                "scrapedAt": "2025-05-02T01:17:51.535567Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq0v50k",
+                "username": "Charming_Squirrel_13",
+                "body": "1/10lb compared to 1/8lb from a few years ago. 1/10lb burger is extremely thin and mostly bread at that point lol",
+                "url": "https://www.reddit.com/r/stocks/comments/1kc837j/mcdonalds_reports_largest_revenue_drop_in_us/mq0v50k/",
+                "upVotes": 106,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T14:26:13.000Z",
+                "scrapedAt": "2025-05-02T01:17:51.535567Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses McDonald's reporting its largest revenue drop in the US since the pandemic, with sales shrinking by almost 4%. Users express concerns about the implications of consumers pulling back on spending at fast-food and retail businesses like McDonald's and Walmart. There is a consensus that if consumers are cutting back on spending on affordable items like fast food, it may indicate broader budget constraints and a lack of willingness to spend on higher-priced discretionary categories like electronics. Some users attribute McDonald's sales decline to factors such as price hikes, lack of promotions, declining affordability, and increased competition. Comparisons are drawn with other fast-food companies like Domino's, which have been performing better.",
+        "sentiment": {
+            "company": "apple",
+            "score": -0.6
+        }
+    },
+    "t3_1kc9o0y": {
+        "post": {
+            "id": "t3_1kc9o0y",
+            "category": "finance1",
+            "query": "(JPMorgan OR JPM OR Goldman Sachs OR GS OR Morgan Stanley OR MS OR Bank of America OR BAC OR Citigroup OR C OR Wells Fargo OR WFC)",
+            "subreddit": "investing",
+            "title": "Those of you who got out of the market, are you getting back in?",
+            "body": "Genuinely curious. I know a lot of people on here voted against Trump and sold in November or January and felt like hero's in early April. But now we had the Zweig Breadth Thrust signal which has been 100% bullish over the last 80 years, followed by solid earnings. I'm not a fan of timing the market but it seems pretty clear that we aren't going to retrace the April 8th lows so if you're staying out, why?\n\nI didn't exit any of my equity positions (other than rebalancing) and personally advise clients not to try and time the market. I made 2 purchases over the last 2 months, both just proceeding big dips. A bit of bad luck but I wasn't trying to time anything. I'll be making more purchases tomorrow as I do regularly the week of payroll.",
+            "url": "https://www.reddit.com/r/investing/comments/1kc9o0y/those_of_you_who_got_out_of_the_market_are_you/",
+            "upVotes": 167,
+            "upVoteRatio": 0.73,
+            "createdAt": "2025-05-01T14:09:42.000Z",
+            "scrapedAt": "2025-05-02T01:18:42.970607Z",
+            "company_tags": [
+                "misc"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq0urok",
+                "username": "breesyroux",
+                "body": "Yesterday morning:\n\"Bad reports, recession imminent, what do we do??\n\nThis morning:\n\"Good reports, everything is great, what do we buy??",
+                "url": "https://www.reddit.com/r/investing/comments/1kc9o0y/those_of_you_who_got_out_of_the_market_are_you/mq0urok/",
+                "upVotes": 409,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T14:24:21.000Z",
+                "scrapedAt": "2025-05-02T01:18:42.970607Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq19fwq",
+                "username": "WinstonSalemSmith",
+                "body": "I am not buying. The bullish sentiment is based on the idea that Trump will abandon tariffs to appease the electorate. This is difficult as he is politically invested in them, but in any case it looks like China will play hardball.\n\nI can buy back in at a higher price in October etc. Not my plan, but possible.",
+                "url": "https://www.reddit.com/r/investing/comments/1kc9o0y/those_of_you_who_got_out_of_the_market_are_you/mq19fwq/",
+                "upVotes": 163,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T15:36:42.000Z",
+                "scrapedAt": "2025-05-02T01:18:42.970607Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mq1kfyo",
+                "username": "NeverLookBothWays",
+                "body": "This is a good assessment.  It’s also worth noting that even if tariffs are called off we’re not going to get back to where we were anytime soon.  Trust has been broken internationally which leads to more uncertainty, and it’s clear Trump is not going to broker any “deals” on the heels of a full on trade war.  So we’re essentially left off worse than where we started.\n\nIt might be worthwhile timing the market for the spike that will happen when/if tariffs are rescinded, but it’s likely not going to soar for any prolonged period until relationships are repaired.",
+                "url": "https://www.reddit.com/r/investing/comments/1kc9o0y/those_of_you_who_got_out_of_the_market_are_you/mq1kfyo/",
+                "upVotes": 52,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T16:31:09.000Z",
+                "scrapedAt": "2025-05-02T01:18:42.970607Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses the current market situation and whether individuals who previously exited the market are considering getting back in. There is a mix of opinions, with some users mentioning positive signals like the Zweig Breadth Thrust signal and solid earnings, while others express concerns about the impact of tariffs and the uncertainty surrounding international relations. Some users advocate for staying invested and not trying to time the market, while others are more cautious and prefer to wait for more clarity before re-entering the market.",
+        "sentiment": {
+            "company": "misc",
+            "score": 0.2
+        }
+    },
+    "t3_1kcbjt7": {
+        "post": {
+            "id": "t3_1kcbjt7",
+            "category": "finance1",
+            "query": "(JPMorgan OR JPM OR Goldman Sachs OR GS OR Morgan Stanley OR MS OR Bank of America OR BAC OR Citigroup OR C OR Wells Fargo OR WFC)",
+            "subreddit": "investing",
+            "title": "Is The Whole Market a Meme Stock Now?",
+            "body": "During the first quarter GDP contracted and inflation increased.  There have been 125% tariffs with China for weeks now with no sign of a deal.  There have been no tariff deals with other countries announced yet.  Consumers are nervous.  Tourism to the US is down significantly. And yet SPY is up almost 2% this morning.  Why are people so bullish?  Is there any reason behind this?",
+            "url": "https://www.reddit.com/r/investing/comments/1kcbjt7/is_the_whole_market_a_meme_stock_now/",
+            "upVotes": 477,
+            "upVoteRatio": 0.86,
+            "createdAt": "2025-05-01T15:28:47.000Z",
+            "scrapedAt": "2025-05-02T01:18:42.970607Z",
+            "company_tags": [
+                "misc"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq19mb5",
+                "username": "mistressbitcoin",
+                "body": "All markets trade on emotions.",
+                "url": "https://www.reddit.com/r/investing/comments/1kcbjt7/is_the_whole_market_a_meme_stock_now/mq19mb5/",
+                "upVotes": 303,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T15:37:34.000Z",
+                "scrapedAt": "2025-05-02T01:18:42.970607Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses the disconnect between the current economic indicators such as GDP contraction, inflation increase, ongoing tariffs with China, consumer nervousness, and decreased tourism to the US, and the stock market performance, specifically the SPY which is up almost 2%. The main question raised is why investors are bullish despite these negative factors.",
+        "sentiment": {
+            "company": "misc",
+            "score": 0.2
+        }
+    },
+    "t3_1kcb31r": {
+        "post": {
+            "id": "t3_1kcb31r",
+            "category": "finance2",
+            "query": "(BlackRock OR BLK OR Visa OR V OR Mastercard OR MA OR American Express OR AXP OR Charles Schwab OR SCHW OR Berkshire Hathaway OR BRK)",
+            "subreddit": "investing",
+            "title": "What is the difference between Buying Power and Available Cash (Robinhood)",
+            "body": "For context I got a bonus from Robinhood which I forgot to account was for how much worth of shares exactly but after investing for 25.95$, I got 29.84$ despite making a negative return on Mastercard (21$ of my investment) and a VERY SMALL positive return on BTC (bought for 4.95 and got 5.56$) at the end. So anybody mind explaining it to me please?\n",
+            "url": "https://www.reddit.com/r/investing/comments/1kcb31r/what_is_the_difference_between_buying_power_and/",
+            "upVotes": 3,
+            "upVoteRatio": 1,
+            "createdAt": "2025-05-01T15:09:41.000Z",
+            "scrapedAt": "2025-05-02T01:20:44.971151Z",
+            "company_tags": [
+                "misc"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq16xw5",
+                "username": "NYCmetalguy",
+                "body": "Buying power is usually how much you can purchase with the amount\n\nCash is how much cash is in your account\n\nThere’s usually a difference if you have margins on as you can buy more or less than the cash you have in your account depending if you have margin or is waiting for cash to settle",
+                "url": "https://www.reddit.com/r/investing/comments/1kcb31r/what_is_the_difference_between_buying_power_and/mq16xw5/",
+                "upVotes": 2,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T15:24:29.000Z",
+                "scrapedAt": "2025-05-02T01:20:44.971151Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses the difference between Buying Power and Available Cash on the Robinhood platform. The user received a bonus from Robinhood, invested in shares, and noticed discrepancies in the amount received despite negative returns on Mastercard and a small positive return on BTC. The user is seeking an explanation for the difference between Buying Power and Available Cash.\nKey comments explain that Buying Power refers to the amount you can purchase with the funds available, while Available Cash is the actual cash in your account. The difference between the two may be influenced by factors such as margin trading and cash settlement times.",
+        "sentiment": {
+            "company": "misc",
+            "score": 0.5
+        }
+    },
+    "t3_1kc0qv5": {
+        "post": {
+            "id": "t3_1kc0qv5",
+            "category": "finance2",
+            "query": "(BlackRock OR BLK OR Visa OR V OR Mastercard OR MA OR American Express OR AXP OR Charles Schwab OR SCHW OR Berkshire Hathaway OR BRK)",
+            "subreddit": "investing",
+            "title": "What financial stocks are worth investing in?",
+            "body": "I am 95% in Big Tech and I'd like to venture out so I decided to add some finance. What do you guys suggest?\n\nMy list right now is MS, GS, JPM, AXP, COF, and PGR. Anything bad about these picks? I tried to pick well known names that have seen good returns the past 5 years.",
+            "url": "https://www.reddit.com/r/investing/comments/1kc0qv5/what_financial_stocks_are_worth_investing_in/",
+            "upVotes": 1,
+            "upVoteRatio": 0.53,
+            "createdAt": "2025-05-01T04:58:07.000Z",
+            "scrapedAt": "2025-05-02T01:20:44.971151Z",
+            "company_tags": [
+                "jp_morgan"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mpz0ta0",
+                "username": "Odd_Bumblebee_916",
+                "body": "They should benefit from 2 changes in the economic environment:\n- higher volatility that leads to higher turnover of risk assets and therefore to higher fee income for market makers (banks)\n- steeper yield curve so banks earn more by lending on the long end and borrowing on the front end of the curve.\nSo more tailwinds for banks. Yet, they are still exposed to the business cycle and get hit when default and unemployment rises.",
+                "url": "https://www.reddit.com/r/investing/comments/1kc0qv5/what_financial_stocks_are_worth_investing_in/mpz0ta0/",
+                "upVotes": 1,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T05:24:55.000Z",
+                "scrapedAt": "2025-05-02T01:20:44.971151Z",
+                "company_tags": [
+                    "misc"
+                ]
+            },
+            {
+                "id": "t1_mpzfx1w",
+                "username": "dvdmovie1",
+                "body": "SNEX if there's a pullback.",
+                "url": "https://www.reddit.com/r/investing/comments/1kc0qv5/what_financial_stocks_are_worth_investing_in/mpzfx1w/",
+                "upVotes": 2,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T07:54:37.000Z",
+                "scrapedAt": "2025-05-02T01:20:44.971151Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread discusses diversifying investments into financial stocks, specifically mentioning MS (Morgan Stanley), GS (Goldman Sachs), JPM (JPMorgan Chase), AXP (American Express), COF (Capital One), and PGR (Progressive Corporation). The original poster seeks suggestions and feedback on these picks. Key comments mention SNEX as a potential option during a pullback and highlight the potential benefits for banks like JPM due to higher volatility and a steeper yield curve in the economic environment.",
+        "sentiment": {
+            "company": "jp_morgan",
+            "score": 0.7
+        }
+    },
+    "t3_1kcl40u": {
+        "post": {
+            "id": "t3_1kcl40u",
+            "category": "finance2",
+            "query": "(BlackRock OR BLK OR Visa OR V OR Mastercard OR MA OR American Express OR AXP OR Charles Schwab OR SCHW OR Berkshire Hathaway OR BRK)",
+            "subreddit": "investing",
+            "title": "For info: Here are a selection of dividend paying ETFs available to European investors for consideration",
+            "body": "A lot of people are asking about ETFs that are available to European investors. The popular among Americans SCHD ETF from Schwab is unfortunately not available to European investors due to regulatory restrictions, as US-domiciled ETFs do not comply with EU regulations.\n\nHere is my list of ETFs that are available for your consideration and further research:\n\n**1) ISF: iShares Core FTSE 100 UCITS ETF GBP Dist**\n\nThis is a FTSE 100 (UK's top 100 companies) index fund. Another fund that tracks the same would be VUKE from Vanguard. Vanguard has low fees but only allows investments into their own funds, so you may prefer VUKE to ISF if that is your preferred platform.\n\n**2) VHYL: FTSE All-World High Dividend Yield UCITS ETF**\n\nThis is a hugely popular ETF with Europeans. There are $5.8 Billion assets under management in this investment. It is a select of high yielding dividend stocks and the top holdings are all well known excellent companies. It is a global fund so offers some degree of diversification, though it leans heavily towards US stocks with 42.8% of the ETF being US based. The number of stocks this ETF invests in is 2,192.\n\n**3) VUSA: Vanguard S&amp;P 500 UCITS ETF USD Dis**\n\nThis is an S&amp;P 500 index fund from Vanguard. It is an equivalent to the US based ETF VOO that you have probably seen all over.\n\n**4) EUE: iShares Core EURO STOXX 50 UCITS ETF EUR Dist**\n\nThis ETF seeks to track the performance of an index composed of 50 of the largest companies in the Eurozone. It is a very good complimentary piece to US based or weighted ETFs for diversification reasons. It also comes with the added fringe benefit of having a payout scheduled that operates on different quarters to most other ETFs, meaning you can emulate a monthly salaried income by incorporating this ETF (though you obviously should not invest based on pay out schedule alone).\n\n**5) GBDV: SPDR S&amp;P Global Dividend Aristocrats UCITS ETF Dis**\n\nThe objective of the ETF is to track the performance of high dividend yielding equities globally.\n\n**6) USDV: SPDR S&amp;P U.S. Dividend Aristocrats UCITS ETF Dist**\n\nThe objective of the Fund is to track the US equity market performance of certain high dividend-yielding equity securities. These are stocks that have grown their dividends for at least 25 consecutive years.\n\n**7) IUKD: iShares UK Dividend UCITS ETF GBP (Dist)**\n\nThis ETF seeks to track the performance of an index composed of 50 stocks with leading dividend yields from UK listed companies.\n\n**8) HDLG: Invesco S&amp;P 500 High Div Low Vlty UCITS ETF Dist**\n\nThis ETF aims to provide investors with a broad exposure to US companies that historically have provided high dividend yields with lower volatility. This is a conservative, risk-averse dividend fund.\n\n**9) FUSD: Fidelity US Quality Income UCITS ETF Inc USD**\n\nThis ETF tracks high quality companies from the US, which offer high dividend yields. It offers strong growth potential and lower yield than other options.\n\nThe above investments are some ideas for European investments scratching their heads at where to go with no SCHD to select. I believe that these represent a cross-section of popular dividend funds among Europeans and offer diversification across the UK, Europe and USA as well as some global exposure.\n\nThere are thousands of ETFs out there and it can be daunting to new investors. I hope that this post goes someway to separate the wheat from the chaff.",
+            "url": "https://www.reddit.com/r/investing/comments/1kcl40u/for_info_here_are_a_selection_of_dividend_paying/",
+            "upVotes": 3,
+            "upVoteRatio": 1,
+            "createdAt": "2025-05-01T22:09:23.000Z",
+            "scrapedAt": "2025-05-02T01:20:44.971151Z",
+            "company_tags": [
+                "misc"
+            ]
+        },
+        "comments": [
+            {
+                "id": "t1_mq3u1pz",
+                "username": "Upper_Ordinary1639",
+                "body": "Thanks for the info! I'll definitely check out those dividend distributing ETFs. Sounds like a good option for European investors.",
+                "url": "https://www.reddit.com/r/investing/comments/1kcl40u/for_info_here_are_a_selection_of_dividend_paying/mq3u1pz/",
+                "upVotes": 1,
+                "upVoteRatio": null,
+                "createdAt": "2025-05-01T23:21:14.000Z",
+                "scrapedAt": "2025-05-02T01:20:44.971151Z",
+                "company_tags": [
+                    "misc"
+                ]
+            }
+        ],
+        "summary": "The Reddit thread provides a list of dividend-paying ETFs available to European investors as an alternative to popular American ETFs that are not accessible due to regulatory restrictions. The list includes ETFs such as ISF tracking the FTSE 100, VHYL focusing on high dividend yield stocks globally, VUSA mirroring the S&P 500, EUE tracking Eurozone's largest companies, and GBDV targeting global dividend aristocrats. Users express interest in exploring these options for dividend distribution and diversification purposes.",
+        "sentiment": {
+            "company": "misc",
+            "score": 0.8
+        }
     }
 }
